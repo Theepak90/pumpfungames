@@ -2,14 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Retro gaming fonts */
+/* Retro gaming font */
 .font-retro {
   font-family: 'Press Start 2P', monospace;
-}
-
-.font-retro-light {
-  font-family: 'VT323', monospace;
   font-weight: 400;
+  -webkit-font-smoothing: antialiased;
 }
 
 :root {
