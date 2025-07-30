@@ -301,7 +301,7 @@ export default function Home() {
                   <span style={{color: '#53d493'}}>${1600}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="truncate">2. Sergio_The_Jew</span>
+                  <span className="truncate">2. Sergio_Jew</span>
                   <span style={{color: '#53d493'}}>${1255}</span>
                 </div>
                 <div className="flex justify-between items-center">
