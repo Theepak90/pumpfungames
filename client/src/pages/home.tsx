@@ -214,7 +214,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-mono" style={{backgroundColor: '#1a1a1a'}}>
+    <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#1a1a1a'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
         <div className="text-green-400 text-2xl mr-3">🎮</div>
@@ -228,10 +228,10 @@ export default function Home() {
           
           {/* Title Section */}
           <div className="text-center mb-8">
-            <h1 className="text-white text-6xl font-bold mb-2 font-mono tracking-wider">
+            <h1 className="text-white text-4xl font-bold mb-2 font-retro tracking-wider">
               PumpGames<span className="text-green-400">.fun</span>
             </h1>
-            <p className="text-gray-300 text-xl font-mono">Skill Based Betting</p>
+            <p className="text-gray-300 text-lg font-retro">Skill Based Betting</p>
           </div>
 
           {/* Main Game Area - Three Column Layout */}
@@ -239,16 +239,16 @@ export default function Home() {
             
             {/* Left Panel - Leaderboard */}
             <div className="bg-gray-800 p-4 border border-gray-600 rounded-sm">
-              <h3 className="text-yellow-400 text-base mb-3 font-mono flex items-center">
+              <h3 className="text-yellow-400 text-sm mb-3 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
-              <div className="text-white text-sm space-y-1 mb-6 font-mono">
+              <div className="text-white text-xs space-y-1 mb-6 font-retro">
                 <div>1.</div>
                 <div>2.</div>
                 <div>3.</div>
               </div>
               <div className="border-t border-gray-600 pt-4">
-                <button className="bg-gray-700 text-white px-3 py-1 text-xs border border-gray-600 hover:bg-gray-600 font-mono w-full">
+                <button className="bg-gray-700 text-white px-3 py-1 text-xs border border-gray-600 hover:bg-gray-600 font-retro w-full">
                   View Full Board
                 </button>
               </div>
@@ -259,19 +259,19 @@ export default function Home() {
               
               {/* Username with edit icon */}
               <div className="flex items-center justify-between mb-4 bg-gray-700 px-3 py-2 border border-gray-600">
-                <span className="text-gray-300 font-mono text-sm">〈Your Username〉</span>
+                <span className="text-gray-300 font-retro text-xs">〈Your Username〉</span>
                 <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
               {/* Bet Amount */}
-              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 font-mono border border-gray-400">
+              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 font-retro border border-gray-400">
                 {selectedBetAmount}$
               </div>
               
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="bg-green-500 text-white font-bold text-xl py-3 w-full mb-4 font-mono hover:bg-green-600 transition-colors border border-green-400"
+                className="bg-green-500 text-white font-bold text-lg py-3 w-full mb-4 font-retro hover:bg-green-600 transition-colors border border-green-400"
               >
                 PLAY
               </button>
@@ -280,7 +280,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-1 mb-4">
                 <button 
                   onClick={() => setSelectedRegion("EU")}
-                  className={`py-1 px-3 text-xs border font-mono ${
+                  className={`py-1 px-3 text-xs border font-retro ${
                     selectedRegion === "EU" 
                       ? 'bg-blue-600 text-white border-blue-500' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
@@ -288,7 +288,7 @@ export default function Home() {
                 >
                   EU
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-3 text-xs border border-gray-600 hover:bg-gray-600 font-mono">
+                <button className="bg-gray-700 text-white py-1 px-3 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
                   Friends
                 </button>
               </div>
@@ -296,31 +296,31 @@ export default function Home() {
               {/* Stats at bottom */}
               <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-600 pt-3">
                 <div>
-                  <div className="text-white font-bold text-lg font-mono">{playersInGame || 54}</div>
-                  <div className="text-gray-400 text-xs font-mono">Players Online</div>
+                  <div className="text-white font-bold text-sm font-retro">{playersInGame || 54}</div>
+                  <div className="text-gray-400 text-xs font-retro">Players Online</div>
                 </div>
                 <div>
-                  <div className="text-white font-bold text-lg font-mono">+${(globalWinnings || 240331).toLocaleString()}</div>
-                  <div className="text-gray-400 text-xs font-mono">Global Player Winnings</div>
+                  <div className="text-white font-bold text-sm font-retro">+${(globalWinnings || 240331).toLocaleString()}</div>
+                  <div className="text-gray-400 text-xs font-retro">Global Player Winnings</div>
                 </div>
               </div>
             </div>
 
             {/* Right Panel - Wallet */}
             <div className="bg-gray-800 p-4 border border-gray-600 rounded-sm">
-              <h3 className="text-white text-base mb-4 font-mono">Wallet</h3>
+              <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="text-green-400 font-bold text-2xl mb-4 text-center bg-gray-900 py-3 border border-gray-600 font-mono">
+              <div className="text-green-400 font-bold text-lg mb-4 text-center bg-gray-900 py-3 border border-gray-600 font-retro">
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
               {/* Wallet buttons */}
               <div className="grid grid-cols-2 gap-1">
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-mono">
+                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
                   Top Up
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-mono">
+                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
                   Withdraw
                 </button>
               </div>

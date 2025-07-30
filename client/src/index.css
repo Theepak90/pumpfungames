@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Retro gaming font */
+.font-retro {
+  font-family: 'Press Start 2P', monospace;
+}
+
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);
