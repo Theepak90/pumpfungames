@@ -52,8 +52,8 @@ class SmoothSnake {
       });
     }
     
-    // Set minimum mass (spawn mass)
-    this.minimumMass = START_SEGMENTS * this.segmentMass;
+    // Set minimum mass (50% of spawn mass)
+    this.minimumMass = START_SEGMENTS * this.segmentMass * 0.5;
   }
   
   get head() {
@@ -86,9 +86,10 @@ class SmoothSnake {
     
     // Handle boost mechanic with minimum mass protection
     const BOOST_MULTIPLIER = 1.5;
-    const BOOST_MASS_COST = 0.2;
+    const BOOST_DROP_INTERVAL = 20; // frames (3 drops per second at 60fps)
+    const BOOST_DROP_MASS = 0.5;
     
-    // Prevent boosting if at minimum mass
+    // Prevent boosting if below 50% of spawn mass
     if (this.totalMass <= this.minimumMass) {
       this.isBoosting = false;
     }
@@ -97,25 +98,25 @@ class SmoothSnake {
       this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.6 pixels per frame when boosting
       this.boostCooldown++;
       
-      // Drop 1 food orb per boost tick (not every 5 frames)
-      if (onDropFood) {
+      // Drop orb every 20 frames (3 per second)
+      if (this.boostCooldown % BOOST_DROP_INTERVAL === 0 && onDropFood) {
         const tail = this.segments[this.segments.length - 1];
         onDropFood({
           x: tail.x,
           y: tail.y,
-          size: 3,
+          size: 4,
           color: '#f55400',
-          mass: BOOST_MASS_COST
+          mass: BOOST_DROP_MASS
         });
-      }
-      
-      // Remove mass from snake
-      if (this.growthRemaining >= BOOST_MASS_COST) {
-        this.growthRemaining -= BOOST_MASS_COST;
-      } else {
-        // If no buffer left, shorten tail
-        if (this.segments.length > 1) {
-          this.segments.pop();
+        
+        // Subtract 0.5 mass
+        if (this.growthRemaining >= BOOST_DROP_MASS) {
+          this.growthRemaining -= BOOST_DROP_MASS;
+        } else {
+          // Lose tail if growth buffer is empty
+          if (this.segments.length > 1) {
+            this.segments.pop();
+          }
         }
       }
     } else {
@@ -169,7 +170,7 @@ class SmoothSnake {
   }
   
   setBoost(boosting: boolean) {
-    // Only allow boosting if above minimum mass
+    // Only allow boosting if above 50% of spawn mass
     if (boosting && this.totalMass <= this.minimumMass) {
       this.isBoosting = false;
       return;
@@ -567,7 +568,7 @@ export default function GamePage() {
     }
     snake.currentAngle = 0;
     snake.growthRemaining = 0;
-    snake.minimumMass = START_SEGMENTS * snake.segmentMass; // Reset minimum mass
+    snake.minimumMass = START_SEGMENTS * snake.segmentMass * 0.5; // Reset minimum mass (50% of spawn)
     snake.setBoost(false);
     setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
@@ -596,7 +597,7 @@ export default function GamePage() {
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
           <div className="text-white text-sm">Length: {snake.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
-          <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass}</div>
+          <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass.toFixed(1)} (50% spawn)</div>
           {isBoosting && (
             <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
           )}
@@ -610,7 +611,7 @@ export default function GamePage() {
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
-          <div className="text-gray-400 text-xs">Boost drops food but shrinks snake</div>
+          <div className="text-gray-400 text-xs">Drops 3 orbs/sec (0.5 mass each)</div>
           <div className="text-blue-400 text-xs">Red=2 mass, Green=1 mass, Blue=0.5 mass</div>
         </div>
       </div>
