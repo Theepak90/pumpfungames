@@ -298,24 +298,15 @@ export default function Home() {
               <div className="text-white text-xs space-y-1 font-retro mb-3">
                 <div className="flex justify-between items-center">
                   <span className="truncate">1. TokyOnTop</span>
-                  <span className="text-right flex-shrink-0">
-                    <span style={{color: '#53d493'}} className="mr-1">${1600}</span>
-                    <span className="text-orange-400">$1,420</span>
-                  </span>
+                  <span style={{color: '#53d493'}}>${1600}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="truncate">2. Sergio_The_Jew</span>
-                  <span className="text-right flex-shrink-0">
-                    <span style={{color: '#53d493'}} className="mr-1">${1255}</span>
-                    <span className="text-orange-400">$1,105</span>
-                  </span>
+                  <span style={{color: '#53d493'}}>${1255}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="truncate">3. 1$_to_1k</span>
-                  <span className="text-right flex-shrink-0">
-                    <span style={{color: '#53d493'}} className="mr-1">${964}</span>
-                    <span className="text-orange-400">$845</span>
-                  </span>
+                  <span style={{color: '#53d493'}}>${964}</span>
                 </div>
               </div>
               <button className="bg-gray-700 text-white px-2 py-1 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro w-full">
