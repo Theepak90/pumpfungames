@@ -28,7 +28,7 @@ class SmoothSnake {
     this.speed = 4;
     this.radius = 12;
     this.currentAngle = 0;
-    this.turnSpeed = 0.06; // Smooth turning speed
+    this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
     this.segmentSpacing = 8; // Distance between segments
     this.growthRemaining = 0; // Growth counter for eating food
     
@@ -55,13 +55,17 @@ class SmoothSnake {
     // Calculate target angle from mouse direction relative to screen center
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
-    // Calculate angle difference and normalize to [-PI, PI]
+    // Robust angle difference calculation to prevent 180° flips
     let angleDiff = targetAngle - this.currentAngle;
-    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
     
     // Smoothly interpolate toward target angle
     this.currentAngle += angleDiff * this.turnSpeed;
+    
+    // Keep currentAngle in proper range to prevent accumulation
+    if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
+    if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
     // Move head in current direction
     const newHead = {
@@ -103,8 +107,8 @@ class SmoothSnake {
   }
   
   eatFood(food: Food) {
-    // Growth amount based on food size (larger food = more growth)
-    const growthPerFood = Math.floor(food.size * 2); // Scale with food size
+    // More realistic growth - smaller amounts like Slither.io
+    const growthPerFood = Math.max(1, Math.floor(food.size / 3)); // Much less dramatic
     this.growthRemaining += growthPerFood;
     return Math.floor(food.size); // Return score increase
   }
