@@ -3,6 +3,12 @@ import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 
+// Game constants
+const MAP_CENTER_X = 2000;
+const MAP_CENTER_Y = 2000;
+const MAP_RADIUS = 1800; // Circular map radius
+const FOOD_COUNT = 150;
+
 interface Position {
   x: number;
   y: number;
@@ -217,10 +223,6 @@ export default function GamePage() {
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
-  const MAP_CENTER_X = 2000;
-  const MAP_CENTER_Y = 2000;
-  const MAP_RADIUS = 1800; // Circular map radius
-  const FOOD_COUNT = 150;
 
   // Handle canvas resize for fullscreen
   useEffect(() => {
