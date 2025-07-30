@@ -44,17 +44,19 @@ class SmoothSnake {
     this.segmentMass = 1; // Each segment = 1 mass
     this.massPerSegment = 3; // 3 mass = 1 visible segment (like Slither.io)
     
-    // Initialize with 30 mass (10 visible segments)
+    // Initialize with 45 mass (15 visible segments)
     this.segments = [];
-    const START_MASS = 30;
-    const START_SEGMENTS = Math.floor(START_MASS / this.massPerSegment);
+    const START_MASS = 45; // 15 balls x 3 mass each
+    this.growthRemaining = START_MASS;
+    
+    // Pre-generate 60 segment positions for smooth body tracking
+    const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * this.segmentSpacing * 3, // Space them further apart
+        x: x - i * this.segmentSpacing, // Normal spacing for tracking
         y: y 
       });
     }
-    this.growthRemaining = START_MASS - (START_SEGMENTS * this.massPerSegment);
     
     // Set minimum mass (50% of spawn mass)
     this.minimumMass = START_MASS * 0.5;
@@ -69,7 +71,7 @@ class SmoothSnake {
   }
   
   get totalMass() {
-    return this.segments.length * this.segmentMass + this.growthRemaining;
+    return this.growthRemaining; // Mass is now tracked purely in growthRemaining
   }
   
   get visibleSegments() {
@@ -123,15 +125,8 @@ class SmoothSnake {
       if (this.growthRemaining >= boostMassLoss) {
         this.growthRemaining -= boostMassLoss;
       } else {
-        // Need to remove segments if growth buffer empty
-        const deficit = boostMassLoss - this.growthRemaining;
-        this.growthRemaining = 0;
-        
-        // Remove mass equivalent by shortening segments array
-        const segmentsToRemove = Math.floor(deficit / this.massPerSegment);
-        for (let i = 0; i < segmentsToRemove && this.segments.length > 3; i++) {
-          this.segments.pop();
-        }
+        // Cap at minimum mass, don't go below
+        this.growthRemaining = Math.max(0, this.growthRemaining - boostMassLoss);
       }
     } else {
       this.speed = this.baseSpeed;
@@ -178,31 +173,24 @@ class SmoothSnake {
       }
     }
     
-    // Add new segments when we have enough mass
-    while (this.growthRemaining >= this.massPerSegment) {
-      // Add new segment at tail when we have enough mass
+    // Extend segments array if needed for body tracking
+    while (this.segments.length < 100) { // Ensure we have enough segments for tracking
       const tail = this.segments[this.segments.length - 1];
       const secondToLast = this.segments[this.segments.length - 2] || tail;
       
       // Calculate direction for new segment placement
       const dx = tail.x - secondToLast.x;
       const dy = tail.y - secondToLast.y;
-      const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing * 3;
-      const newX = tail.x + (dx / length) * this.segmentSpacing * 3;
-      const newY = tail.y + (dy / length) * this.segmentSpacing * 3;
+      const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing;
+      const newX = tail.x + (dx / length) * this.segmentSpacing;
+      const newY = tail.y + (dy / length) * this.segmentSpacing;
       
       this.segments.push({ x: newX, y: newY });
-      this.growthRemaining -= this.massPerSegment;
-    }
-    
-    // Normal segment removal for movement (not boost-related)
-    if (!this.isBoosting && this.segments.length > this.visibleSegments) {
-      this.segments.pop();
     }
   }
   
   eatFood(food: Food) {
-    // Growth based on food mass
+    // Growth based on food mass - no limits, let it grow indefinitely
     const mass = food.mass || 1; // Default to 1 if no mass specified
     this.growthRemaining += mass;
     return mass; // Return score increase based on mass
@@ -518,7 +506,8 @@ export default function GamePage() {
       
       // Draw evenly spaced segments to create bead-like appearance
       for (let i = 0; i < maxVisibleSegments && i < snake.segments.length; i++) {
-        const segmentIndex = Math.min(i * 3, snake.segments.length - 1); // Space out which segments we draw
+        const SEGMENT_DRAW_SPACING = 4; // Draw every 4th segment for proper spacing
+        const segmentIndex = Math.min(i * SEGMENT_DRAW_SPACING, snake.segments.length - 1);
         const segment = snake.segments[segmentIndex];
         const isHead = i === 0;
         
@@ -629,15 +618,15 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (30 mass = 10 visible segments)
+    // Reset snake to initial state (45 mass = 15 visible segments)
     snake.segments = [];
-    const START_MASS = 30;
-    const START_SEGMENTS = Math.floor(START_MASS / snake.massPerSegment);
+    const START_MASS = 45;
+    const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: 2000 - i * snake.segmentSpacing * 3, y: 2000 });
+      snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
     }
     snake.currentAngle = 0;
-    snake.growthRemaining = START_MASS - (START_SEGMENTS * snake.massPerSegment);
+    snake.growthRemaining = START_MASS;
     snake.minimumMass = START_MASS * 0.5; // Reset minimum mass (50% of spawn)
     snake.setBoost(false);
     setIsBoosting(false);
