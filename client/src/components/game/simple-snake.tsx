@@ -17,16 +17,20 @@ interface Snake {
 
 export function SimpleSnake({ onExit }: SimpleSnakeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [snake, setSnake] = useState<Snake>({
-    segments: [{ x: 400, y: 300 }],
-    direction: { x: 0, y: 0 }
-  });
-  const [targetDirection, setTargetDirection] = useState({ x: 0, y: 0 });
   
   const GRID_SIZE = 20;
   const CANVAS_WIDTH = 800;
   const CANVAS_HEIGHT = 600;
-  const SNAKE_SPEED = 3;
+  const SNAKE_SPEED = 2;
+  const DEATH_BARRIER_RADIUS = 350; // Red circle radius
+  const CENTER_X = CANVAS_WIDTH / 2;
+  const CENTER_Y = CANVAS_HEIGHT / 2;
+  
+  const [snake, setSnake] = useState<Snake>({
+    segments: [{ x: CENTER_X, y: CENTER_Y }],
+    direction: { x: SNAKE_SPEED, y: 0 } // Always moving initially
+  });
+  const [targetDirection, setTargetDirection] = useState({ x: SNAKE_SPEED, y: 0 });
 
   // Track mouse position
   const [mousePos, setMousePos] = useState({ x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 });
@@ -67,18 +71,11 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
       const dy = mousePosRef.current.y - head.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance > 8) { // Only move if mouse is far enough
-        setTargetDirection({
-          x: (dx / distance) * SNAKE_SPEED,
-          y: (dy / distance) * SNAKE_SPEED
-        });
-      } else {
-        // Slow down when very close to mouse
-        setTargetDirection({ 
-          x: dx * 0.1, 
-          y: dy * 0.1 
-        });
-      }
+      // Always keep moving - calculate direction to mouse
+      setTargetDirection({
+        x: (dx / distance) * SNAKE_SPEED,
+        y: (dy / distance) * SNAKE_SPEED
+      });
     };
 
     const intervalId = setInterval(updateDirection, 16); // ~60fps updates
@@ -102,23 +99,33 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
         head.x += newSnake.direction.x;
         head.y += newSnake.direction.y;
         
-        // Keep snake on screen
-        head.x = Math.max(10, Math.min(CANVAS_WIDTH - 10, head.x));
-        head.y = Math.max(10, Math.min(CANVAS_HEIGHT - 10, head.y));
+        // Check death barrier collision and teleport to center
+        const distanceFromCenter = Math.sqrt(
+          (head.x - CENTER_X) ** 2 + (head.y - CENTER_Y) ** 2
+        );
         
-        // Update segments - smoother trailing
+        if (distanceFromCenter > DEATH_BARRIER_RADIUS) {
+          // Teleport back to center
+          head.x = CENTER_X;
+          head.y = CENTER_Y;
+        }
+        
+        // Update segments - slither.io style smooth following
         const newSegments = [head];
-        for (let i = 1; i < Math.min(15, prevSnake.segments.length + 1); i++) {
+        const segmentDistance = 16; // Distance between segments
+        
+        for (let i = 1; i < Math.min(20, prevSnake.segments.length + 1); i++) {
           const prevSegment = newSegments[i - 1];
           const currentSegment = prevSnake.segments[i - 1] || prevSegment;
           
-          // Smooth following for each segment
+          // Calculate direction from current to previous segment
           const dx = prevSegment.x - currentSegment.x;
           const dy = prevSegment.y - currentSegment.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
-          if (distance > 12) { // Maintain distance between segments
-            const ratio = (distance - 12) / distance;
+          if (distance > segmentDistance) {
+            // Move segment towards previous one maintaining fixed distance
+            const ratio = (distance - segmentDistance) / distance;
             newSegments.push({
               x: currentSegment.x + dx * ratio,
               y: currentSegment.y + dy * ratio
@@ -148,12 +155,12 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
     if (!ctx) return;
 
     const render = () => {
-      // Clear canvas
-      ctx.fillStyle = '#0a0a0a';
+      // Clear canvas with dark blue background like slither.io
+      ctx.fillStyle = '#2c2c54';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Draw grid
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      // Draw subtle grid pattern
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
       ctx.lineWidth = 1;
       
       // Vertical lines
@@ -172,40 +179,84 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
         ctx.stroke();
       }
 
-      // Draw snake
-      snake.segments.forEach((segment, index) => {
-        const radius = index === 0 ? 8 : Math.max(4, 8 - index * 0.3);
-        const alpha = index === 0 ? 1 : Math.max(0.3, 1 - (index * 0.1));
-        
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = '#FFD700'; // Neon yellow
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 10;
-        
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        // Draw eyes on head
-        if (index === 0) {
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = 'white';
+      // Draw death barrier (red circle)
+      ctx.strokeStyle = '#ff3333';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 5]);
+      ctx.beginPath();
+      ctx.arc(CENTER_X, CENTER_Y, DEATH_BARRIER_RADIUS, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw slither.io style snake
+      if (snake.segments.length > 1) {
+        // Draw snake body with gradient segments
+        snake.segments.forEach((segment, index) => {
+          const isHead = index === 0;
+          const baseRadius = isHead ? 12 : Math.max(8, 12 - index * 0.15);
+          
+          // Create gradient colors like slither.io
+          const hue = 30; // Orange/brown base
+          const saturation = isHead ? 80 : Math.max(60, 80 - index * 2);
+          const lightness = isHead ? 65 : Math.max(45, 65 - index * 1);
+          
+          ctx.globalAlpha = 1;
+          
+          // Draw main segment body
+          const gradient = ctx.createRadialGradient(
+            segment.x, segment.y, 0,
+            segment.x, segment.y, baseRadius
+          );
+          gradient.addColorStop(0, `hsl(${hue}, ${saturation}%, ${lightness + 20}%)`);
+          gradient.addColorStop(0.7, `hsl(${hue}, ${saturation}%, ${lightness}%)`);
+          gradient.addColorStop(1, `hsl(${hue}, ${saturation}%, ${lightness - 15}%)`);
+          
+          ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(segment.x - 3, segment.y - 3, 2, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(segment.x + 3, segment.y - 3, 2, 0, 2 * Math.PI);
+          ctx.arc(segment.x, segment.y, baseRadius, 0, 2 * Math.PI);
           ctx.fill();
           
-          ctx.fillStyle = 'black';
-          ctx.beginPath();
-          ctx.arc(segment.x - 3, segment.y - 3, 1, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(segment.x + 3, segment.y - 3, 1, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      });
+          // Add darker border
+          ctx.strokeStyle = `hsl(${hue}, ${saturation}%, ${lightness - 25}%)`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          
+          // Draw eyes on head only
+          if (isHead) {
+            const head = snake.segments[0];
+            const direction = snake.direction;
+            const magnitude = Math.sqrt(direction.x ** 2 + direction.y ** 2);
+            
+            if (magnitude > 0) {
+              const normalizedX = direction.x / magnitude;
+              const normalizedY = direction.y / magnitude;
+              
+              // Eye positions based on movement direction
+              const eyeDistance = 6;
+              const eyeOffsetX = -normalizedY * eyeDistance;
+              const eyeOffsetY = normalizedX * eyeDistance;
+              
+              // Draw eyes
+              ctx.fillStyle = 'white';
+              ctx.beginPath();
+              ctx.arc(head.x + eyeOffsetX, head.y + eyeOffsetY, 3, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(head.x - eyeOffsetX, head.y - eyeOffsetY, 3, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              // Eye pupils
+              ctx.fillStyle = 'black';
+              ctx.beginPath();
+              ctx.arc(head.x + eyeOffsetX + normalizedX, head.y + eyeOffsetY + normalizedY, 1.5, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(head.x - eyeOffsetX + normalizedX, head.y - eyeOffsetY + normalizedY, 1.5, 0, 2 * Math.PI);
+              ctx.fill();
+            }
+          }
+        });
+      }
       
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
