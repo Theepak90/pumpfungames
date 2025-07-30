@@ -296,17 +296,17 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
 
       // Draw eyes that follow mouse
       if (snake.segments.length > 0) {
-        const head = snake.head;
-        const eyeAngle = Math.atan2(targetMouse.y - head.y, targetMouse.x - head.x);
+        const snakeHead = snake.head;
+        const eyeAngle = Math.atan2(targetMouse.y - snakeHead.y, targetMouse.x - snakeHead.x);
         const eyeDistance = 8;
         const eyeSize = 4;
         const pupilSize = 2;
         
         // Eye positions
-        const eye1X = head.x + Math.cos(eyeAngle + Math.PI/2) * eyeDistance;
-        const eye1Y = head.y + Math.sin(eyeAngle + Math.PI/2) * eyeDistance;
-        const eye2X = head.x + Math.cos(eyeAngle - Math.PI/2) * eyeDistance;
-        const eye2Y = head.y + Math.sin(eyeAngle - Math.PI/2) * eyeDistance;
+        const eye1X = snakeHead.x + Math.cos(eyeAngle + Math.PI/2) * eyeDistance;
+        const eye1Y = snakeHead.y + Math.sin(eyeAngle + Math.PI/2) * eyeDistance;
+        const eye2X = snakeHead.x + Math.cos(eyeAngle - Math.PI/2) * eyeDistance;
+        const eye2Y = snakeHead.y + Math.sin(eyeAngle - Math.PI/2) * eyeDistance;
         
         // White eyes
         ctx.fillStyle = 'white';
