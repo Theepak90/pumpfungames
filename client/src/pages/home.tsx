@@ -91,26 +91,26 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
   
-  // Daily winnings counter
+  // Daily winnings counter - $1 per second, 20k-30k target
   useEffect(() => {
     const updateWinnings = () => {
       const now = new Date();
       const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
       const todayStart = new Date(easternTime.getFullYear(), easternTime.getMonth(), easternTime.getDate());
       const timeToday = easternTime.getTime() - todayStart.getTime();
-      const dayProgress = timeToday / (24 * 60 * 60 * 1000); // 0-1 through the day
+      const secondsToday = Math.floor(timeToday / 1000);
       
-      // Random daily target between 80k-300k
+      // Random daily target between 20k-30k
       const seed = todayStart.getTime();
-      const dailyTarget = 80000 + (Math.sin(seed) * 0.5 + 0.5) * 220000;
+      const dailyTarget = 20000 + (Math.sin(seed) * 0.5 + 0.5) * 10000;
       
-      // Calculate current winnings based on day progress
-      const currentWinnings = Math.floor(dailyTarget * dayProgress);
+      // $1 per second, but cap at daily target
+      const currentWinnings = Math.min(secondsToday, Math.floor(dailyTarget));
       setDailyWinnings(currentWinnings);
     };
     
     updateWinnings();
-    const interval = setInterval(updateWinnings, 30000); // Update every 30 seconds
+    const interval = setInterval(updateWinnings, 1000); // Update every second
     
     return () => clearInterval(interval);
   }, []);
