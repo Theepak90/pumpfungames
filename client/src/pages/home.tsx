@@ -296,10 +296,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
-      <div className="flex items-center p-4">
-        <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
-        <span className="text-white text-lg">Welcome, </span>
-        <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center">
+          <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
+          <span className="text-white text-lg">Welcome, </span>
+          <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
+        </div>
+        {user && (
+          <button 
+            onClick={handleLogout}
+            className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
+          >
+            Logout
+          </button>
+        )}
       </div>
 
       {/* Main Content Container */}
@@ -318,7 +328,7 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
             
             {/* Left Panel - Leaderboard */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64 self-start">
               <h3 className="text-yellow-400 text-sm mb-2 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
@@ -442,7 +452,7 @@ export default function Home() {
             </div>
 
             {/* Right Panel - Wallet */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64 self-start">
               <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
@@ -463,43 +473,7 @@ export default function Home() {
 
           </div>
 
-          {/* Bet Amount Selection */}
-          <div className="flex justify-center mt-8 space-x-4">
-            {[1, 5, 20].map((amount) => (
-              <button
-                key={amount}
-                onClick={() => setSelectedBetAmount(amount)}
-                className={`px-6 py-2 font-bold rounded ${
-                  selectedBetAmount === amount
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-700 text-white border border-gray-600 hover:bg-gray-600'
-                }`}
-              >
-                ${amount}
-              </button>
-            ))}
-          </div>
-
         </div>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="flex justify-center space-x-8 p-4">
-        <Button
-          onClick={handleClaimDailyCrate}
-          className="bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 hover:bg-gray-600"
-        >
-          <Gift className="w-4 h-4 mr-2" />
-          Daily Crate
-        </Button>
-        
-        <Button
-          onClick={logout}
-          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Logout
-        </Button>
       </div>
     </div>
   );
