@@ -126,6 +126,8 @@ export interface Player {
 export interface Snake {
   segments: Point[];
   direction: Direction;
+  angle: number; // For smooth slither.io-style direction in radians
+  speed: number; // Base movement speed
   growing: boolean;
 }
 

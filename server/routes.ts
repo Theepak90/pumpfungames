@@ -117,12 +117,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const gameData = insertGameSchema.parse(req.body);
       const game = await storage.createGame(gameData);
       
-      // Initialize game state
+      // Initialize game state with larger world for slither.io style
       const gameState: GameState = {
         id: game.id,
         players: [],
-        food: generateFood(20, { width: 800, height: 600 }),
-        gameArea: { width: 800, height: 600 },
+        food: generateFood(100, { width: 4000, height: 4000 }), // Much larger world
+        gameArea: { width: 4000, height: 4000 },
         status: 'waiting',
         betAmount: parseFloat(game.betAmount)
       };
@@ -264,13 +264,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = await storage.getUser(ws.userId);
     if (!user) return;
 
-    // Add player to game state
+    // Add player to game state with slither.io style positioning
+    const startX = Math.random() * 2000 + 1000; // Larger game world
+    const startY = Math.random() * 2000 + 1000;
+    const startAngle = Math.random() * Math.PI * 2;
+    
     const player: Player = {
       id: ws.userId,
       username: user.username,
       snake: {
-        segments: [{ x: Math.random() * 780 + 10, y: Math.random() * 580 + 10 }],
+        segments: [
+          { x: startX, y: startY },
+          { x: startX - 15, y: startY },
+          { x: startX - 30, y: startY }
+        ],
         direction: 'right',
+        angle: startAngle,
+        speed: 2,
         growing: false
       },
       kills: 0,
@@ -311,12 +321,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const player = gameState.players.find(p => p.id === userId);
     if (!player || !player.isAlive) return;
 
-    // Update player direction (with validation to prevent reverse)
-    const currentDir = player.snake.direction;
-    const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
-    
-    if (opposites[currentDir as keyof typeof opposites] !== direction) {
-      player.snake.direction = direction as Direction;
+    // Update player angle for slither.io style movement
+    const angle = parseFloat(direction);
+    if (!isNaN(angle)) {
+      player.snake.angle = angle;
       await storage.updateGameState(gameId, gameState);
     }
   }
@@ -382,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateGame(gameId, { status: 'finished', endedAt: new Date() });
         clearInterval(gameLoop);
       }
-    }, 1000 / 10); // 10 FPS
+    }, 1000 / 20); // 20 FPS for smoother movement
   }
 
   async function updateGameLogic(gameState: GameState) {
@@ -394,46 +402,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { snake } = player;
       const head = snake.segments[0];
       
-      // Calculate new head position
-      let newHead = { ...head };
-      switch (snake.direction) {
-        case 'up': newHead.y -= 20; break;
-        case 'down': newHead.y += 20; break;
-        case 'left': newHead.x -= 20; break;
-        case 'right': newHead.x += 20; break;
-      }
+      // Calculate new head position using smooth angle-based movement
+      const newHead = {
+        x: head.x + Math.cos(snake.angle) * snake.speed,
+        y: head.y + Math.sin(snake.angle) * snake.speed
+      };
 
-      // Check wall collision
-      if (newHead.x < 0 || newHead.x >= gameArea.width || 
-          newHead.y < 0 || newHead.y >= gameArea.height) {
-        player.isAlive = false;
-        await handlePlayerDeath(player.id);
-        continue;
-      }
+      // Check wall collision (wrap around or kill - let's wrap for now like slither.io)
+      if (newHead.x < 0) newHead.x = gameArea.width;
+      if (newHead.x >= gameArea.width) newHead.x = 0;
+      if (newHead.y < 0) newHead.y = gameArea.height;
+      if (newHead.y >= gameArea.height) newHead.y = 0;
 
-      // Check self collision
-      if (snake.segments.some(segment => segment.x === newHead.x && segment.y === newHead.y)) {
-        player.isAlive = false;
-        await handlePlayerDeath(player.id);
-        continue;
-      }
-
-      // Check collision with other snakes
-      for (const otherPlayer of players) {
-        if (otherPlayer.id === player.id || !otherPlayer.isAlive) continue;
-        
-        if (otherPlayer.snake.segments.some(segment => 
-          segment.x === newHead.x && segment.y === newHead.y)) {
+      // Check self collision (head hitting own body)
+      for (let i = 4; i < snake.segments.length; i++) { // Skip first few segments to prevent immediate collision
+        const segment = snake.segments[i];
+        const distance = Math.sqrt(
+          Math.pow(newHead.x - segment.x, 2) + Math.pow(newHead.y - segment.y, 2)
+        );
+        if (distance < 15) { // Collision radius
           player.isAlive = false;
-          otherPlayer.kills++;
-          otherPlayer.earnings += gameState.betAmount;
-          
-          // Award earnings to killer
-          await storage.updateUserBalance(otherPlayer.id, gameState.betAmount);
-          await storage.updateUser(otherPlayer.id, { 
-            kills: (await storage.getUser(otherPlayer.id))!.kills + 1
-          });
-          
           await handlePlayerDeath(player.id);
           break;
         }
@@ -441,28 +429,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!player.isAlive) continue;
 
-      // Move snake
+      // Check collision with other snakes
+      for (const otherPlayer of players) {
+        if (otherPlayer.id === player.id || !otherPlayer.isAlive) continue;
+        
+        for (const segment of otherPlayer.snake.segments) {
+          const distance = Math.sqrt(
+            Math.pow(newHead.x - segment.x, 2) + Math.pow(newHead.y - segment.y, 2)
+          );
+          if (distance < 15) { // Collision radius
+            player.isAlive = false;
+            otherPlayer.kills++;
+            otherPlayer.earnings += gameState.betAmount;
+            
+            // Award earnings to killer
+            await storage.updateUserBalance(otherPlayer.id, gameState.betAmount);
+            await storage.updateUser(otherPlayer.id, { 
+              kills: (await storage.getUser(otherPlayer.id))!.kills + 1
+            });
+            
+            await handlePlayerDeath(player.id);
+            break;
+          }
+        }
+        if (!player.isAlive) break;
+      }
+
+      if (!player.isAlive) continue;
+
+      // Move snake - add new head
       snake.segments.unshift(newHead);
 
       // Check food collision
-      const eatenFood = food.findIndex(f => 
-        Math.abs(f.position.x - newHead.x) < 20 && 
-        Math.abs(f.position.y - newHead.y) < 20
-      );
+      const eatenFoodIndex = food.findIndex(f => {
+        const distance = Math.sqrt(
+          Math.pow(f.position.x - newHead.x, 2) + Math.pow(f.position.y - newHead.y, 2)
+        );
+        return distance < 20;
+      });
 
-      if (eatenFood !== -1) {
-        food.splice(eatenFood, 1);
+      if (eatenFoodIndex !== -1) {
+        food.splice(eatenFoodIndex, 1);
         snake.growing = true;
         
-        // Add new food
+        // Add new food to maintain count
         food.push(...generateFood(1, gameArea));
       }
 
-      // Remove tail if not growing
+      // Remove tail if not growing, otherwise grow the snake
       if (snake.growing) {
         snake.growing = false;
       } else {
         snake.segments.pop();
+      }
+
+      // Maintain smooth movement by updating segment positions
+      for (let i = 1; i < snake.segments.length; i++) {
+        const prev = snake.segments[i - 1];
+        const curr = snake.segments[i];
+        const distance = Math.sqrt(
+          Math.pow(prev.x - curr.x, 2) + Math.pow(prev.y - curr.y, 2)
+        );
+        
+        if (distance > 15) { // Maintain consistent segment spacing
+          const angle = Math.atan2(prev.y - curr.y, prev.x - curr.x);
+          snake.segments[i] = {
+            x: prev.x - Math.cos(angle) * 15,
+            y: prev.y - Math.sin(angle) * 15
+          };
+        }
       }
     }
   }
@@ -478,8 +513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     for (let i = 0; i < count; i++) {
       food.push({
         position: {
-          x: Math.floor(Math.random() * (gameArea.width / 20)) * 20,
-          y: Math.floor(Math.random() * (gameArea.height / 20)) * 20
+          x: Math.random() * gameArea.width,
+          y: Math.random() * gameArea.height
         },
         value: 1
       });

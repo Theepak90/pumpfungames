@@ -147,42 +147,7 @@ export default function Home() {
     }
   };
 
-  // Keyboard controls for game
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (!isGameActive || !gameState) return;
-
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          e.preventDefault();
-          move('up');
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          e.preventDefault();
-          move('down');
-          break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          e.preventDefault();
-          move('left');
-          break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          e.preventDefault();
-          move('right');
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isGameActive, gameState, move]);
+  // Mouse controls are now handled in the SnakeGame component
 
   // Show auth form if not logged in
   if (!user) {
