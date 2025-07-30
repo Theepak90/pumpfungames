@@ -304,7 +304,7 @@ export default function Home() {
         </div>
         {user && (
           <button 
-            onClick={handleLogout}
+            onClick={logout}
             className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
           >
             Logout
