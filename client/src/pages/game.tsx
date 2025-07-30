@@ -29,7 +29,7 @@ class SmoothSnake {
   boostCooldown: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 2; // 50% slower than before
+    this.baseSpeed = 2.0; // 2.0 pixels per frame (120 pixels/sec at 60fps)
     this.speed = this.baseSpeed;
     this.radius = 12;
     this.currentAngle = 0;
@@ -39,10 +39,10 @@ class SmoothSnake {
     this.isBoosting = false;
     this.boostCooldown = 0;
     
-    // Initialize with evenly spaced segments
+    // Initialize with longer starting segments (30-40 like Slither.io)
     this.segments = [];
-    const initialLength = 15; // Number of segments
-    for (let i = 0; i < initialLength; i++) {
+    const START_SEGMENTS = 35; // Much longer starting snake
+    for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
         x: x - i * this.segmentSpacing, 
         y: y 
@@ -76,32 +76,29 @@ class SmoothSnake {
     
     // Handle boost mechanic
     if (this.isBoosting && this.segments.length > 10) {
-      this.speed = this.baseSpeed * 1.5; // 50% faster than base
+      const BOOST_MULTIPLIER = 1.5;
+      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.0 pixels per frame when boosting
       this.boostCooldown++;
       
       // Drop food orbs every 5 frames while boosting (mass = 0.2)
       if (this.boostCooldown % 5 === 0 && onDropFood) {
         const tail = this.segments[this.segments.length - 1];
         onDropFood({
-          x: tail.x + (Math.random() - 0.5) * 15,
-          y: tail.y + (Math.random() - 0.5) * 15,
+          x: tail.x,
+          y: tail.y,
           size: 3,
-          color: '#ff6600',
+          color: '#f55400',
           mass: 0.2
         });
       }
       
-      // Mass loss: 0.2 per frame while boosting
+      // Remove 0.2 mass per frame by decrementing growthRemaining or popping segments
       const BOOST_MASS_LOSS = 0.2;
       if (this.growthRemaining >= BOOST_MASS_LOSS) {
         this.growthRemaining -= BOOST_MASS_LOSS;
       } else {
-        // If not enough growth remaining, remove segments
-        const remaining = BOOST_MASS_LOSS - this.growthRemaining;
-        this.growthRemaining = 0;
-        
-        // Remove fractional segments (every 5 boost frames = 1 segment)
-        if (this.boostCooldown % 5 === 0 && this.segments.length > 10) {
+        // Not enough growth remaining, remove segments
+        if (this.segments.length > 10) {
           this.segments.pop();
         }
       }
@@ -324,9 +321,9 @@ export default function GamePage() {
         return;
       }
 
-      // Food gravitation toward snake head
+      // Food gravitation toward snake head (increased strength)
       const suctionRadius = 100;
-      const suctionStrength = 0.2;
+      const suctionStrength = 0.8;
       
       setFoods(prevFoods => {
         return prevFoods.map(food => {
@@ -540,9 +537,10 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial length and position
+    // Reset snake to initial length and position (35 segments like Slither.io)
     snake.segments = [];
-    for (let i = 0; i < 15; i++) {
+    const START_SEGMENTS = 35;
+    for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
     }
     snake.currentAngle = 0;
