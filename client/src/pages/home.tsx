@@ -115,7 +115,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const [isLoginMode, setIsLoginMode] = useState(true);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -127,14 +127,10 @@ export default function Home() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (isLoginMode) {
-        await login(username, password);
-      } else {
-        await register(username, password);
-      }
+      await login(username, password);
       toast({
-        title: isLoginMode ? "Welcome back!" : "Account created!",
-        description: `Successfully ${isLoginMode ? "logged in" : "registered"}.`,
+        title: "Welcome back!",
+        description: "Successfully logged in.",
       });
     } catch (error) {
       toast({
@@ -234,59 +230,26 @@ export default function Home() {
             <p className="text-gray-400">Skill-Based Crypto Snake Game</p>
           </CardHeader>
           <CardContent>
-            <Tabs value={isLoginMode ? "login" : "register"} onValueChange={(value) => setIsLoginMode(value === "login")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Register</TabsTrigger>
-              </TabsList>
-              <TabsContent value="login" className="space-y-4">
-                <form onSubmit={handleAuth} className="space-y-4">
-                  <Input
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="bg-dark-bg border-dark-border"
-                    required
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-dark-bg border-dark-border"
-                    required
-                  />
-                  <Button type="submit" className="w-full bg-neon-yellow text-black hover:bg-yellow-400">
-                    Login
-                  </Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="register" className="space-y-4">
-                <form onSubmit={handleAuth} className="space-y-4">
-                  <Input
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="bg-dark-bg border-dark-border"
-                    required
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-dark-bg border-dark-border"
-                    required
-                  />
-                  <Button type="submit" className="w-full bg-neon-yellow text-black hover:bg-yellow-400">
-                    Register
-                  </Button>
-                </form>
-                <p className="text-sm text-gray-400 text-center">
-                  New accounts start with $10.00 and 0.05 SOL
-                </p>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleAuth} className="space-y-4">
+              <Input
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="bg-dark-bg border-dark-border"
+                required
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-dark-bg border-dark-border"
+                required
+              />
+              <Button type="submit" className="w-full bg-neon-yellow text-black hover:bg-yellow-400">
+                Login
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
