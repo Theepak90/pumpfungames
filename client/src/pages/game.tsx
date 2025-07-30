@@ -209,7 +209,7 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
-  const [snake] = useState(new SmoothSnake(2000, 2000));
+  const [snake] = useState(new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y));
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -217,8 +217,9 @@ export default function GamePage() {
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
-  const MAP_WIDTH = 4000;
-  const MAP_HEIGHT = 4000;
+  const MAP_CENTER_X = 2000;
+  const MAP_CENTER_Y = 2000;
+  const MAP_RADIUS = 1800; // Circular map radius
   const FOOD_COUNT = 150;
 
   // Handle canvas resize for fullscreen
@@ -239,29 +240,35 @@ export default function GamePage() {
   useEffect(() => {
     const initialFoods: Food[] = [];
     for (let i = 0; i < FOOD_COUNT; i++) {
+      // Generate food within circular boundary
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MAP_RADIUS - 100); // Keep food away from edge
+      const x = MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+      
       const foodType = Math.random();
       let food: Food;
       
       if (foodType < 0.1) { // 10% big food
         food = {
-          x: Math.random() * MAP_WIDTH,
-          y: Math.random() * MAP_HEIGHT,
+          x: x,
+          y: y,
           size: 10,
           mass: 2,
           color: '#ff4444'
         };
       } else if (foodType < 0.4) { // 30% medium food
         food = {
-          x: Math.random() * MAP_WIDTH,
-          y: Math.random() * MAP_HEIGHT,
+          x: x,
+          y: y,
           size: 6,
           mass: 1,
           color: '#44ff44'
         };
       } else { // 60% small food
         food = {
-          x: Math.random() * MAP_WIDTH,
-          y: Math.random() * MAP_HEIGHT,
+          x: x,
+          y: y,
           size: 4,
           mass: 0.5,
           color: '#4444ff'
@@ -359,9 +366,12 @@ export default function GamePage() {
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
 
-      // Check map boundaries (death barrier)
+      // Check circular map boundaries (death barrier)
       const updatedHead = snake.head;
-      if (updatedHead.x < 0 || updatedHead.x > MAP_WIDTH || updatedHead.y < 0 || updatedHead.y > MAP_HEIGHT) {
+      const distanceFromCenter = Math.sqrt(
+        (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
+      );
+      if (distanceFromCenter > MAP_RADIUS) {
         setGameOver(true);
         return;
       }
@@ -406,26 +416,32 @@ export default function GamePage() {
             const foodType = Math.random();
             let newFood: Food;
             
+            // Generate new food within circular boundary
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * (MAP_RADIUS - 100);
+            const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+            const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+            
             if (foodType < 0.1) { // 10% big food
               newFood = {
-                x: Math.random() * MAP_WIDTH,
-                y: Math.random() * MAP_HEIGHT,
+                x: newX,
+                y: newY,
                 size: 10,
                 mass: 2,
                 color: '#ff4444'
               };
             } else if (foodType < 0.4) { // 30% medium food
               newFood = {
-                x: Math.random() * MAP_WIDTH,
-                y: Math.random() * MAP_HEIGHT,
+                x: newX,
+                y: newY,
                 size: 6,
                 mass: 1,
                 color: '#44ff44'
               };
             } else { // 60% small food
               newFood = {
-                x: Math.random() * MAP_WIDTH,
-                y: Math.random() * MAP_HEIGHT,
+                x: newX,
+                y: newY,
                 size: 4,
                 mass: 0.5,
                 color: '#4444ff'
@@ -484,29 +500,46 @@ export default function GamePage() {
       };
       
       // Draw hexagonal grid pattern with cellular appearance
-      for (let row = 0; row * hexHeight * 0.75 < MAP_HEIGHT + hexHeight; row++) {
-        for (let col = 0; col * hexSize * 1.5 < MAP_WIDTH + hexSize * 2; col++) {
+      const mapSize = MAP_RADIUS * 2.5; // Cover area larger than map for red zone
+      for (let row = 0; row * hexHeight * 0.75 < mapSize; row++) {
+        for (let col = 0; col * hexSize * 1.5 < mapSize; col++) {
           const x = col * hexSize * 1.5;
           const y = row * hexHeight * 0.75 + (col % 2) * hexHeight * 0.375;
           
-          // Vary the hex colors slightly for organic look
-          const variation = Math.sin(x * 0.01 + y * 0.01) * 0.1;
-          const baseBlue = 0x2a + Math.floor(variation * 20);
-          const baseGreen = 0x2f + Math.floor(variation * 15);
-          const baseBrightness = 0x3a + Math.floor(variation * 25);
+          // Check distance from map center
+          const distanceFromCenter = Math.sqrt(
+            (x - MAP_CENTER_X) ** 2 + (y - MAP_CENTER_Y) ** 2
+          );
           
-          const fillColor = `rgb(${baseBlue}, ${baseGreen}, ${baseBrightness})`;
-          const strokeColor = '#1a1d24';
+          let fillColor, strokeColor;
+          
+          if (distanceFromCenter > MAP_RADIUS) {
+            // Outside death barrier - red zone
+            const redIntensity = Math.min(255, 150 + (distanceFromCenter - MAP_RADIUS) * 0.1);
+            fillColor = `rgb(${redIntensity}, 20, 20)`;
+            strokeColor = '#8b0000';
+          } else {
+            // Inside safe zone - normal hexagons
+            const variation = Math.sin(x * 0.01 + y * 0.01) * 0.1;
+            const baseBlue = 0x2a + Math.floor(variation * 20);
+            const baseGreen = 0x2f + Math.floor(variation * 15);
+            const baseBrightness = 0x3a + Math.floor(variation * 25);
+            
+            fillColor = `rgb(${baseBlue}, ${baseGreen}, ${baseBrightness})`;
+            strokeColor = '#1a1d24';
+          }
           
           drawFilledHexagon(x, y, fillColor, strokeColor);
         }
       }
 
-      // Draw map boundaries
+      // Draw circular death barrier
       ctx.strokeStyle = '#ff3333';
-      ctx.lineWidth = 4;
-      ctx.setLineDash([20, 10]);
-      ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+      ctx.lineWidth = 6;
+      ctx.setLineDash([30, 15]);
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.setLineDash([]);
 
       // Draw food with gradient effect
@@ -656,7 +689,7 @@ export default function GamePage() {
     const START_MASS = 45;
     const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
+      snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
     }
     snake.currentAngle = 0;
     snake.growthRemaining = START_MASS;
