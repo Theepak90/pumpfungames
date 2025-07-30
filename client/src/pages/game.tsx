@@ -164,13 +164,17 @@ class SmoothSnake {
       }
     }
     
-    // Only remove tail segment if not growing
-    if (this.growthRemaining > 0) {
-      this.growthRemaining--;
-    } else {
-      // Keep minimum length and remove excess
-      if (this.segments.length > 15) {
-        this.segments.pop();
+    // Remove segments based on movement speed to maintain proper body density
+    const segmentRemovalRate = this.isBoosting ? BOOST_MULTIPLIER : 1;
+    
+    for (let i = 0; i < segmentRemovalRate; i++) {
+      if (this.growthRemaining > 0) {
+        this.growthRemaining -= 1;
+      } else {
+        // Keep minimum length and remove excess
+        if (this.segments.length > 15) {
+          this.segments.pop();
+        }
       }
     }
   }
