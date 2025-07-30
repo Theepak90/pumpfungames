@@ -22,7 +22,11 @@ class Snake {
   radius: number;
   
   constructor(x: number, y: number) {
-    this.segments = [{ x, y }];
+    // Start with a decent length snake (10 segments)
+    this.segments = [];
+    for (let i = 0; i < 10; i++) {
+      this.segments.push({ x: x - i * 20, y });
+    }
     this.speed = 3;
     this.radius = 12;
   }
@@ -35,17 +39,22 @@ class Snake {
     return this.segments.length;
   }
   
-  move(direction: Position) {
+  move(direction: Position, isGrowing: boolean = false) {
     // Move head toward target
     const newHead = {
       x: this.head.x + direction.x,
       y: this.head.y + direction.y
     };
     
-    // Add new head
+    // Add new head at front
     this.segments.unshift(newHead);
     
-    // Keep segments at proper distance
+    // Only remove tail if NOT growing (this prevents infinite growth)
+    if (!isGrowing) {
+      this.segments.pop();
+    }
+    
+    // Keep segments at proper distance - make body follow smoothly
     for (let i = 1; i < this.segments.length; i++) {
       const current = this.segments[i];
       const previous = this.segments[i - 1];
@@ -54,7 +63,7 @@ class Snake {
       const dy = previous.y - current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      const segmentDistance = this.radius * 2;
+      const segmentDistance = this.radius * 1.8; // Tighter spacing
       
       if (distance > segmentDistance) {
         const ratio = segmentDistance / distance;
@@ -81,12 +90,25 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   
-  // Game constants
-  const CANVAS_WIDTH = 800;
-  const CANVAS_HEIGHT = 600;
+  // Game constants - fullscreen
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const MAP_WIDTH = 4000;
   const MAP_HEIGHT = 4000;
   const FOOD_COUNT = 150;
+
+  // Handle canvas resize for fullscreen
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      setCanvasSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, []);
 
   // Initialize food
   useEffect(() => {
@@ -113,15 +135,15 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
       const mouseY = e.clientY - rect.top;
       
       // Convert screen coordinates to world coordinates
-      const worldX = mouseX - CANVAS_WIDTH/2 + snake.head.x;
-      const worldY = mouseY - CANVAS_HEIGHT/2 + snake.head.y;
+      const worldX = mouseX - canvasSize.width/2 + snake.head.x;
+      const worldY = mouseY - canvasSize.height/2 + snake.head.y;
       
       setTargetMouse({ x: worldX, y: worldY });
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
-  }, [snake.head.x, snake.head.y]);
+  }, [snake.head.x, snake.head.y, canvasSize]);
 
   // Game loop
   useEffect(() => {
@@ -149,53 +171,63 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
         };
       }
 
-      // Move snake
-      snake.move(direction);
+      // Check if snake will eat food this frame
+      let willGrow = false;
+      const currentHead = snake.head;
+      
+      // Check food collision first to determine if growing
+      for (let i = 0; i < foods.length; i++) {
+        const food = foods[i];
+        const dist = Math.sqrt((currentHead.x + direction.x - food.x) ** 2 + (currentHead.y + direction.y - food.y) ** 2);
+        if (dist < snake.radius + food.size) {
+          willGrow = true;
+          break;
+        }
+      }
+
+      // Move snake (only grows if eating food)
+      snake.move(direction, willGrow);
 
       // Check map boundaries (death barrier)
-      const head = snake.head;
-      if (head.x < 0 || head.x > MAP_WIDTH || head.y < 0 || head.y > MAP_HEIGHT) {
+      const updatedHead = snake.head;
+      if (updatedHead.x < 0 || updatedHead.x > MAP_WIDTH || updatedHead.y < 0 || updatedHead.y > MAP_HEIGHT) {
         setGameOver(true);
         return;
       }
 
-      // Food collision detection
+      // Update food array after eating
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
-        let hasEaten = false;
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
-          const dist = Math.sqrt((head.x - food.x) ** 2 + (head.y - food.y) ** 2);
+          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
           if (dist < snake.radius + food.size) {
-            // Eat food
-            snake.grow(3);
+            // Remove eaten food and add new one
             newFoods.splice(i, 1);
-            hasEaten = true;
-            
-            // Add new food to maintain count
             newFoods.push({
               x: Math.random() * MAP_WIDTH,
               y: Math.random() * MAP_HEIGHT,
               size: 3 + Math.random() * 8,
               color: `hsl(${Math.random() * 360}, 60%, 60%)`
             });
+            break; // Only eat one food per frame
           }
         }
         
-        return hasEaten ? newFoods : prevFoods;
+        return newFoods;
       });
 
       // Clear canvas
       ctx.fillStyle = '#2c2c54';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
       // Save context for camera transform
       ctx.save();
 
       // Camera follows snake head
-      ctx.translate(CANVAS_WIDTH/2 - snake.head.x, CANVAS_HEIGHT/2 - snake.head.y);
+      ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
 
       // Draw map grid
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -318,28 +350,34 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
 
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, [targetMouse, snake, foods, gameOver]);
+  }, [targetMouse, snake, foods, gameOver, canvasSize]);
 
   const resetGame = () => {
     setGameOver(false);
-    snake.segments = [{ x: 2000, y: 2000 }];
+    // Reset snake to initial length
+    snake.segments = [];
+    for (let i = 0; i < 10; i++) {
+      snake.segments.push({ x: 2000 - i * 20, y: 2000 });
+    }
     setTargetMouse({ x: 2000, y: 2000 });
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div className="flex items-center gap-4">
+    <div className="relative w-screen h-screen overflow-hidden">
+      {/* UI Overlay */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-4">
         <button
           onClick={onExit}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
         >
-          Back to Menu
+          Exit
         </button>
-        <h2 className="text-2xl font-bold text-white">DAMNBRUH Snake Game</h2>
+        <div className="text-white font-bold">DAMNBRUH</div>
+        <div className="text-white text-sm">Length: {snake.length}</div>
         {gameOver && (
           <button
             onClick={resetGame}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
           >
             Play Again
           </button>
@@ -347,22 +385,21 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
       </div>
       
       {gameOver && (
-        <div className="text-red-500 text-xl font-bold">
-          Game Over! You hit the death barrier!
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="text-red-500 text-4xl font-bold text-center">
+            Game Over!
+            <div className="text-white text-lg mt-2">You hit the death barrier!</div>
+          </div>
         </div>
       )}
       
       <canvas
         ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        className="border-2 border-gray-400 cursor-none"
+        width={canvasSize.width}
+        height={canvasSize.height}
+        className="cursor-none block"
         style={{ background: '#2c2c54' }}
       />
-      
-      <div className="text-white text-sm">
-        Move your mouse to control the snake. Eat the colored food to grow!
-      </div>
     </div>
   );
 }
