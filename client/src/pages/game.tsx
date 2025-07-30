@@ -27,9 +27,11 @@ class SmoothSnake {
   growthRemaining: number;
   isBoosting: boolean;
   boostCooldown: number;
+  segmentMass: number;
+  minimumMass: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 2.0; // 2.0 pixels per frame (120 pixels/sec at 60fps)
+    this.baseSpeed = 2.4; // 20% faster than original (2.0 → 2.4 px/frame)
     this.speed = this.baseSpeed;
     this.radius = 12;
     this.currentAngle = 0;
@@ -38,6 +40,7 @@ class SmoothSnake {
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
+    this.segmentMass = 1; // Each segment = 1 mass
     
     // Initialize with longer starting segments (30-40 like Slither.io)
     this.segments = [];
@@ -48,6 +51,9 @@ class SmoothSnake {
         y: y 
       });
     }
+    
+    // Set minimum mass (spawn mass)
+    this.minimumMass = START_SEGMENTS * this.segmentMass;
   }
   
   get head() {
@@ -56,6 +62,10 @@ class SmoothSnake {
   
   get length() {
     return this.segments.length;
+  }
+  
+  get totalMass() {
+    return this.segments.length * this.segmentMass + this.growthRemaining;
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -74,31 +84,37 @@ class SmoothSnake {
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
-    // Handle boost mechanic
-    if (this.isBoosting && this.segments.length > 10) {
-      const BOOST_MULTIPLIER = 1.5;
-      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.0 pixels per frame when boosting
+    // Handle boost mechanic with minimum mass protection
+    const BOOST_MULTIPLIER = 1.5;
+    const BOOST_MASS_COST = 0.2;
+    
+    // Prevent boosting if at minimum mass
+    if (this.totalMass <= this.minimumMass) {
+      this.isBoosting = false;
+    }
+    
+    if (this.isBoosting && this.totalMass > this.minimumMass) {
+      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.6 pixels per frame when boosting
       this.boostCooldown++;
       
-      // Drop food orbs every 5 frames while boosting (mass = 0.2)
-      if (this.boostCooldown % 5 === 0 && onDropFood) {
+      // Drop 1 food orb per boost tick (not every 5 frames)
+      if (onDropFood) {
         const tail = this.segments[this.segments.length - 1];
         onDropFood({
           x: tail.x,
           y: tail.y,
           size: 3,
           color: '#f55400',
-          mass: 0.2
+          mass: BOOST_MASS_COST
         });
       }
       
-      // Remove 0.2 mass per frame by decrementing growthRemaining or popping segments
-      const BOOST_MASS_LOSS = 0.2;
-      if (this.growthRemaining >= BOOST_MASS_LOSS) {
-        this.growthRemaining -= BOOST_MASS_LOSS;
+      // Remove mass from snake
+      if (this.growthRemaining >= BOOST_MASS_COST) {
+        this.growthRemaining -= BOOST_MASS_COST;
       } else {
-        // Not enough growth remaining, remove segments
-        if (this.segments.length > 10) {
+        // If no buffer left, shorten tail
+        if (this.segments.length > 1) {
           this.segments.pop();
         }
       }
@@ -153,6 +169,12 @@ class SmoothSnake {
   }
   
   setBoost(boosting: boolean) {
+    // Only allow boosting if above minimum mass
+    if (boosting && this.totalMass <= this.minimumMass) {
+      this.isBoosting = false;
+      return;
+    }
+    
     this.isBoosting = boosting;
     if (!boosting) {
       this.boostCooldown = 0;
@@ -545,6 +567,7 @@ export default function GamePage() {
     }
     snake.currentAngle = 0;
     snake.growthRemaining = 0;
+    snake.minimumMass = START_SEGMENTS * snake.segmentMass; // Reset minimum mass
     snake.setBoost(false);
     setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
@@ -572,9 +595,13 @@ export default function GamePage() {
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
           <div className="text-white text-sm">Length: {snake.length}</div>
-          <div className="text-blue-400 text-xs">Mass: {snake.growthRemaining.toFixed(1)}</div>
+          <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
+          <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass}</div>
           {isBoosting && (
             <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
+          )}
+          {snake.totalMass <= snake.minimumMass && (
+            <div className="text-red-400 text-xs">Cannot boost - too small!</div>
           )}
         </div>
       </div>
