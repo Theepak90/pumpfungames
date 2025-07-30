@@ -318,7 +318,7 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
             
             {/* Left Panel - Leaderboard */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64">
               <h3 className="text-yellow-400 text-sm mb-2 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
@@ -442,7 +442,7 @@ export default function Home() {
             </div>
 
             {/* Right Panel - Wallet */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col h-64">
               <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
