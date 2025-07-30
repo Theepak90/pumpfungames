@@ -45,31 +45,31 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 14; // Increased spacing for better separation
+    this.segmentSpacing = 16; // Fixed spacing between segments
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
     this.segmentMass = 1; // Each segment = 1 mass
-    this.massPerSegment = 3; // 3 mass = 1 visible segment (like Slither.io)
-    this.baseSegmentRadius = 12; // Starting segment radius
-    this.maxSegmentRadius = 24; // Maximum segment radius when fully grown
+    this.massPerSegment = 5; // 5 mass = 1 new segment
+    this.baseSegmentRadius = 14; // Fixed segment radius
+    this.maxSegmentRadius = 14; // Keep consistent size
     
-    // Initialize with 45 mass (15 visible segments)
+    // Start with 5 balls (25 mass total)
     this.segments = [];
-    const START_MASS = 45; // 15 balls x 3 mass each
+    const START_MASS = 25; // 5 balls x 5 mass each
     this.growthRemaining = START_MASS;
     
-    // Pre-generate 60 segment positions for smooth body tracking
-    const START_SEGMENTS = 60;
+    // Initialize exactly 5 segments for tracking
+    const START_SEGMENTS = 5;
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * this.segmentSpacing, // Normal spacing for initialization
+        x: x - i * this.segmentSpacing,
         y: y 
       });
     }
     
-    // Set minimum mass (50% of spawn mass)
-    this.minimumMass = START_MASS * 0.5;
+    // Set minimum mass (cannot go below starting size)
+    this.minimumMass = START_MASS;
   }
   
   get head() {
@@ -88,15 +88,29 @@ class SmoothSnake {
     return Math.floor(this.totalMass / this.massPerSegment);
   }
   
-  // Calculate segment radius based on total mass (gradual size increase)
+  // All segments have consistent size - no gradual size increase
   getSegmentRadius(segmentIndex: number) {
-    const massRatio = Math.min(this.totalMass / 150, 1); // Cap growth at 150 mass
-    const sizeMultiplier = 1 + massRatio * 0.8; // Up to 80% size increase
+    return this.baseSegmentRadius; // Fixed size for all segments
+  }
+  
+  // Add new segment when mass threshold is reached
+  addSegment() {
+    if (this.segments.length < 2) return;
     
-    // Head is slightly larger, body segments gradually smaller
-    const positionMultiplier = segmentIndex === 0 ? 1.1 : Math.max(0.8, 1 - segmentIndex * 0.02);
+    // Duplicate from second-to-last segment position
+    const secondLast = this.segments[this.segments.length - 2];
+    const last = this.segments[this.segments.length - 1];
     
-    return this.baseSegmentRadius * sizeMultiplier * positionMultiplier;
+    // Calculate direction from second-last to last
+    const dx = last.x - secondLast.x;
+    const dy = last.y - secondLast.y;
+    const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing;
+    
+    // Place new segment behind the last one
+    const newX = last.x + (dx / length) * this.segmentSpacing;
+    const newY = last.y + (dy / length) * this.segmentSpacing;
+    
+    this.segments.push({ x: newX, y: newY });
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -189,26 +203,23 @@ class SmoothSnake {
       }
     }
     
-    // Extend segments array if needed for body tracking
-    while (this.segments.length < 100) { // Ensure we have enough segments for tracking
-      const tail = this.segments[this.segments.length - 1];
-      const secondToLast = this.segments[this.segments.length - 2] || tail;
-      
-      // Calculate direction for new segment placement
-      const dx = tail.x - secondToLast.x;
-      const dy = tail.y - secondToLast.y;
-      const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing;
-      const newX = tail.x + (dx / length) * this.segmentSpacing;
-      const newY = tail.y + (dy / length) * this.segmentSpacing;
-      
-      this.segments.push({ x: newX, y: newY });
-    }
+    // Don't auto-extend segments - only add through growth
   }
   
   eatFood(food: Food) {
-    // Growth based on food mass - no limits, let it grow indefinitely
+    // Growth based on food mass
     const mass = food.mass || 1; // Default to 1 if no mass specified
+    const oldMass = this.growthRemaining;
     this.growthRemaining += mass;
+    
+    // Check if we should add a new segment (every 5 mass)
+    const oldSegments = Math.floor(oldMass / this.massPerSegment);
+    const newSegments = Math.floor(this.growthRemaining / this.massPerSegment);
+    
+    if (newSegments > oldSegments) {
+      this.addSegment();
+    }
+    
     return mass; // Return score increase based on mass
   }
   
@@ -549,19 +560,13 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body with 3D gradient spheres (separated beads)
-      const maxVisibleSegments = snake.visibleSegments;
+      // Draw snake body with consistent sized spheres
+      const actualSegments = snake.segments.length;
       
-      // Draw segments with consistent spacing regardless of boost state
-      const drawSpacing = 2.2; // Consistent spacing for better bead separation
-      
-      // Draw segments with dynamic sizing
-      for (let i = 0; i < maxVisibleSegments && i < snake.segments.length; i++) {
-        const segmentIndex = Math.min(Math.floor(i * drawSpacing), snake.segments.length - 1);
-        const segment = snake.segments[segmentIndex];
+      // Draw all actual segments (no spacing calculation needed)
+      for (let i = 0; i < actualSegments; i++) {
+        const segment = snake.segments[i];
         const isHead = i === 0;
-        
-        // Get dynamic radius based on snake's mass
         const segmentRadius = snake.getSegmentRadius(i);
         
         // Create radial gradient for 3D effect (light top, dark bottom)
@@ -657,7 +662,7 @@ export default function GamePage() {
       ctx.fillStyle = 'white';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Size: ${(snake.totalMass / 45 * 100).toFixed(0)}%`, 20, 70);
+      ctx.fillText(`Segments: ${snake.segments.length}`, 20, 70);
       
 
 
@@ -671,16 +676,16 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (45 mass = 15 visible segments)
+    // Reset snake to initial state (5 segments, 25 mass)
     snake.segments = [];
-    const START_MASS = 45;
-    const START_SEGMENTS = 60;
+    const START_MASS = 25;
+    const START_SEGMENTS = 5;
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
     }
     snake.currentAngle = 0;
     snake.growthRemaining = START_MASS;
-    snake.minimumMass = START_MASS * 0.5; // Reset minimum mass (50% of spawn)
+    snake.minimumMass = START_MASS; // Reset minimum mass (cannot go below starting)
     snake.setBoost(false);
     setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
@@ -707,7 +712,7 @@ export default function GamePage() {
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Size: {(snake.totalMass / 45 * 100).toFixed(0)}%</div>
+          <div className="text-white text-sm">Segments: {snake.segments.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
           <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass.toFixed(1)} (50% spawn)</div>
           {isBoosting && (
@@ -733,7 +738,7 @@ export default function GamePage() {
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
             <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Size: {(snake.totalMass / 45 * 100).toFixed(0)}%</div>
+            <div className="text-white text-lg mb-6">Final Segments: {snake.segments.length}</div>
             <div className="flex gap-4">
               <Button
                 onClick={resetGame}
