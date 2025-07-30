@@ -472,84 +472,45 @@ export default function GamePage() {
       // Camera follows snake head
       ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
 
-      // Draw hexagonal cellular pattern like Slither.io
-      const hexSize = 35;
-      const hexHeight = hexSize * Math.sqrt(3);
+      // Fill area outside death barrier with darker green
+      const mapSize = MAP_RADIUS * 2.5;
+      ctx.fillStyle = '#52a47a';
+      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
       
-      // Function to draw a filled hexagon at given center
-      const drawFilledHexagon = (centerX: number, centerY: number, fillColor: string, strokeColor: string) => {
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const angle = (i * Math.PI) / 3;
-          const x = centerX + hexSize * Math.cos(angle);
-          const y = centerY + hexSize * Math.sin(angle);
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        }
-        ctx.closePath();
-        
-        // Fill the hexagon
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-        
-        // Stroke the border
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      };
-      
-      // Draw hexagonal grid pattern with cellular appearance
-      const mapSize = MAP_RADIUS * 2.5; // Cover area larger than map for red zone
-      for (let row = 0; row * hexHeight * 0.75 < mapSize; row++) {
-        for (let col = 0; col * hexSize * 1.5 < mapSize; col++) {
-          const x = col * hexSize * 1.5;
-          const y = row * hexHeight * 0.75 + (col % 2) * hexHeight * 0.375;
-          
-          // Check distance from map center
-          const distanceFromCenter = Math.sqrt(
-            (x - MAP_CENTER_X) ** 2 + (y - MAP_CENTER_Y) ** 2
-          );
-          
-          let fillColor, strokeColor;
-          
-          if (distanceFromCenter > MAP_RADIUS) {
-            // Outside death barrier - red zone
-            const redIntensity = Math.min(255, 150 + (distanceFromCenter - MAP_RADIUS) * 0.1);
-            fillColor = `rgb(${redIntensity}, 20, 20)`;
-            strokeColor = '#8b0000';
-          } else {
-            // Inside safe zone - normal hexagons
-            const variation = Math.sin(x * 0.01 + y * 0.01) * 0.1;
-            const baseBlue = 0x2a + Math.floor(variation * 20);
-            const baseGreen = 0x2f + Math.floor(variation * 15);
-            const baseBrightness = 0x3a + Math.floor(variation * 25);
-            
-            fillColor = `rgb(${baseBlue}, ${baseGreen}, ${baseBrightness})`;
-            strokeColor = '#1a1d24';
-          }
-          
-          drawFilledHexagon(x, y, fillColor, strokeColor);
-        }
-      }
-
-      // Draw thick red barrier band
-      const barrierWidth = 60; // Width of the red barrier band
-      
-      // Draw outer red circle (barrier)
-      ctx.fillStyle = '#cc2222';
-      ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS + barrierWidth/2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Cut out inner circle to create ring
+      // Cut out the safe zone circle
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS - barrierWidth/2, 0, Math.PI * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
+      
+      // Draw simple black grid overlay
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.lineWidth = 1;
+      const gridSize = 50;
+      
+      // Vertical lines
+      for (let x = -mapSize; x <= mapSize; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, -mapSize);
+        ctx.lineTo(x, mapSize);
+        ctx.stroke();
+      }
+      
+      // Horizontal lines
+      for (let y = -mapSize; y <= mapSize; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(-mapSize, y);
+        ctx.lineTo(mapSize, y);
+        ctx.stroke();
+      }
+
+      // Draw thin death barrier line
+      ctx.strokeStyle = '#53d392';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
 
       // Draw food with gradient effect
       foods.forEach(food => {
