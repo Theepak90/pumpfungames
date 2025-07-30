@@ -192,7 +192,11 @@ export default function Home() {
           <span className="text-white text-lg">Welcome, </span>
           <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
         </div>
-
+        <button 
+          className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
+        >
+          Logout
+        </button>
       </div>
 
       {/* Main Content Container */}
