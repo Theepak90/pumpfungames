@@ -217,7 +217,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900 text-white font-mono">
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
-        <div className="text-green-400 text-xl mr-2">🎮</div>
+        <img src="/attached_assets/Untitled design (23)_1753911455454.png" alt="Controller" className="w-8 h-8 mr-3" />
         <span className="text-white text-lg">Welcome, </span>
         <span className="text-green-400 text-lg font-bold">{user.username}</span>
       </div>
@@ -228,9 +228,7 @@ export default function Home() {
           
           {/* Title Section */}
           <div className="text-center mb-8">
-            <h1 className="text-white text-5xl font-bold mb-2">
-              PumpGames<span className="text-green-400">.fun</span>
-            </h1>
+            <img src="/attached_assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png (2)_1753911455455.png" alt="PumpGames.fun" className="mx-auto mb-4 max-w-md h-auto" />
             <p className="text-gray-300 text-lg">Skill Based Betting</p>
           </div>
 
@@ -238,44 +236,44 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-8">
             
             {/* Left Panel - Leaderboard */}
-            <div className="bg-gray-800 p-4 rounded border border-gray-600">
+            <div className="bg-gray-800 p-4 rounded-lg border border-gray-600 min-h-[300px]">
               <h3 className="text-yellow-400 text-lg mb-3 flex items-center">
                 🏆 Leaderboard
               </h3>
-              <div className="text-white text-sm space-y-1">
+              <div className="text-white text-sm space-y-1 mb-4">
                 <div>1.</div>
                 <div>2.</div>
                 <div>3.</div>
               </div>
-              <button className="bg-gray-700 text-white px-4 py-1 mt-3 text-sm border border-gray-600 hover:bg-gray-600">
+              <button className="bg-gray-700 text-white px-4 py-2 text-sm border border-gray-600 hover:bg-gray-600 rounded w-full">
                 View Full Board
               </button>
             </div>
 
             {/* Center Panel - Game Controls */}
-            <div className="bg-gray-800 p-6 rounded border border-gray-600">
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-600 min-h-[300px]">
               
               {/* Username with edit icon */}
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-gray-400">〈Your Username〉</span>
-                <Edit3 className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center justify-between mb-4 bg-gray-700 px-4 py-2 rounded border border-gray-600">
+                <span className="text-gray-300">〈{user.username}〉</span>
+                <Edit3 className="w-4 h-4 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
               {/* Bet Amount */}
-              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 rounded">
+              <div className="bg-white text-black p-3 text-center font-bold text-xl mb-4 rounded border-2 border-gray-600">
                 {selectedBetAmount}$
               </div>
               
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="bg-green-500 text-white font-bold text-2xl py-4 w-full mb-4 rounded hover:bg-green-600 transition-colors"
+                className="bg-green-500 text-white font-bold text-2xl py-4 w-full mb-4 rounded border-2 border-green-400 hover:bg-green-600 transition-colors shadow-lg"
               >
                 PLAY
               </button>
               
               {/* Region and Friends buttons */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-4">
                 <button 
                   onClick={() => setSelectedRegion("EU")}
                   className={`py-2 px-4 text-sm border rounded ${
@@ -292,7 +290,7 @@ export default function Home() {
               </div>
               
               {/* Stats at bottom */}
-              <div className="mt-6 grid grid-cols-2 gap-4 text-center">
+              <div className="grid grid-cols-2 gap-4 text-center border-t border-gray-600 pt-4">
                 <div>
                   <div className="text-white font-bold text-xl">{playersInGame || 54}</div>
                   <div className="text-gray-400 text-xs">Players Online</div>
@@ -305,11 +303,11 @@ export default function Home() {
             </div>
 
             {/* Right Panel - Wallet */}
-            <div className="bg-gray-800 p-4 rounded border border-gray-600">
-              <h3 className="text-white text-lg mb-3">Wallet</h3>
+            <div className="bg-gray-800 p-4 rounded-lg border border-gray-600 min-h-[300px]">
+              <h3 className="text-white text-lg mb-4">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="text-green-400 font-bold text-3xl mb-4">
+              <div className="text-green-400 font-bold text-3xl mb-6 text-center bg-gray-900 py-4 rounded border border-gray-600">
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
