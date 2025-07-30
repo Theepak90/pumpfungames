@@ -354,26 +354,46 @@ export default function Home() {
                 >
                   $1
                 </button>
-                <div className="relative">
+                <div className="relative group">
                   <button 
                     disabled
-                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed w-full"
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
                   >
                     $5
                   </button>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 bg-gray-600 border border-gray-500" style={{clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)'}}></div>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" style={{imageRendering: 'pixelated'}}>
+                      <rect x="5" y="7" width="6" height="6" fill="currentColor"/>
+                      <rect x="4" y="6" width="1" height="1" fill="currentColor"/>
+                      <rect x="11" y="6" width="1" height="1" fill="currentColor"/>
+                      <rect x="4" y="5" width="1" height="1" fill="currentColor"/>
+                      <rect x="11" y="5" width="1" height="1" fill="currentColor"/>
+                      <rect x="6" y="4" width="4" height="1" fill="currentColor"/>
+                      <rect x="6" y="3" width="4" height="1" fill="currentColor"/>
+                      <rect x="7" y="2" width="2" height="1" fill="currentColor"/>
+                      <rect x="7" y="9" width="2" height="1" fill="currentColor"/>
+                    </svg>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="relative group">
                   <button 
                     disabled
-                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed w-full"
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
                   >
                     $20
                   </button>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 bg-gray-600 border border-gray-500" style={{clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)'}}></div>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" style={{imageRendering: 'pixelated'}}>
+                      <rect x="5" y="7" width="6" height="6" fill="currentColor"/>
+                      <rect x="4" y="6" width="1" height="1" fill="currentColor"/>
+                      <rect x="11" y="6" width="1" height="1" fill="currentColor"/>
+                      <rect x="4" y="5" width="1" height="1" fill="currentColor"/>
+                      <rect x="11" y="5" width="1" height="1" fill="currentColor"/>
+                      <rect x="6" y="4" width="4" height="1" fill="currentColor"/>
+                      <rect x="6" y="3" width="4" height="1" fill="currentColor"/>
+                      <rect x="7" y="2" width="2" height="1" fill="currentColor"/>
+                      <rect x="7" y="9" width="2" height="1" fill="currentColor"/>
+                    </svg>
                   </div>
                 </div>
               </div>
