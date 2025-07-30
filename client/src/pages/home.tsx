@@ -72,13 +72,11 @@ export default function Home() {
     const betAmount = selectedBetAmount;
     const userBalance = parseFloat(user.balance);
 
+    // For testing - give unlimited balance
     if (userBalance < betAmount) {
-      toast({
-        title: "Insufficient Balance",
-        description: "You don't have enough funds to play this game.",
-        variant: "destructive",
-      });
-      return;
+      // Auto-add funds for testing
+      const newBalance = Math.max(userBalance + 1000, betAmount * 10);
+      updateUser({ balance: newBalance.toFixed(4) });
     }
 
     try {

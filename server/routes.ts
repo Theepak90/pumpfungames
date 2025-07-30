@@ -139,8 +139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const betAmount = parseFloat(game.betAmount);
       const userBalance = parseFloat(user.balance);
 
+      // For testing - give unlimited balance
       if (userBalance < betAmount) {
-        return res.status(400).json({ message: "Insufficient balance" });
+        // Auto-add funds for testing instead of rejecting
+        await storage.updateUserBalance(userId, betAmount * 10);
       }
 
       // Deduct bet amount
