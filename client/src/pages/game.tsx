@@ -454,14 +454,12 @@ export default function GamePage() {
       // Camera follows snake head
       ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
 
-      // Draw hexagonal pattern like Slither.io
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-      const hexSize = 40;
+      // Draw hexagonal cellular pattern like Slither.io
+      const hexSize = 35;
       const hexHeight = hexSize * Math.sqrt(3);
       
-      // Function to draw a hexagon at given center
-      const drawHexagon = (centerX: number, centerY: number) => {
+      // Function to draw a filled hexagon at given center
+      const drawFilledHexagon = (centerX: number, centerY: number, fillColor: string, strokeColor: string) => {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
           const angle = (i * Math.PI) / 3;
@@ -474,15 +472,33 @@ export default function GamePage() {
           }
         }
         ctx.closePath();
+        
+        // Fill the hexagon
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+        
+        // Stroke the border
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
         ctx.stroke();
       };
       
-      // Draw hexagonal grid pattern
+      // Draw hexagonal grid pattern with cellular appearance
       for (let row = 0; row * hexHeight * 0.75 < MAP_HEIGHT + hexHeight; row++) {
         for (let col = 0; col * hexSize * 1.5 < MAP_WIDTH + hexSize * 2; col++) {
           const x = col * hexSize * 1.5;
           const y = row * hexHeight * 0.75 + (col % 2) * hexHeight * 0.375;
-          drawHexagon(x, y);
+          
+          // Vary the hex colors slightly for organic look
+          const variation = Math.sin(x * 0.01 + y * 0.01) * 0.1;
+          const baseBlue = 0x2a + Math.floor(variation * 20);
+          const baseGreen = 0x2f + Math.floor(variation * 15);
+          const baseBrightness = 0x3a + Math.floor(variation * 25);
+          
+          const fillColor = `rgb(${baseBlue}, ${baseGreen}, ${baseBrightness})`;
+          const strokeColor = '#1a1d24';
+          
+          drawFilledHexagon(x, y, fillColor, strokeColor);
         }
       }
 
