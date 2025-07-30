@@ -8,7 +8,6 @@ import {
   type GameState,
   type Player,
   type WebSocketMessage,
-  type Direction
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -293,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await storage.updateGameState(gameId, gameState);
 
     // Start game if enough players
-    if (gameState.players.length >= 2 && gameState.status === 'waiting') {
+    if (gameState.players.length >= 1 && gameState.status === 'waiting') { // Start with 1 player for testing
       gameState.status = 'active';
       await storage.updateGameState(gameId, gameState);
       await storage.updateGame(gameId, { status: 'active', startedAt: new Date() });
@@ -325,13 +324,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const angle = parseFloat(direction);
     if (!isNaN(angle)) {
       player.snake.angle = angle;
-      await storage.updateGameState(gameId, gameState);
     }
+
+    await storage.updateGameState(gameId, gameState);
   }
 
   async function handleLeaveGame(ws: AuthenticatedWebSocket, message: WebSocketMessage) {
     const { gameId, userId } = ws;
-    
     if (!gameId || !userId) return;
 
     const gameState = await storage.getGameState(gameId);
@@ -341,185 +340,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     gameState.players = gameState.players.filter(p => p.id !== userId);
     await storage.updateGameState(gameId, gameState);
 
-    // End game if no players left
-    if (gameState.players.length === 0) {
-      gameState.status = 'finished';
-      await storage.updateGameState(gameId, gameState);
-      await storage.updateGame(gameId, { status: 'finished', endedAt: new Date() });
-    }
-
-    ws.gameId = undefined;
-    
+    // Broadcast updated state
     broadcastToGame(gameId, {
-      type: 'game_state',
+      type: 'game_state', 
       payload: gameState
     });
+
+    ws.gameId = undefined;
   }
 
   function broadcastToGame(gameId: string, message: WebSocketMessage) {
-    wss.clients.forEach((client: AuthenticatedWebSocket) => {
-      if (client.readyState === WebSocket.OPEN && client.gameId === gameId) {
-        client.send(JSON.stringify(message));
+    wss.clients.forEach((client: WebSocket) => {
+      const ws = client as AuthenticatedWebSocket;
+      if (ws.gameId === gameId && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
       }
     });
   }
 
+  // Game loop for continuous movement (slither.io style)
+  const gameLoops = new Map<string, NodeJS.Timeout>();
+
   function startGameLoop(gameId: string) {
-    const gameLoop = setInterval(async () => {
+    if (gameLoops.has(gameId)) return; // Already running
+
+    const interval = setInterval(async () => {
       const gameState = await storage.getGameState(gameId);
       if (!gameState || gameState.status !== 'active') {
-        clearInterval(gameLoop);
+        clearInterval(interval);
+        gameLoops.delete(gameId);
         return;
       }
 
-      // Update game logic
-      await updateGameLogic(gameState);
+      // Update all players with continuous movement
+      for (const player of gameState.players) {
+        if (player.isAlive) {
+          updatePlayerPosition(player);
+          
+          // Check collisions with boundaries (wrap around like slither.io)
+          const head = player.snake.segments[0];
+          if (head.x < 0) head.x = gameState.gameArea.width;
+          if (head.x > gameState.gameArea.width) head.x = 0;
+          if (head.y < 0) head.y = gameState.gameArea.height;
+          if (head.y > gameState.gameArea.height) head.y = 0;
+
+          // Check food collision
+          checkFoodCollision(player, gameState);
+          
+          // Check snake collisions
+          checkSnakeCollisions(player, gameState);
+        }
+      }
+
+      // Remove dead players after a delay
+      gameState.players = gameState.players.filter(p => p.isAlive);
+
+      // End game if only one player left
+      if (gameState.players.length <= 1) {
+        gameState.status = 'finished';
+        await storage.updateGame(gameId, { status: 'finished', endedAt: new Date() });
+        clearInterval(interval);
+        gameLoops.delete(gameId);
+      }
+
       await storage.updateGameState(gameId, gameState);
 
-      // Broadcast updated state
+      // Broadcast update
       broadcastToGame(gameId, {
         type: 'game_update',
         payload: gameState
       });
+    }, 50); // 20 FPS for smooth movement
 
-      // Check for game end conditions
-      const alivePlayers = gameState.players.filter(p => p.isAlive);
-      if (alivePlayers.length <= 1) {
-        gameState.status = 'finished';
-        await storage.updateGameState(gameId, gameState);
-        await storage.updateGame(gameId, { status: 'finished', endedAt: new Date() });
-        clearInterval(gameLoop);
-      }
-    }, 1000 / 20); // 20 FPS for smoother movement
+    gameLoops.set(gameId, interval);
   }
 
-  async function updateGameLogic(gameState: GameState) {
-    const { players, food, gameArea } = gameState;
+  function updatePlayerPosition(player: Player) {
+    const head = player.snake.segments[0];
+    const speed = player.snake.speed;
+    const angle = player.snake.angle;
 
-    for (const player of players) {
-      if (!player.isAlive) continue;
+    // Calculate new head position based on angle
+    const newX = head.x + Math.cos(angle) * speed;
+    const newY = head.y + Math.sin(angle) * speed;
 
-      const { snake } = player;
-      const head = snake.segments[0];
-      
-      // Calculate new head position using smooth angle-based movement
-      const newHead = {
-        x: head.x + Math.cos(snake.angle) * snake.speed,
-        y: head.y + Math.sin(snake.angle) * snake.speed
-      };
+    // Add new head
+    player.snake.segments.unshift({ x: newX, y: newY });
 
-      // Check wall collision (wrap around or kill - let's wrap for now like slither.io)
-      if (newHead.x < 0) newHead.x = gameArea.width;
-      if (newHead.x >= gameArea.width) newHead.x = 0;
-      if (newHead.y < 0) newHead.y = gameArea.height;
-      if (newHead.y >= gameArea.height) newHead.y = 0;
+    // Remove tail if not growing
+    if (!player.snake.growing) {
+      player.snake.segments.pop();
+    } else {
+      player.snake.growing = false;
+    }
+  }
 
-      // Check self collision (head hitting own body)
-      for (let i = 4; i < snake.segments.length; i++) { // Skip first few segments to prevent immediate collision
-        const segment = snake.segments[i];
-        const distance = Math.sqrt(
-          Math.pow(newHead.x - segment.x, 2) + Math.pow(newHead.y - segment.y, 2)
-        );
-        if (distance < 15) { // Collision radius
-          player.isAlive = false;
-          await handlePlayerDeath(player.id);
-          break;
-        }
-      }
+  function checkFoodCollision(player: Player, gameState: GameState) {
+    const head = player.snake.segments[0];
+    const foodRadius = 8;
+    const snakeRadius = 10;
 
-      if (!player.isAlive) continue;
+    for (let i = gameState.food.length - 1; i >= 0; i--) {
+      const food = gameState.food[i];
+      const distance = Math.sqrt(
+        Math.pow(head.x - food.position.x, 2) + Math.pow(head.y - food.position.y, 2)
+      );
 
-      // Check collision with other snakes
-      for (const otherPlayer of players) {
-        if (otherPlayer.id === player.id || !otherPlayer.isAlive) continue;
-        
-        for (const segment of otherPlayer.snake.segments) {
-          const distance = Math.sqrt(
-            Math.pow(newHead.x - segment.x, 2) + Math.pow(newHead.y - segment.y, 2)
-          );
-          if (distance < 15) { // Collision radius
-            player.isAlive = false;
-            otherPlayer.kills++;
-            otherPlayer.earnings += gameState.betAmount;
-            
-            // Award earnings to killer
-            await storage.updateUserBalance(otherPlayer.id, gameState.betAmount);
-            await storage.updateUser(otherPlayer.id, { 
-              kills: (await storage.getUser(otherPlayer.id))!.kills + 1
-            });
-            
-            await handlePlayerDeath(player.id);
-            break;
-          }
-        }
-        if (!player.isAlive) break;
-      }
-
-      if (!player.isAlive) continue;
-
-      // Move snake - add new head
-      snake.segments.unshift(newHead);
-
-      // Check food collision
-      const eatenFoodIndex = food.findIndex(f => {
-        const distance = Math.sqrt(
-          Math.pow(f.position.x - newHead.x, 2) + Math.pow(f.position.y - newHead.y, 2)
-        );
-        return distance < 20;
-      });
-
-      if (eatenFoodIndex !== -1) {
-        food.splice(eatenFoodIndex, 1);
-        snake.growing = true;
+      if (distance < foodRadius + snakeRadius) {
+        gameState.food.splice(i, 1);
+        player.snake.growing = true;
+        player.kills += 1;
         
         // Add new food to maintain count
-        food.push(...generateFood(1, gameArea));
-      }
-
-      // Remove tail if not growing, otherwise grow the snake
-      if (snake.growing) {
-        snake.growing = false;
-      } else {
-        snake.segments.pop();
-      }
-
-      // Maintain smooth movement by updating segment positions
-      for (let i = 1; i < snake.segments.length; i++) {
-        const prev = snake.segments[i - 1];
-        const curr = snake.segments[i];
-        const distance = Math.sqrt(
-          Math.pow(prev.x - curr.x, 2) + Math.pow(prev.y - curr.y, 2)
-        );
-        
-        if (distance > 15) { // Maintain consistent segment spacing
-          const angle = Math.atan2(prev.y - curr.y, prev.x - curr.x);
-          snake.segments[i] = {
-            x: prev.x - Math.cos(angle) * 15,
-            y: prev.y - Math.sin(angle) * 15
-          };
-        }
+        gameState.food.push(generateSingleFood(gameState.gameArea));
       }
     }
   }
 
-  async function handlePlayerDeath(playerId: string) {
-    await storage.updateUser(playerId, {
-      deaths: (await storage.getUser(playerId))!.deaths + 1
-    });
+  function checkSnakeCollisions(player: Player, gameState: GameState) {
+    const head = player.snake.segments[0];
+    const snakeRadius = 10;
+
+    // Check collision with other snakes
+    for (const otherPlayer of gameState.players) {
+      if (otherPlayer.id === player.id || !otherPlayer.isAlive) continue;
+
+      for (const segment of otherPlayer.snake.segments) {
+        const distance = Math.sqrt(
+          Math.pow(head.x - segment.x, 2) + Math.pow(head.y - segment.y, 2)
+        );
+
+        if (distance < snakeRadius * 2) {
+          player.isAlive = false;
+          return;
+        }
+      }
+    }
+
+    // Check self collision (after head)
+    for (let i = 4; i < player.snake.segments.length; i++) {
+      const segment = player.snake.segments[i];
+      const distance = Math.sqrt(
+        Math.pow(head.x - segment.x, 2) + Math.pow(head.y - segment.y, 2)
+      );
+
+      if (distance < snakeRadius) {
+        player.isAlive = false;
+        return;
+      }
+    }
   }
 
+  // Helper functions for food generation
   function generateFood(count: number, gameArea: { width: number; height: number }) {
     const food = [];
     for (let i = 0; i < count; i++) {
-      food.push({
-        position: {
-          x: Math.random() * gameArea.width,
-          y: Math.random() * gameArea.height
-        },
-        value: 1
-      });
+      food.push(generateSingleFood(gameArea));
     }
     return food;
+  }
+
+  function generateSingleFood(gameArea: { width: number; height: number }) {
+    return {
+      position: {
+        x: Math.random() * gameArea.width,
+        y: Math.random() * gameArea.height
+      },
+      value: Math.floor(Math.random() * 5) + 1, // Random value 1-5
+      color: `hsl(${Math.random() * 360}, 70%, 60%)`
+    };
   }
 
   return httpServer;

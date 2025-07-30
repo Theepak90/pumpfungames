@@ -61,7 +61,7 @@ export function SnakeGame({ gameState, onMove, onLeave }: SnakeGameProps) {
       
       setMousePos({ x: mouseX, y: mouseY });
       
-      // Calculate direction from center to mouse
+      // Calculate direction from center to mouse for slither.io controls
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       
@@ -162,12 +162,12 @@ export function SnakeGame({ gameState, onMove, onLeave }: SnakeGameProps) {
   };
 
   const drawFood = (ctx: CanvasRenderingContext2D) => {
-    gameState.food.forEach(food => {
-      ctx.fillStyle = '#FFD700';
-      ctx.shadowColor = '#FFD700';
+    gameState.food.forEach((food: any) => {
+      ctx.fillStyle = food.color || '#FFD700';
+      ctx.shadowColor = food.color || '#FFD700';
       ctx.shadowBlur = 10;
       ctx.beginPath();
-      ctx.arc(food.position.x, food.position.y, 8, 0, 2 * Math.PI);
+      ctx.arc(food.position.x, food.position.y, 6 + (food.value || 1), 0, 2 * Math.PI);
       ctx.fill();
       ctx.shadowBlur = 0;
     });
