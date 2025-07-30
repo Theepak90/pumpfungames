@@ -412,14 +412,14 @@ export default function Home() {
               {/* Region and Friends buttons */}
               <div className="grid grid-cols-2 gap-1 mb-3">
                 <button 
-                  onClick={() => setSelectedRegion("EU")}
+                  onClick={() => setSelectedRegion(selectedRegion === "EU" ? "US" : "EU")}
                   className={`py-1 px-3 text-sm border-2 font-retro ${
                     selectedRegion === "EU" 
                       ? 'bg-blue-600 text-white border-blue-500' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
-                  }`}
+                  } transition-colors`}
                 >
-                  EU
+                  {selectedRegion}
                 </button>
                 <button className="bg-gray-700 text-white py-1 px-3 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro">
                   Friends
