@@ -143,53 +143,15 @@ export default function Home() {
 
   // Start game handler
   const handleStartGame = async () => {
-    if (!user) return;
-
     const betAmount = selectedBetAmount;
-    const userBalance = parseFloat(user.balance);
-
-    // For testing - give unlimited balance
-    if (userBalance < betAmount) {
-      // Auto-add funds for testing
-      const newBalance = Math.max(userBalance + 1000, betAmount * 10);
-      updateUser({ balance: newBalance.toFixed(4) });
-    }
-
-    try {
-      // Create a new game
-      const gameResponse = await apiRequest("POST", "/api/games/create", {
-        region: selectedRegion,
-        betAmount: betAmount.toFixed(2),
-        playersCount: 0,
-        maxPlayers: 20,
-        status: 'waiting'
-      });
-      const game = await gameResponse.json();
-
-      // Join the game
-      const joinResponse = await apiRequest("POST", `/api/games/${game.id}/join`, {
-        userId: user.id
-      });
-
-      if (joinResponse.ok) {
-        // Update user balance locally
-        updateUser({ balance: (userBalance - betAmount).toFixed(4) });
-        
-        toast({
-          title: "Game Started!",
-          description: `Starting snake game with $${betAmount} bet.`,
-        });
-        
-        // Navigate to fullscreen game
-        setLocation('/game');
-      }
-    } catch (error) {
-      toast({
-        title: "Failed to Start Game",
-        description: error instanceof Error ? error.message : "Could not start the game.",
-        variant: "destructive",
-      });
-    }
+    
+    toast({
+      title: "Game Started!",
+      description: `Starting snake game with $${betAmount} bet.`,
+    });
+    
+    // Navigate to fullscreen game
+    setLocation('/game');
   };
 
   // Handle daily crate claim
@@ -219,42 +181,7 @@ export default function Home() {
 
   // Mouse controls are now handled in the SnakeGame component
 
-  // Show auth form if not logged in
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-dark-card border-dark-border">
-          <CardHeader className="text-center">
-            <div className="text-4xl mb-2">🎃</div>
-            <CardTitle className="text-2xl neon-yellow">DAMNBRUH</CardTitle>
-            <p className="text-gray-400">Skill-Based Crypto Snake Game</p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAuth} className="space-y-4">
-              <Input
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="bg-dark-bg border-dark-border"
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-dark-bg border-dark-border"
-                required
-              />
-              <Button type="submit" className="w-full bg-neon-yellow text-black hover:bg-yellow-400">
-                Login
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Skip authentication for now - show homepage directly
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
@@ -265,14 +192,7 @@ export default function Home() {
           <span className="text-white text-lg">Welcome, </span>
           <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
         </div>
-        {user && (
-          <button 
-            onClick={logout}
-            className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
-          >
-            Logout
-          </button>
-        )}
+
       </div>
 
       {/* Main Content Container */}
@@ -429,7 +349,7 @@ export default function Home() {
               
               {/* Balance Display */}
               <div className="font-bold text-lg mb-3 text-center bg-gray-900 py-3 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
-                ${parseFloat(user.balance).toFixed(2)}
+                $984.37
               </div>
               
               {/* Wallet buttons */}
