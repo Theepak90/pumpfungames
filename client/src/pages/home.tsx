@@ -214,12 +214,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#1a1a1a'}}>
+    <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
-        <div className="text-green-400 text-2xl mr-3">🎮</div>
+        <div className="text-2xl mr-3" style={{color: '#53d493'}}>🎮</div>
         <span className="text-white text-lg">Welcome, </span>
-        <span className="text-green-400 text-lg font-bold">Player one</span>
+        <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
       </div>
 
       {/* Main Content Container */}
@@ -229,7 +229,7 @@ export default function Home() {
           {/* Title Section */}
           <div className="text-center mb-8">
             <h1 className="text-white text-4xl font-bold mb-2 font-retro tracking-wider">
-              PumpGames<span className="text-green-400">.fun</span>
+              PumpGames<span style={{color: '#53d493'}}>.fun</span>
             </h1>
             <p className="text-gray-300 text-lg font-retro">Skill Based Betting</p>
           </div>
@@ -271,7 +271,10 @@ export default function Home() {
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="bg-green-500 text-white font-bold text-lg py-3 w-full mb-4 font-retro hover:bg-green-600 transition-colors border border-green-400"
+                className="text-white font-bold text-lg py-3 w-full mb-4 font-retro transition-colors border"
+                style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4ac785'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#53d493'}
               >
                 PLAY
               </button>
@@ -311,7 +314,7 @@ export default function Home() {
               <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="text-green-400 font-bold text-lg mb-4 text-center bg-gray-900 py-3 border border-gray-600 font-retro">
+              <div className="font-bold text-lg mb-4 text-center bg-gray-900 py-3 border border-gray-600 font-retro" style={{color: '#53d493'}}>
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
