@@ -535,14 +535,21 @@ export default function GamePage() {
         }
       }
 
-      // Draw circular death barrier
-      ctx.strokeStyle = '#ff3333';
-      ctx.lineWidth = 6;
-      ctx.setLineDash([30, 15]);
+      // Draw thick red barrier band
+      const barrierWidth = 60; // Width of the red barrier band
+      
+      // Draw outer red circle (barrier)
+      ctx.fillStyle = '#cc2222';
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS + barrierWidth/2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Cut out inner circle to create ring
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS - barrierWidth/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
 
       // Draw food with gradient effect
       foods.forEach(food => {
