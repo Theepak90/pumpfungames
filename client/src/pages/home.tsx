@@ -258,7 +258,7 @@ export default function Home() {
               
               {/* Username with edit icon */}
               <div className="flex items-center justify-between mb-3 bg-gray-700 px-3 py-2 border-2 border-gray-600">
-                <span className="text-gray-300 font-retro text-sm">〈Your Username〉</span>
+                <span className="text-gray-300 font-retro text-xs">〈Username〉</span>
                 <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
@@ -298,12 +298,12 @@ export default function Home() {
               {/* Stats at bottom */}
               <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-600 pt-2">
                 <div>
-                  <div className="text-white font-bold text-base font-retro">{playersInGame || 54}</div>
-                  <div className="text-gray-400 text-sm font-retro">Players Online</div>
+                  <div className="text-white font-bold text-sm font-retro">{playersInGame || 54}</div>
+                  <div className="text-gray-400 text-xs font-retro">Players Online</div>
                 </div>
                 <div>
-                  <div className="text-white font-bold text-base font-retro">+${(globalWinnings || 240331).toLocaleString()}</div>
-                  <div className="text-gray-400 text-sm font-retro">Global Player Winnings</div>
+                  <div className="text-white font-bold text-sm font-retro">+${(globalWinnings || 240331).toLocaleString()}</div>
+                  <div className="text-gray-400 text-xs font-retro">Global Winnings</div>
                 </div>
               </div>
             </div>
