@@ -341,9 +341,41 @@ export default function Home() {
                 <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
-              {/* Bet Amount */}
-              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-3 font-retro border-2 border-gray-600">
-                {selectedBetAmount}$
+              {/* Bet Amount Selection */}
+              <div className="grid grid-cols-3 gap-1 mb-3">
+                <button 
+                  onClick={() => setSelectedBetAmount(1)}
+                  className={`py-2 px-3 text-sm border-2 font-retro ${
+                    selectedBetAmount === 1 
+                      ? 'text-white border-2' 
+                      : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
+                  }`}
+                  style={selectedBetAmount === 1 ? {backgroundColor: '#53d493', borderColor: '#53d493'} : {}}
+                >
+                  $1
+                </button>
+                <div className="relative">
+                  <button 
+                    disabled
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed w-full"
+                  >
+                    $5
+                  </button>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-gray-600 border border-gray-500" style={{clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)'}}></div>
+                  </div>
+                </div>
+                <div className="relative">
+                  <button 
+                    disabled
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed w-full"
+                  >
+                    $20
+                  </button>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-gray-600 border border-gray-500" style={{clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)'}}></div>
+                  </div>
+                </div>
               </div>
               
               {/* Play Button */}
