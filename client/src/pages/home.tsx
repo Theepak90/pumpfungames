@@ -38,11 +38,33 @@ export default function Home() {
   const { isConnected, gameState, joinGame, move, leaveGame } = useWebSocket(user?.id || null);
   const { toast } = useToast();
 
+  // Animated player count effect
+  useEffect(() => {
+    let direction = 1; // 1 for up, -1 for down
+    let currentCount = 150;
+    
+    const interval = setInterval(() => {
+      currentCount += direction;
+      
+      // Change direction at boundaries
+      if (currentCount >= 600) {
+        direction = -1;
+      } else if (currentCount <= 150) {
+        direction = 1;
+      }
+      
+      setAnimatedPlayerCount(currentCount);
+    }, 2000 + Math.random() * 3000); // Random interval between 2-5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -298,7 +320,7 @@ export default function Home() {
               {/* Stats at bottom */}
               <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-600 pt-2">
                 <div>
-                  <div className="text-white font-bold text-sm font-retro">{playersInGame || 54}</div>
+                  <div className="text-white font-bold text-sm font-retro">{animatedPlayerCount}</div>
                   <div className="text-gray-400 text-xs font-retro">Players Online</div>
                 </div>
                 <div>
