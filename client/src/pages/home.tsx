@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
 import { useGame } from "@/contexts/game-context";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet } from "@/components/ui/wallet";
-import { SimpleSnake } from "@/components/game/simple-snake";
+
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Settings, 
@@ -23,6 +24,7 @@ import {
 
 export default function Home() {
   const { user, login, register, logout, updateUser } = useAuth();
+  const [, setLocation] = useLocation();
   const { 
     selectedBetAmount, 
     setSelectedBetAmount, 
@@ -38,7 +40,7 @@ export default function Home() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isGameActive, setIsGameActive] = useState(false);
+
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Auth form handler
@@ -99,13 +101,13 @@ export default function Home() {
         // Update user balance locally
         updateUser({ balance: (userBalance - betAmount).toFixed(4) });
         
-        // Start simple snake game
-        setIsGameActive(true);
-        
         toast({
           title: "Game Started!",
           description: `Starting snake game with $${betAmount} bet.`,
         });
+        
+        // Navigate to fullscreen game
+        setLocation('/game');
       }
     } catch (error) {
       toast({
@@ -271,16 +273,7 @@ export default function Home() {
 
           {/* Center Panel */}
           <main className="lg:col-span-2 space-y-6">
-            {/* Game Area or Username Block */}
-            {isGameActive ? (
-              <SimpleSnake 
-                onExit={() => {
-                  setIsGameActive(false);
-                }}
-              />
-            ) : (
-              <>
-                {/* Username Block */}
+            {/* Username Block */}
                 <div className="flex items-center justify-center space-x-4">
                   {/* Score cube */}
                   <div className="bg-neon-yellow text-black w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl glow-hover">
@@ -358,8 +351,6 @@ export default function Home() {
                     </div>
                   </CardContent>
                 </Card>
-              </>
-            )}
           </main>
 
           {/* Right Panel */}
