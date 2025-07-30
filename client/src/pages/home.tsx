@@ -21,6 +21,7 @@ import {
   Users,
   Gift
 } from "lucide-react";
+import logoImage from "@assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png_1753912259610.png";
 
 export default function Home() {
   const { user, login, register, logout, updateUser } = useAuth();
@@ -217,7 +218,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
-        <div className="text-2xl mr-3" style={{color: '#53d493'}}>🎮</div>
+        <img src={logoImage} alt="Game Logo" className="w-8 h-8 mr-3" />
         <span className="text-white text-lg">Welcome, </span>
         <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
       </div>
