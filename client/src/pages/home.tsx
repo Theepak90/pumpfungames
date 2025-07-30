@@ -12,7 +12,7 @@ import { Leaderboard } from "@/components/ui/leaderboard";
 import { Wallet } from "@/components/ui/wallet";
 import { Friends } from "@/components/ui/friends";
 import { SnakeCustomizer } from "@/components/ui/snake-customizer";
-import { SimpleSnake } from "@/components/game/simple-snake";
+import { FreshSnake } from "@/components/game/fresh-snake";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Settings, 
@@ -284,7 +284,7 @@ export default function Home() {
           <main className="lg:col-span-6 space-y-6">
             {/* Game Area or Username Block */}
             {isGameActive ? (
-              <SimpleSnake 
+              <FreshSnake 
                 onExit={() => {
                   setIsGameActive(false);
                 }}
