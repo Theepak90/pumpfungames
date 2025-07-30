@@ -229,8 +229,62 @@ export class DatabaseStorage implements IStorage {
       .from(gameStates)
       .where(eq(gameStates.id, gameId));
     
-    if (!state) return undefined;
-    return state.data as GameState;
+    if (state) {
+      return state.data as GameState;
+    }
+
+    // Create initial game state if it doesn't exist
+    const game = await this.getGame(gameId);
+    if (!game) return undefined;
+
+    const participants = await this.getGameParticipants(gameId);
+    const users = await Promise.all(
+      participants.map(p => this.getUser(p.userId))
+    );
+
+    const players = participants.map((participant, index) => ({
+      id: participant.userId,
+      username: users[index]?.username || 'Unknown',
+      color: this.getRandomColor(),
+      kills: participant.kills,
+      isAlive: participant.isAlive,
+      snake: {
+        segments: [{ x: 500 + Math.random() * 500, y: 500 + Math.random() * 500 }],
+        direction: Math.random() * Math.PI * 2
+      }
+    }));
+
+    const initialGameState: GameState = {
+      gameId,
+      players,
+      food: this.generateFood(20),
+      gameTime: 0,
+      status: 'active'
+    };
+
+    await this.updateGameState(gameId, initialGameState);
+    return initialGameState;
+  }
+
+  private getRandomColor(): string {
+    const colors = ['#FFD700', '#32CD32', '#1E90FF', '#FF69B4', '#FF4500', '#9370DB', '#00CED1'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  private generateFood(count: number): any[] {
+    const food = [];
+    for (let i = 0; i < count; i++) {
+      food.push({
+        id: `food_${i}`,
+        position: {
+          x: Math.random() * 2000,
+          y: Math.random() * 2000
+        },
+        value: Math.floor(Math.random() * 3) + 1,
+        color: this.getRandomColor()
+      });
+    }
+    return food;
   }
 
   async updateGameState(gameId: string, state: GameState): Promise<void> {

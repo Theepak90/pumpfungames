@@ -218,16 +218,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket handling
   wss.on('connection', (ws: AuthenticatedWebSocket) => {
+    console.log('New WebSocket connection');
+    
     ws.on('message', async (data: Buffer) => {
       try {
         const message: WebSocketMessage = JSON.parse(data.toString());
+        console.log('Received WebSocket message:', message);
         
         switch (message.type) {
           case 'authenticate':
             ws.userId = message.payload.userId;
+            console.log('Authenticated user:', ws.userId);
             break;
             
           case 'join_game':
+            console.log('Processing join_game request');
             await handleJoinGame(ws, message);
             break;
             
@@ -254,9 +259,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Game logic functions
   async function handleJoinGame(ws: AuthenticatedWebSocket, message: WebSocketMessage) {
     const { gameId } = message.payload;
-    const gameState = await storage.getGameState(gameId);
+    console.log('Joining game:', gameId, 'User:', ws.userId);
     
-    if (!gameState || !ws.userId) return;
+    const gameState = await storage.getGameState(gameId);
+    console.log('Game state found:', !!gameState);
+    
+    if (!gameState || !ws.userId) {
+      console.log('Missing game state or user ID');
+      return;
+    }
 
     ws.gameId = gameId;
     
@@ -302,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Broadcast updated game state
+    console.log('Broadcasting game state to', gameState.players.length, 'players');
     broadcastToGame(gameId, {
       type: 'game_state',
       payload: gameState

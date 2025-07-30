@@ -15,6 +15,7 @@ export function useWebSocket(userId: string | null) {
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
+      console.log('WebSocket connected');
       setIsConnected(true);
       // Authenticate with the server
       sendMessage({
@@ -30,6 +31,7 @@ export function useWebSocket(userId: string | null) {
         switch (message.type) {
           case 'game_state':
           case 'game_update':
+            console.log('Game state received:', message.payload);
             setGameState(message.payload);
             break;
           default:
@@ -62,6 +64,7 @@ export function useWebSocket(userId: string | null) {
   };
 
   const joinGame = (gameId: string) => {
+    console.log('Joining game:', gameId);
     sendMessage({
       type: 'join_game',
       payload: { gameId }
