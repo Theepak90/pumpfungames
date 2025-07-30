@@ -218,7 +218,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
-        <img src={logoImage} alt="Game Logo" className="w-8 h-8 mr-3" />
+        <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
         <span className="text-white text-lg">Welcome, </span>
         <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
       </div>
