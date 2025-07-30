@@ -49,36 +49,53 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Update snake direction based on mouse position
-  useEffect(() => {
-    const head = snake.segments[0];
-    if (!head) return;
-    
-    // Calculate direction from snake head to mouse
-    const dx = mousePos.x - head.x;
-    const dy = mousePos.y - head.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance > 5) { // Only move if mouse is far enough
-      setTargetDirection({
-        x: (dx / distance) * SNAKE_SPEED,
-        y: (dy / distance) * SNAKE_SPEED
-      });
-    } else {
-      // Stop moving when very close to mouse
-      setTargetDirection({ x: 0, y: 0 });
-    }
-  }, [mousePos, snake.segments]);
+  // Update snake direction based on mouse position - use ref for real-time updates
+  const mousePosRef = useRef(mousePos);
+  mousePosRef.current = mousePos;
+  
+  const snakeRef = useRef(snake);
+  snakeRef.current = snake;
 
-  // Game loop
+  // Continuous direction updating
   useEffect(() => {
-    const gameLoop = setInterval(() => {
+    const updateDirection = () => {
+      const head = snakeRef.current.segments[0];
+      if (!head) return;
+      
+      // Calculate direction from snake head to mouse
+      const dx = mousePosRef.current.x - head.x;
+      const dy = mousePosRef.current.y - head.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 8) { // Only move if mouse is far enough
+        setTargetDirection({
+          x: (dx / distance) * SNAKE_SPEED,
+          y: (dy / distance) * SNAKE_SPEED
+        });
+      } else {
+        // Slow down when very close to mouse
+        setTargetDirection({ 
+          x: dx * 0.1, 
+          y: dy * 0.1 
+        });
+      }
+    };
+
+    const intervalId = setInterval(updateDirection, 16); // ~60fps updates
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Game loop with requestAnimationFrame for smoother movement
+  useEffect(() => {
+    let animationId: number;
+    
+    const gameLoop = () => {
       setSnake(prevSnake => {
         const newSnake = { ...prevSnake };
         
-        // Smoothly interpolate direction
-        newSnake.direction.x += (targetDirection.x - newSnake.direction.x) * 0.1;
-        newSnake.direction.y += (targetDirection.y - newSnake.direction.y) * 0.1;
+        // Much faster and smoother interpolation
+        newSnake.direction.x += (targetDirection.x - newSnake.direction.x) * 0.3;
+        newSnake.direction.y += (targetDirection.y - newSnake.direction.y) * 0.3;
         
         // Move snake head
         const head = { ...newSnake.segments[0] };
@@ -89,14 +106,37 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
         head.x = Math.max(10, Math.min(CANVAS_WIDTH - 10, head.x));
         head.y = Math.max(10, Math.min(CANVAS_HEIGHT - 10, head.y));
         
-        // Update segments
-        newSnake.segments = [head, ...newSnake.segments.slice(0, 10)]; // Keep 10 segments
+        // Update segments - smoother trailing
+        const newSegments = [head];
+        for (let i = 1; i < Math.min(15, prevSnake.segments.length + 1); i++) {
+          const prevSegment = newSegments[i - 1];
+          const currentSegment = prevSnake.segments[i - 1] || prevSegment;
+          
+          // Smooth following for each segment
+          const dx = prevSegment.x - currentSegment.x;
+          const dy = prevSegment.y - currentSegment.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance > 12) { // Maintain distance between segments
+            const ratio = (distance - 12) / distance;
+            newSegments.push({
+              x: currentSegment.x + dx * ratio,
+              y: currentSegment.y + dy * ratio
+            });
+          } else {
+            newSegments.push({ ...currentSegment });
+          }
+        }
         
+        newSnake.segments = newSegments;
         return newSnake;
       });
-    }, 50);
-
-    return () => clearInterval(gameLoop);
+      
+      animationId = requestAnimationFrame(gameLoop);
+    };
+    
+    animationId = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(animationId);
   }, [targetDirection]);
 
   // Render loop
