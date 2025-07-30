@@ -18,19 +18,25 @@ interface Food {
 class SmoothSnake {
   segments: Position[];
   speed: number;
+  baseSpeed: number;
   radius: number;
   currentAngle: number;
   turnSpeed: number;
   segmentSpacing: number;
   growthRemaining: number;
+  isBoosting: boolean;
+  boostCooldown: number;
   
   constructor(x: number, y: number) {
-    this.speed = 4;
+    this.baseSpeed = 4;
+    this.speed = this.baseSpeed;
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
     this.segmentSpacing = 8; // Distance between segments
     this.growthRemaining = 0; // Growth counter for eating food
+    this.isBoosting = false;
+    this.boostCooldown = 0;
     
     // Initialize with evenly spaced segments
     this.segments = [];
@@ -51,7 +57,7 @@ class SmoothSnake {
     return this.segments.length;
   }
   
-  move(mouseDirectionX: number, mouseDirectionY: number) {
+  move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
     // Calculate target angle from mouse direction relative to screen center
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
@@ -66,6 +72,34 @@ class SmoothSnake {
     // Keep currentAngle in proper range to prevent accumulation
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
+    
+    // Handle boost mechanic
+    if (this.isBoosting && this.segments.length > 10) {
+      this.speed = this.baseSpeed * 1.5; // Boost speed
+      this.boostCooldown++;
+      
+      // Drop food orbs every 8 frames while boosting
+      if (this.boostCooldown % 8 === 0 && onDropFood) {
+        const tail = this.segments[this.segments.length - 1];
+        onDropFood({
+          x: tail.x + (Math.random() - 0.5) * 20,
+          y: tail.y + (Math.random() - 0.5) * 20,
+          size: 3,
+          color: '#ff6600'
+        });
+      }
+      
+      // Shrink snake gradually while boosting
+      if (this.boostCooldown % 4 === 0) { // Every 4 frames
+        if (this.growthRemaining > 0) {
+          this.growthRemaining--;
+        } else if (this.segments.length > 10) {
+          this.segments.pop();
+        }
+      }
+    } else {
+      this.speed = this.baseSpeed;
+    }
     
     // Move head in current direction
     const newHead = {
@@ -107,10 +141,16 @@ class SmoothSnake {
   }
   
   eatFood(food: Food) {
-    // More realistic growth - smaller amounts like Slither.io
-    const growthPerFood = Math.max(1, Math.floor(food.size / 3)); // Much less dramatic
-    this.growthRemaining += growthPerFood;
+    // Very realistic growth - just 1 segment per orb like real Slither.io
+    this.growthRemaining += 1;
     return Math.floor(food.size); // Return score increase
+  }
+  
+  setBoost(boosting: boolean) {
+    this.isBoosting = boosting;
+    if (!boosting) {
+      this.boostCooldown = 0;
+    }
   }
 }
 
@@ -122,6 +162,7 @@ export default function GamePage() {
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
+  const [isBoosting, setIsBoosting] = useState(false);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -185,6 +226,45 @@ export default function GamePage() {
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
   }, [canvasSize]);
 
+  // Boost controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        setIsBoosting(true);
+        snake.setBoost(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        setIsBoosting(false);
+        snake.setBoost(false);
+      }
+    };
+
+    const handleMouseDown = () => {
+      setIsBoosting(true);
+      snake.setBoost(true);
+    };
+
+    const handleMouseUp = () => {
+      setIsBoosting(false);
+      snake.setBoost(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [snake]);
+
   // Game loop
   useEffect(() => {
     if (gameOver) return;
@@ -199,7 +279,10 @@ export default function GamePage() {
     
     const gameLoop = () => {
       // Move snake with smooth turning based on mouse direction
-      snake.move(mouseDirection.x, mouseDirection.y);
+      snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
+        // Add dropped food from boosting to the food array
+        setFoods(prevFoods => [...prevFoods, droppedFood]);
+      });
 
       // Check map boundaries (death barrier)
       const updatedHead = snake.head;
@@ -366,26 +449,7 @@ export default function GamePage() {
       ctx.fillText(`Score: ${score}`, 20, 40);
       ctx.fillText(`Length: ${snake.length}`, 20, 70);
       
-      // Draw direction indicator at screen center
-      const centerX = canvasSize.width / 2;
-      const centerY = canvasSize.height / 2;
-      const indicatorLength = 40;
-      
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.lineTo(
-        centerX + mouseDirection.x * indicatorLength,
-        centerY + mouseDirection.y * indicatorLength
-      );
-      ctx.stroke();
-      
-      // Small circle at center
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
-      ctx.fill();
+
 
       animationId = requestAnimationFrame(gameLoop);
     };
@@ -404,6 +468,8 @@ export default function GamePage() {
     }
     snake.currentAngle = 0;
     snake.growthRemaining = 0;
+    snake.setBoost(false);
+    setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
   };
 
@@ -429,6 +495,17 @@ export default function GamePage() {
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score}</div>
           <div className="text-white text-sm">Length: {snake.length}</div>
+          {isBoosting && (
+            <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
+          )}
+        </div>
+      </div>
+      
+      {/* Controls Instructions */}
+      <div className="absolute bottom-4 left-4 z-10">
+        <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
+          <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
+          <div className="text-gray-400 text-xs">Boost drops food but shrinks snake</div>
         </div>
       </div>
       
