@@ -5,16 +5,14 @@ import {
   type InsertGame,
   type GameParticipant,
   type InsertGameParticipant,
-  type Friendship,
-  type InsertFriendship,
   type DailyCrate,
   type InsertDailyCrate,
   type GameState,
   type Player,
+  type Direction,
   users,
   games,
   gameParticipants,
-  friendships,
   dailyCrates,
   gameStates
 } from "@shared/schema";
@@ -28,7 +26,6 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   updateUserBalance(id: string, amount: number): Promise<User | undefined>;
-  getLeaderboard(limit?: number): Promise<User[]>;
 
   // Game operations
   createGame(game: InsertGame): Promise<Game>;
@@ -39,10 +36,7 @@ export interface IStorage {
   getGameParticipants(gameId: string): Promise<GameParticipant[]>;
   updateGameParticipant(id: string, updates: Partial<GameParticipant>): Promise<GameParticipant | undefined>;
 
-  // Friend operations
-  getFriends(userId: string): Promise<User[]>;
-  addFriend(userId: string, friendId: string): Promise<Friendship>;
-  acceptFriendRequest(userId: string, friendId: string): Promise<Friendship | undefined>;
+
 
   // Daily crate operations
   getLastDailyCrate(userId: string): Promise<DailyCrate | undefined>;
@@ -93,13 +87,7 @@ export class DatabaseStorage implements IStorage {
     return this.updateUser(id, { balance: newBalance.toFixed(4) });
   }
 
-  async getLeaderboard(limit: number = 10): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(desc(users.kills), desc(users.totalEarnings))
-      .limit(limit);
-  }
+
 
   // Game operations
   async createGame(game: InsertGame): Promise<Game> {
@@ -161,44 +149,7 @@ export class DatabaseStorage implements IStorage {
     return updatedParticipant || undefined;
   }
 
-  // Friend operations
-  async getFriends(userId: string): Promise<User[]> {
-    const userFriendships = await db
-      .select({
-        friendId: friendships.friendId,
-      })
-      .from(friendships)
-      .where(and(eq(friendships.userId, userId), eq(friendships.status, 'accepted')));
 
-    if (userFriendships.length === 0) return [];
-
-    const friendIds = userFriendships.map((f: any) => f.friendId);
-    return await db
-      .select()
-      .from(users)
-      .where(or(...friendIds.map((id: string) => eq(users.id, id))));
-  }
-
-  async addFriend(userId: string, friendId: string): Promise<Friendship> {
-    const [friendship] = await db
-      .insert(friendships)
-      .values({
-        userId,
-        friendId,
-        status: 'accepted' // Auto-accept for simplicity
-      })
-      .returning();
-    return friendship;
-  }
-
-  async acceptFriendRequest(userId: string, friendId: string): Promise<Friendship | undefined> {
-    const [updatedFriendship] = await db
-      .update(friendships)
-      .set({ status: 'accepted' })
-      .where(and(eq(friendships.userId, friendId), eq(friendships.friendId, userId)))
-      .returning();
-    return updatedFriendship || undefined;
-  }
 
   // Daily crate operations
   async getLastDailyCrate(userId: string): Promise<DailyCrate | undefined> {
@@ -247,20 +198,24 @@ export class DatabaseStorage implements IStorage {
       username: users[index]?.username || 'Unknown',
       color: this.getRandomColor(),
       kills: participant.kills,
-      earnings: participant.earnings,
+      earnings: parseFloat(participant.earnings),
       isAlive: participant.isAlive,
       snake: {
         segments: [{ x: 500 + Math.random() * 500, y: 500 + Math.random() * 500 }],
-        direction: Math.random() * Math.PI * 2
+        direction: 'right' as Direction,
+        angle: Math.random() * Math.PI * 2,
+        speed: 2,
+        growing: false
       }
     }));
 
     const initialGameState: GameState = {
-      gameId,
+      id: gameId,
       players,
       food: this.generateFood(20),
-      gameTime: 0,
-      status: 'active'
+      gameArea: { width: 4000, height: 4000 },
+      status: 'active',
+      betAmount: parseFloat(game.betAmount)
     };
 
     await this.updateGameState(gameId, initialGameState);

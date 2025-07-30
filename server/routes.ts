@@ -92,18 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/users/:id/snake-color", async (req, res) => {
-    try {
-      const { color } = z.object({ color: z.string() }).parse(req.body);
-      const user = await storage.updateUser(req.params.id, { snakeColor: color });
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json({ ...user, password: undefined });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid color" });
-    }
-  });
+
 
   // Game routes
   app.get("/api/games/active", async (req, res) => {
@@ -170,34 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Leaderboard route
-  app.get("/api/leaderboard", async (req, res) => {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const leaderboard = await storage.getLeaderboard(limit);
-    res.json(leaderboard.map(user => ({ ...user, password: undefined })));
-  });
 
-  // Friends routes
-  app.get("/api/users/:id/friends", async (req, res) => {
-    const friends = await storage.getFriends(req.params.id);
-    res.json(friends.map(friend => ({ ...friend, password: undefined })));
-  });
-
-  app.post("/api/users/:id/add-friend", async (req, res) => {
-    try {
-      const { friendUsername } = z.object({ friendUsername: z.string() }).parse(req.body);
-      
-      const friend = await storage.getUserByUsername(friendUsername);
-      if (!friend) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const friendship = await storage.addFriend(req.params.id, friend.id);
-      res.json(friendship);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to add friend" });
-    }
-  });
 
   // Daily crate route
   app.post("/api/users/:id/claim-daily-crate", async (req, res) => {

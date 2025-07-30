@@ -8,10 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Leaderboard } from "@/components/ui/leaderboard";
 import { Wallet } from "@/components/ui/wallet";
-import { Friends } from "@/components/ui/friends";
-import { SnakeCustomizer } from "@/components/ui/snake-customizer";
 import { SimpleSnake } from "@/components/game/simple-snake";
 import { apiRequest } from "@/lib/queryClient";
 import { 
@@ -20,9 +17,7 @@ import {
   LogOut, 
   Edit3, 
   Wallet as WalletIcon,
-  Trophy,
   Users,
-  Palette,
   Gift
 } from "lucide-react";
 
@@ -272,16 +267,10 @@ export default function Home() {
 
       {/* Main Layout */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-screen">
-          
-          {/* Left Panel */}
-          <aside className="lg:col-span-3 space-y-6">
-            <Leaderboard />
-            <Friends />
-          </aside>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-screen">
 
           {/* Center Panel */}
-          <main className="lg:col-span-6 space-y-6">
+          <main className="lg:col-span-2 space-y-6">
             {/* Game Area or Username Block */}
             {isGameActive ? (
               <SimpleSnake 
@@ -374,9 +363,8 @@ export default function Home() {
           </main>
 
           {/* Right Panel */}
-          <aside className="lg:col-span-3 space-y-6">
+          <aside className="lg:col-span-1 space-y-6">
             <Wallet />
-            <SnakeCustomizer />
           </aside>
         </div>
       </div>

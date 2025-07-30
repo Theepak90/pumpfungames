@@ -43,13 +43,7 @@ export const gameParticipants = pgTable("game_participants", {
   eliminatedAt: timestamp("eliminated_at")
 });
 
-export const friendships = pgTable("friendships", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  friendId: varchar("friend_id").notNull().references(() => users.id),
-  status: text("status").notNull(), // 'pending', 'accepted', 'blocked'
-  createdAt: timestamp("created_at").default(sql`now()`).notNull()
-});
+
 
 export const dailyCrates = pgTable("daily_crates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -68,8 +62,6 @@ export const gameStates = pgTable("game_states", {
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
   gameParticipants: many(gameParticipants),
-  friendsInitiated: many(friendships, { relationName: "userFriends" }),
-  friendsReceived: many(friendships, { relationName: "friendUser" }),
   dailyCrates: many(dailyCrates)
 }));
 
@@ -92,18 +84,7 @@ export const gameParticipantsRelations = relations(gameParticipants, ({ one }) =
   })
 }));
 
-export const friendshipsRelations = relations(friendships, ({ one }) => ({
-  user: one(users, {
-    fields: [friendships.userId],
-    references: [users.id],
-    relationName: "userFriends"
-  }),
-  friend: one(users, {
-    fields: [friendships.friendId],
-    references: [users.id],
-    relationName: "friendUser"
-  })
-}));
+
 
 export const dailyCratesRelations = relations(dailyCrates, ({ one }) => ({
   user: one(users, {
@@ -139,10 +120,7 @@ export const insertGameParticipantSchema = createInsertSchema(gameParticipants).
   eliminatedAt: true
 });
 
-export const insertFriendshipSchema = createInsertSchema(friendships).omit({
-  id: true,
-  createdAt: true
-});
+
 
 export const insertDailyCrateSchema = createInsertSchema(dailyCrates).omit({
   id: true,
@@ -163,8 +141,7 @@ export type Game = typeof games.$inferSelect;
 export type InsertGameParticipant = z.infer<typeof insertGameParticipantSchema>;
 export type GameParticipant = typeof gameParticipants.$inferSelect;
 
-export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
-export type Friendship = typeof friendships.$inferSelect;
+
 
 export type InsertDailyCrate = z.infer<typeof insertDailyCrateSchema>;
 export type DailyCrate = typeof dailyCrates.$inferSelect;
