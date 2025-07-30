@@ -37,7 +37,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 18; // Distance between segments (slightly less than diameter for overlap)
+    this.segmentSpacing = 8; // Distance between segments for smooth tracking
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
@@ -53,7 +53,7 @@ class SmoothSnake {
     const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * (this.segmentSpacing * 0.5), // Tighter spacing for initialization
+        x: x - i * this.segmentSpacing, // Normal spacing for initialization
         y: y 
       });
     }
@@ -141,18 +141,8 @@ class SmoothSnake {
       y: this.head.y + this.speed * Math.sin(this.currentAngle)
     };
     
-    // Only add new segment if head moved enough distance to prevent jittering
-    const lastSegment = this.segments[0];
-    const dx = newHead.x - lastSegment.x;
-    const dy = newHead.y - lastSegment.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance >= this.segmentSpacing) {
-      this.segments.unshift(newHead);
-    } else {
-      // Update head position without adding new segment
-      this.segments[0] = newHead;
-    }
+    // Always update head position for smooth movement
+    this.segments.unshift(newHead);
     
     // Remove extra head segment addition to prevent jittering
     
@@ -512,14 +502,14 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body with 3D gradient spheres (spaced beads)
-      const segmentRadius = 12;
+      // Draw snake body with 3D gradient spheres (connected beads)
+      const segmentRadius = 14; // Slightly larger radius for better connection
       const SEGMENT_SPACING = 8; // Visual spacing between drawn segments
       const maxVisibleSegments = snake.visibleSegments;
       
-      // Draw evenly spaced segments to create bead-like appearance
+      // Draw evenly spaced segments to create connected bead appearance
       for (let i = 0; i < maxVisibleSegments && i < snake.segments.length; i++) {
-        const SEGMENT_DRAW_SPACING = 4; // Draw every 4th segment for proper spacing
+        const SEGMENT_DRAW_SPACING = 2; // Draw every 2nd segment for closer connection
         const segmentIndex = Math.min(i * SEGMENT_DRAW_SPACING, snake.segments.length - 1);
         const segment = snake.segments[segmentIndex];
         const isHead = i === 0;
@@ -636,7 +626,7 @@ export default function GamePage() {
     const START_MASS = 45;
     const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: 2000 - i * (snake.segmentSpacing * 0.5), y: 2000 });
+      snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
     }
     snake.currentAngle = 0;
     snake.growthRemaining = START_MASS;
