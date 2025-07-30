@@ -1,0 +1,109 @@
+# replit.md
+
+## Overview
+
+This is a multiplayer snake game application built with a modern web stack. The application features real-time gameplay where multiple players compete in snake matches with betting mechanics. Players can customize their snakes, manage virtual currency, maintain friend lists, and compete on global leaderboards.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter (lightweight React router)
+- **Styling**: Tailwind CSS with shadcn/ui component library
+- **State Management**: React Context API for global state (auth, game)
+- **Data Fetching**: TanStack Query (React Query) for server state management
+- **Build Tool**: Vite for fast development and optimized builds
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js server
+- **Language**: TypeScript throughout the entire stack
+- **Real-time Communication**: WebSocket server for live game updates
+- **API Design**: RESTful endpoints for CRUD operations
+- **Session Management**: In-memory storage for development (can be extended to Redis)
+
+### Database Layer
+- **ORM**: Drizzle ORM for type-safe database operations
+- **Database**: PostgreSQL (configured for Neon serverless)
+- **Migrations**: Drizzle Kit for schema management
+- **Schema**: Strongly typed with Zod validation
+
+## Key Components
+
+### Authentication System
+- Username/password based authentication
+- In-memory session storage for development
+- User profile management with customizable snake appearance
+- Balance tracking for both game currency and SOL tokens
+
+### Game Engine
+- Real-time multiplayer snake gameplay
+- WebSocket-based communication for low-latency updates
+- Game state management with player positions, scores, and eliminations
+- Betting system with configurable bet amounts
+- Regional server selection
+
+### Social Features
+- Friend system with friend requests and management
+- Global leaderboard with live updates
+- User statistics tracking (games played, kills, deaths, earnings)
+
+### Virtual Economy
+- Dual currency system (game currency and SOL)
+- Daily crate rewards system
+- Betting mechanics with winner-takes-all prize pools
+- Wallet management with add/withdraw functionality
+
+## Data Flow
+
+1. **Authentication Flow**: User registers/logs in → Session created → User data cached in context
+2. **Game Flow**: User joins lobby → WebSocket connection established → Real-time game state updates
+3. **Social Flow**: Friend requests → Database updates → Real-time notifications via WebSocket
+4. **Economy Flow**: Bet placement → Game participation → Winnings distribution → Balance updates
+
+## External Dependencies
+
+### Core Libraries
+- **@neondatabase/serverless**: Serverless PostgreSQL connection
+- **@radix-ui/***: Headless UI primitives for accessible components
+- **@tanstack/react-query**: Server state management and caching
+- **drizzle-orm**: Type-safe ORM with PostgreSQL support
+- **ws**: WebSocket library for real-time communication
+- **zod**: Runtime type validation and schema definition
+
+### Development Tools
+- **drizzle-kit**: Database schema management and migrations
+- **tsx**: TypeScript execution for development server
+- **esbuild**: Fast JavaScript bundler for production builds
+- **tailwindcss**: Utility-first CSS framework
+
+### UI Components
+- Complete shadcn/ui component library implementation
+- Dark theme with neon color accents (yellow, green, blue)
+- Responsive design with mobile considerations
+- Custom snake visualization components
+
+## Deployment Strategy
+
+### Development
+- Vite dev server for frontend with HMR
+- tsx for running TypeScript server directly
+- In-memory storage for rapid development iteration
+- WebSocket server integrated with Express server
+
+### Production
+- Frontend: Vite build output served statically
+- Backend: esbuild bundled server executable
+- Database: Neon serverless PostgreSQL
+- Environment: Designed for Replit deployment with specialized plugins
+
+### Environment Configuration
+- Database URL from environment variables
+- Configurable WebSocket endpoints
+- Development vs production asset serving
+- Replit-specific development banner integration
+
+The application is architected for easy scaling with the ability to add Redis for session storage, implement proper authentication tokens, and extend the game engine with more complex mechanics. The type-safe approach throughout the stack ensures reliability and maintainability.

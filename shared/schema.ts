@@ -1,0 +1,150 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  balance: decimal("balance", { precision: 10, scale: 4 }).default("0.0000").notNull(),
+  solBalance: decimal("sol_balance", { precision: 10, scale: 8 }).default("0.00000000").notNull(),
+  totalEarnings: decimal("total_earnings", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  gamesPlayed: integer("games_played").default(0).notNull(),
+  kills: integer("kills").default(0).notNull(),
+  deaths: integer("deaths").default(0).notNull(),
+  snakeColor: text("snake_color").default("#00FF88").notNull(),
+  isOnline: boolean("is_online").default(false).notNull(),
+  lastActive: timestamp("last_active").default(sql`now()`).notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`).notNull()
+});
+
+export const games = pgTable("games", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  region: text("region").notNull(),
+  betAmount: decimal("bet_amount", { precision: 10, scale: 2 }).notNull(),
+  playersCount: integer("players_count").default(0).notNull(),
+  maxPlayers: integer("max_players").default(20).notNull(),
+  status: text("status").notNull(), // 'waiting', 'active', 'finished'
+  createdAt: timestamp("created_at").default(sql`now()`).notNull(),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at")
+});
+
+export const gameParticipants = pgTable("game_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").notNull().references(() => games.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  kills: integer("kills").default(0).notNull(),
+  earnings: decimal("earnings", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  isAlive: boolean("is_alive").default(true).notNull(),
+  joinedAt: timestamp("joined_at").default(sql`now()`).notNull(),
+  eliminatedAt: timestamp("eliminated_at")
+});
+
+export const friendships = pgTable("friendships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  friendId: varchar("friend_id").notNull().references(() => users.id),
+  status: text("status").notNull(), // 'pending', 'accepted', 'blocked'
+  createdAt: timestamp("created_at").default(sql`now()`).notNull()
+});
+
+export const dailyCrates = pgTable("daily_crates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  claimedAt: timestamp("claimed_at").default(sql`now()`).notNull(),
+  reward: decimal("reward", { precision: 10, scale: 4 }).notNull()
+});
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  lastActive: true
+});
+
+export const insertGameSchema = createInsertSchema(games).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  endedAt: true
+});
+
+export const insertGameParticipantSchema = createInsertSchema(gameParticipants).omit({
+  id: true,
+  joinedAt: true,
+  eliminatedAt: true
+});
+
+export const insertFriendshipSchema = createInsertSchema(friendships).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertDailyCrateSchema = createInsertSchema(dailyCrates).omit({
+  id: true,
+  claimedAt: true
+});
+
+// Types
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export type InsertGame = z.infer<typeof insertGameSchema>;
+export type Game = typeof games.$inferSelect;
+
+export type InsertGameParticipant = z.infer<typeof insertGameParticipantSchema>;
+export type GameParticipant = typeof gameParticipants.$inferSelect;
+
+export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
+export type Friendship = typeof friendships.$inferSelect;
+
+export type InsertDailyCrate = z.infer<typeof insertDailyCrateSchema>;
+export type DailyCrate = typeof dailyCrates.$inferSelect;
+
+// Game state types
+export interface GameState {
+  id: string;
+  players: Player[];
+  food: Food[];
+  gameArea: { width: number; height: number };
+  status: 'waiting' | 'active' | 'finished';
+  betAmount: number;
+}
+
+export interface Player {
+  id: string;
+  username: string;
+  snake: Snake;
+  kills: number;
+  earnings: number;
+  isAlive: boolean;
+  color: string;
+}
+
+export interface Snake {
+  segments: Point[];
+  direction: Direction;
+  growing: boolean;
+}
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Food {
+  position: Point;
+  value: number;
+}
+
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
+// WebSocket message types
+export interface WebSocketMessage {
+  type: string;
+  payload?: any;
+  gameId?: string;
+  playerId?: string;
+}
