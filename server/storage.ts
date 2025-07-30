@@ -247,6 +247,7 @@ export class DatabaseStorage implements IStorage {
       username: users[index]?.username || 'Unknown',
       color: this.getRandomColor(),
       kills: participant.kills,
+      earnings: participant.earnings,
       isAlive: participant.isAlive,
       snake: {
         segments: [{ x: 500 + Math.random() * 500, y: 500 + Math.random() * 500 }],

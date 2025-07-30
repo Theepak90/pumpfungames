@@ -12,7 +12,7 @@ import { Leaderboard } from "@/components/ui/leaderboard";
 import { Wallet } from "@/components/ui/wallet";
 import { Friends } from "@/components/ui/friends";
 import { SnakeCustomizer } from "@/components/ui/snake-customizer";
-import { SnakeGame } from "@/components/game/snake-game";
+import { SimpleSnake } from "@/components/game/simple-snake";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Settings, 
@@ -104,13 +104,12 @@ export default function Home() {
         // Update user balance locally
         updateUser({ balance: (userBalance - betAmount).toFixed(4) });
         
-        // Join game via WebSocket
-        joinGame(game.id);
+        // Start simple snake game
         setIsGameActive(true);
         
         toast({
           title: "Game Started!",
-          description: `Joined game with $${betAmount} bet.`,
+          description: `Starting snake game with $${betAmount} bet.`,
         });
       }
     } catch (error) {
@@ -284,12 +283,9 @@ export default function Home() {
           {/* Center Panel */}
           <main className="lg:col-span-6 space-y-6">
             {/* Game Area or Username Block */}
-            {isGameActive && gameState ? (
-              <SnakeGame 
-                gameState={gameState} 
-                onMove={move}
-                onLeave={() => {
-                  leaveGame();
+            {isGameActive ? (
+              <SimpleSnake 
+                onExit={() => {
                   setIsGameActive(false);
                 }}
               />
