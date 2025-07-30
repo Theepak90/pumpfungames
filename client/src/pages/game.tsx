@@ -21,17 +21,24 @@ class SmoothSnake {
   radius: number;
   currentAngle: number;
   turnSpeed: number;
+  segmentSpacing: number;
   
   constructor(x: number, y: number) {
-    // Start with a decent length snake (10 segments)
-    this.segments = [];
-    for (let i = 0; i < 10; i++) {
-      this.segments.push({ x: x - i * 20, y });
-    }
-    this.speed = 3;
+    this.speed = 4;
     this.radius = 12;
-    this.currentAngle = 0; // Current movement angle
-    this.turnSpeed = 0.08; // Smooth turning speed (lower = smoother)
+    this.currentAngle = 0;
+    this.turnSpeed = 0.06; // Smooth turning speed
+    this.segmentSpacing = 8; // Distance between segments
+    
+    // Initialize with evenly spaced segments
+    this.segments = [];
+    const initialLength = 15; // Number of segments
+    for (let i = 0; i < initialLength; i++) {
+      this.segments.push({ 
+        x: x - i * this.segmentSpacing, 
+        y: y 
+      });
+    }
   }
   
   get head() {
@@ -42,11 +49,9 @@ class SmoothSnake {
     return this.segments.length;
   }
   
-  move(targetX: number, targetY: number, isGrowing: boolean = false) {
-    // Calculate target angle from head to mouse
-    const dx = targetX - this.head.x;
-    const dy = targetY - this.head.y;
-    const targetAngle = Math.atan2(dy, dx);
+  move(mouseDirectionX: number, mouseDirectionY: number, isGrowing: boolean = false) {
+    // Calculate target angle from mouse direction relative to screen center
+    const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
     // Calculate angle difference and normalize to [-PI, PI]
     let angleDiff = targetAngle - this.currentAngle;
@@ -62,15 +67,10 @@ class SmoothSnake {
       y: this.head.y + this.speed * Math.sin(this.currentAngle)
     };
     
-    // Add new head at front
+    // Insert new head at the beginning
     this.segments.unshift(newHead);
     
-    // Only remove tail if NOT growing
-    if (!isGrowing) {
-      this.segments.pop();
-    }
-    
-    // Keep segments at proper distance - make body follow smoothly
+    // Smooth body following - each segment follows the one before it
     for (let i = 1; i < this.segments.length; i++) {
       const current = this.segments[i];
       const previous = this.segments[i - 1];
@@ -79,22 +79,43 @@ class SmoothSnake {
       const dy = previous.y - current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      const segmentDistance = this.radius * 1.8; // Tighter spacing
-      
-      if (distance > segmentDistance) {
-        const ratio = segmentDistance / distance;
+      if (distance > this.segmentSpacing) {
+        // Move segment toward the previous one, maintaining proper spacing
+        const moveRatio = (distance - this.segmentSpacing) / distance;
         this.segments[i] = {
-          x: previous.x - dx * ratio,
-          y: previous.y - dy * ratio
+          x: current.x + dx * moveRatio,
+          y: current.y + dy * moveRatio
         };
       }
+    }
+    
+    // Remove excess segments if not growing
+    if (!isGrowing && this.segments.length > 15) {
+      this.segments.pop();
     }
   }
   
   grow(amount: number) {
     const tail = this.segments[this.segments.length - 1];
+    const secondToTail = this.segments[this.segments.length - 2] || tail;
+    
+    // Add new segments extending from the tail
     for (let i = 0; i < amount; i++) {
-      this.segments.push({ ...tail });
+      const dx = tail.x - secondToTail.x;
+      const dy = tail.y - secondToTail.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 0) {
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+        
+        this.segments.push({
+          x: tail.x + normalizedDx * this.segmentSpacing * (i + 1),
+          y: tail.y + normalizedDy * this.segmentSpacing * (i + 1)
+        });
+      } else {
+        this.segments.push({ ...tail });
+      }
     }
   }
 }
@@ -102,8 +123,8 @@ class SmoothSnake {
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
-  const [targetMouse, setTargetMouse] = useState<Position>({ x: 400, y: 300 });
-  const [snake] = useState(new SmoothSnake(2000, 2000)); // Start at center of large map
+  const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
+  const [snake] = useState(new SmoothSnake(2000, 2000));
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -152,16 +173,23 @@ export default function GamePage() {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       
-      // Convert screen coordinates to world coordinates
-      const worldX = mouseX - canvasSize.width/2 + snake.head.x;
-      const worldY = mouseY - canvasSize.height/2 + snake.head.y;
+      // Calculate direction from screen center to mouse (Slither.io style)
+      const directionX = mouseX - canvasSize.width / 2;
+      const directionY = mouseY - canvasSize.height / 2;
       
-      setTargetMouse({ x: worldX, y: worldY });
+      // Normalize the direction vector
+      const magnitude = Math.sqrt(directionX * directionX + directionY * directionY);
+      if (magnitude > 0) {
+        setMouseDirection({
+          x: directionX / magnitude,
+          y: directionY / magnitude
+        });
+      }
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
-  }, [snake.head.x, snake.head.y, canvasSize]);
+  }, [canvasSize]);
 
   // Game loop
   useEffect(() => {
@@ -190,8 +218,8 @@ export default function GamePage() {
         }
       }
 
-      // Move snake with smooth turning toward mouse
-      snake.move(targetMouse.x, targetMouse.y, willGrow);
+      // Move snake with smooth turning based on mouse direction
+      snake.move(mouseDirection.x, mouseDirection.y, willGrow);
 
       // Check map boundaries (death barrier)
       const updatedHead = snake.head;
@@ -280,46 +308,59 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body
+      // Draw snake body with smooth segments
       snake.segments.forEach((segment, index) => {
         const isHead = index === 0;
-        const radius = isHead ? snake.radius : Math.max(6, snake.radius - index * 0.3);
+        const progress = index / Math.max(1, snake.segments.length - 1);
+        const radius = isHead ? snake.radius : Math.max(4, snake.radius * (1 - progress * 0.4));
         
-        // Body gradient
+        // Create smooth gradient for each segment
         const gradient = ctx.createRadialGradient(
           segment.x, segment.y, 0,
           segment.x, segment.y, radius
         );
-        gradient.addColorStop(0, '#ff8c42');
-        gradient.addColorStop(0.7, '#ff6b1a');
-        gradient.addColorStop(1, '#cc4400');
+        
+        if (isHead) {
+          // Head is brighter
+          gradient.addColorStop(0, '#ff9f4a');
+          gradient.addColorStop(0.6, '#ff7a1a');
+          gradient.addColorStop(1, '#d4531a');
+        } else {
+          // Body gets darker toward tail
+          const brightness = 1 - progress * 0.3;
+          gradient.addColorStop(0, `hsl(25, 100%, ${Math.floor(65 * brightness)}%)`);
+          gradient.addColorStop(0.6, `hsl(25, 100%, ${Math.floor(55 * brightness)}%)`);
+          gradient.addColorStop(1, `hsl(25, 100%, ${Math.floor(40 * brightness)}%)`);
+        }
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Body border
-        ctx.strokeStyle = '#994400';
-        ctx.lineWidth = 2;
+        // Subtle border for definition
+        ctx.strokeStyle = isHead ? '#cc4400' : `rgba(153, 68, 0, ${1 - progress * 0.5})`;
+        ctx.lineWidth = isHead ? 2.5 : 1.5;
         ctx.stroke();
       });
 
-      // Draw eyes that follow mouse
+      // Draw eyes that follow mouse direction
       if (snake.segments.length > 0) {
         const snakeHead = snake.head;
-        const eyeAngle = Math.atan2(targetMouse.y - snakeHead.y, targetMouse.x - snakeHead.x);
+        const eyeAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
         const eyeDistance = 8;
         const eyeSize = 4;
         const pupilSize = 2;
         
-        // Eye positions
+        // Eye positions perpendicular to movement direction
         const eye1X = snakeHead.x + Math.cos(eyeAngle + Math.PI/2) * eyeDistance;
         const eye1Y = snakeHead.y + Math.sin(eyeAngle + Math.PI/2) * eyeDistance;
         const eye2X = snakeHead.x + Math.cos(eyeAngle - Math.PI/2) * eyeDistance;
         const eye2Y = snakeHead.y + Math.sin(eyeAngle - Math.PI/2) * eyeDistance;
         
-        // White eyes
+        // White eyes with slight glow
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+        ctx.shadowBlur = 4;
         ctx.fillStyle = 'white';
         ctx.beginPath();
         ctx.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
@@ -327,8 +368,9 @@ export default function GamePage() {
         ctx.beginPath();
         ctx.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
         ctx.fill();
+        ctx.shadowBlur = 0;
         
-        // Black pupils looking at mouse
+        // Black pupils following mouse direction
         const pupilOffset = 2;
         ctx.fillStyle = 'black';
         ctx.beginPath();
@@ -356,25 +398,33 @@ export default function GamePage() {
       ctx.fillText(`Score: ${score}`, 20, 40);
       ctx.fillText(`Length: ${snake.length}`, 20, 70);
       
-      // Draw crosshair at mouse position
-      const mouseScreenX = targetMouse.x - snake.head.x + canvasSize.width/2;
-      const mouseScreenY = targetMouse.y - snake.head.y + canvasSize.height/2;
+      // Draw direction indicator at screen center
+      const centerX = canvasSize.width / 2;
+      const centerY = canvasSize.height / 2;
+      const indicatorLength = 40;
       
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(mouseScreenX - 10, mouseScreenY);
-      ctx.lineTo(mouseScreenX + 10, mouseScreenY);
-      ctx.moveTo(mouseScreenX, mouseScreenY - 10);
-      ctx.lineTo(mouseScreenX, mouseScreenY + 10);
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(
+        centerX + mouseDirection.x * indicatorLength,
+        centerY + mouseDirection.y * indicatorLength
+      );
       ctx.stroke();
+      
+      // Small circle at center
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
+      ctx.fill();
 
       animationId = requestAnimationFrame(gameLoop);
     };
 
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, [targetMouse, snake, foods, gameOver, canvasSize, score]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
   const resetGame = () => {
     setGameOver(false);
@@ -385,7 +435,7 @@ export default function GamePage() {
       snake.segments.push({ x: 2000 - i * 20, y: 2000 });
     }
     snake.currentAngle = 0;
-    setTargetMouse({ x: 2000, y: 2000 });
+    setMouseDirection({ x: 1, y: 0 });
   };
 
   const exitGame = () => {
