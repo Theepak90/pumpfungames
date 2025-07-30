@@ -13,6 +13,7 @@ interface Food {
   y: number;
   size: number;
   color: string;
+  mass?: number; // Mass value for growth
 }
 
 class SmoothSnake {
@@ -28,7 +29,7 @@ class SmoothSnake {
   boostCooldown: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 4;
+    this.baseSpeed = 2; // 50% slower than before
     this.speed = this.baseSpeed;
     this.radius = 12;
     this.currentAngle = 0;
@@ -75,25 +76,32 @@ class SmoothSnake {
     
     // Handle boost mechanic
     if (this.isBoosting && this.segments.length > 10) {
-      this.speed = this.baseSpeed * 1.5; // Boost speed
+      this.speed = this.baseSpeed * 1.5; // 50% faster than base
       this.boostCooldown++;
       
-      // Drop food orbs every 8 frames while boosting
-      if (this.boostCooldown % 8 === 0 && onDropFood) {
+      // Drop food orbs every 5 frames while boosting (mass = 0.2)
+      if (this.boostCooldown % 5 === 0 && onDropFood) {
         const tail = this.segments[this.segments.length - 1];
         onDropFood({
-          x: tail.x + (Math.random() - 0.5) * 20,
-          y: tail.y + (Math.random() - 0.5) * 20,
+          x: tail.x + (Math.random() - 0.5) * 15,
+          y: tail.y + (Math.random() - 0.5) * 15,
           size: 3,
-          color: '#ff6600'
+          color: '#ff6600',
+          mass: 0.2
         });
       }
       
-      // Shrink snake gradually while boosting
-      if (this.boostCooldown % 4 === 0) { // Every 4 frames
-        if (this.growthRemaining > 0) {
-          this.growthRemaining--;
-        } else if (this.segments.length > 10) {
+      // Mass loss: 0.2 per frame while boosting
+      const BOOST_MASS_LOSS = 0.2;
+      if (this.growthRemaining >= BOOST_MASS_LOSS) {
+        this.growthRemaining -= BOOST_MASS_LOSS;
+      } else {
+        // If not enough growth remaining, remove segments
+        const remaining = BOOST_MASS_LOSS - this.growthRemaining;
+        this.growthRemaining = 0;
+        
+        // Remove fractional segments (every 5 boost frames = 1 segment)
+        if (this.boostCooldown % 5 === 0 && this.segments.length > 10) {
           this.segments.pop();
         }
       }
@@ -141,9 +149,10 @@ class SmoothSnake {
   }
   
   eatFood(food: Food) {
-    // Very realistic growth - just 1 segment per orb like real Slither.io
-    this.growthRemaining += 1;
-    return Math.floor(food.size); // Return score increase
+    // Growth based on food mass
+    const mass = food.mass || 1; // Default to 1 if no mass specified
+    this.growthRemaining += mass;
+    return mass; // Return score increase based on mass
   }
   
   setBoost(boosting: boolean) {
@@ -184,16 +193,40 @@ export default function GamePage() {
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, []);
 
-  // Initialize food
+  // Initialize food with mass system
   useEffect(() => {
     const initialFoods: Food[] = [];
     for (let i = 0; i < FOOD_COUNT; i++) {
-      initialFoods.push({
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
-        size: 3 + Math.random() * 8,
-        color: `hsl(${Math.random() * 360}, 60%, 60%)`
-      });
+      const foodType = Math.random();
+      let food: Food;
+      
+      if (foodType < 0.1) { // 10% big food
+        food = {
+          x: Math.random() * MAP_WIDTH,
+          y: Math.random() * MAP_HEIGHT,
+          size: 10,
+          mass: 2,
+          color: '#ff4444'
+        };
+      } else if (foodType < 0.4) { // 30% medium food
+        food = {
+          x: Math.random() * MAP_WIDTH,
+          y: Math.random() * MAP_HEIGHT,
+          size: 6,
+          mass: 1,
+          color: '#44ff44'
+        };
+      } else { // 60% small food
+        food = {
+          x: Math.random() * MAP_WIDTH,
+          y: Math.random() * MAP_HEIGHT,
+          size: 4,
+          mass: 0.5,
+          color: '#4444ff'
+        };
+      }
+      
+      initialFoods.push(food);
     }
     setFoods(initialFoods);
   }, []);
@@ -291,6 +324,27 @@ export default function GamePage() {
         return;
       }
 
+      // Food gravitation toward snake head
+      const suctionRadius = 100;
+      const suctionStrength = 0.2;
+      
+      setFoods(prevFoods => {
+        return prevFoods.map(food => {
+          const dx = updatedHead.x - food.x;
+          const dy = updatedHead.y - food.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < suctionRadius && dist > 0) {
+            return {
+              ...food,
+              x: food.x + (dx / dist) * suctionStrength,
+              y: food.y + (dy / dist) * suctionStrength
+            };
+          }
+          return food;
+        });
+      });
+
       // Check for food collision and handle eating
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
@@ -304,14 +358,39 @@ export default function GamePage() {
             // Snake eats the food - this handles growth internally
             scoreIncrease += snake.eatFood(food);
             
-            // Remove eaten food and add new one
+            // Remove eaten food and add new one with mass system
             newFoods.splice(i, 1);
-            newFoods.push({
-              x: Math.random() * MAP_WIDTH,
-              y: Math.random() * MAP_HEIGHT,
-              size: 3 + Math.random() * 8,
-              color: `hsl(${Math.random() * 360}, 60%, 60%)`
-            });
+            
+            const foodType = Math.random();
+            let newFood: Food;
+            
+            if (foodType < 0.1) { // 10% big food
+              newFood = {
+                x: Math.random() * MAP_WIDTH,
+                y: Math.random() * MAP_HEIGHT,
+                size: 10,
+                mass: 2,
+                color: '#ff4444'
+              };
+            } else if (foodType < 0.4) { // 30% medium food
+              newFood = {
+                x: Math.random() * MAP_WIDTH,
+                y: Math.random() * MAP_HEIGHT,
+                size: 6,
+                mass: 1,
+                color: '#44ff44'
+              };
+            } else { // 60% small food
+              newFood = {
+                x: Math.random() * MAP_WIDTH,
+                y: Math.random() * MAP_HEIGHT,
+                size: 4,
+                mass: 0.5,
+                color: '#4444ff'
+              };
+            }
+            
+            newFoods.push(newFood);
             break; // Only eat one food per frame
           }
         }
@@ -493,8 +572,9 @@ export default function GamePage() {
       {/* Score Display */}
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
-          <div className="text-neon-yellow text-xl font-bold">Score: {score}</div>
+          <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
           <div className="text-white text-sm">Length: {snake.length}</div>
+          <div className="text-blue-400 text-xs">Mass: {snake.growthRemaining.toFixed(1)}</div>
           {isBoosting && (
             <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
           )}
@@ -506,6 +586,7 @@ export default function GamePage() {
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
           <div className="text-gray-400 text-xs">Boost drops food but shrinks snake</div>
+          <div className="text-blue-400 text-xs">Red=2 mass, Green=1 mass, Blue=0.5 mass</div>
         </div>
       </div>
       
