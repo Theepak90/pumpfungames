@@ -146,8 +146,8 @@ class SmoothSnake {
     
     // Remove extra head segment addition to prevent jittering
     
-    // Adjust segment spacing based on boost state
-    const currentSpacing = this.isBoosting ? this.segmentSpacing * 0.7 : this.segmentSpacing;
+    // Adjust segment spacing based on boost state - tighter when boosting for visual effect
+    const currentSpacing = this.isBoosting ? this.segmentSpacing * 0.85 : this.segmentSpacing;
     
     // Smooth body following - each segment follows the one before it
     for (let i = 1; i < this.segments.length; i++) {
@@ -503,14 +503,15 @@ export default function GamePage() {
       });
 
       // Draw snake body with 3D gradient spheres (connected beads)
-      const segmentRadius = 14; // Slightly larger radius for better connection
-      const SEGMENT_SPACING = 8; // Visual spacing between drawn segments
+      const segmentRadius = 16; // Larger radius for better overlap
       const maxVisibleSegments = snake.visibleSegments;
       
-      // Draw evenly spaced segments to create connected bead appearance
+      // Adjust spacing based on boost state to maintain connection
+      const drawSpacing = snake.isBoosting ? 1.4 : 1.8; // Closer spacing when boosting
+      
+      // Draw segments with proper overlap to eliminate gaps
       for (let i = 0; i < maxVisibleSegments && i < snake.segments.length; i++) {
-        const SEGMENT_DRAW_SPACING = 2; // Draw every 2nd segment for closer connection
-        const segmentIndex = Math.min(i * SEGMENT_DRAW_SPACING, snake.segments.length - 1);
+        const segmentIndex = Math.min(Math.floor(i * drawSpacing), snake.segments.length - 1);
         const segment = snake.segments[segmentIndex];
         const isHead = i === 0;
         
