@@ -85,7 +85,7 @@ class SmoothSnake {
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
     // Handle boost mechanic with minimum mass protection
-    const BOOST_MULTIPLIER = 1.3; // 30% faster than base speed
+    const BOOST_MULTIPLIER = 2.0; // Double the normal speed
     const BOOST_DROP_INTERVAL = 20; // frames (3 drops per second at 60fps)
     const BOOST_DROP_MASS = 0.5;
     
@@ -95,7 +95,7 @@ class SmoothSnake {
     }
     
     if (this.isBoosting && this.totalMass > this.minimumMass) {
-      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.744 pixels per frame when boosting
+      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 5.76 pixels per frame when boosting (double normal)
       this.boostCooldown++;
       
       // Drop orb every 20 frames (3 per second)
@@ -344,9 +344,9 @@ export default function GamePage() {
         return;
       }
 
-      // Food gravitation toward snake head (increased strength)
-      const suctionRadius = 100;
-      const suctionStrength = 0.8;
+      // Food gravitation toward snake head (30px radius, 2x faster)
+      const suctionRadius = 30;
+      const suctionStrength = 1.6;
       
       setFoods(prevFoods => {
         return prevFoods.map(food => {
