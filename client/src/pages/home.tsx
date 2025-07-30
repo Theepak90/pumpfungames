@@ -238,7 +238,7 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
             
             {/* Left Panel - Leaderboard */}
-            <div className="bg-gray-800 p-4 border border-gray-600 rounded-sm">
+            <div className="bg-gray-800 p-4 border-2 border-gray-600">
               <h3 className="text-yellow-400 text-sm mb-3 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
@@ -248,33 +248,33 @@ export default function Home() {
                 <div>3.</div>
               </div>
               <div className="border-t border-gray-600 pt-4">
-                <button className="bg-gray-700 text-white px-3 py-1 text-xs border border-gray-600 hover:bg-gray-600 font-retro w-full">
+                <button className="bg-gray-700 text-white px-3 py-1 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro w-full">
                   View Full Board
                 </button>
               </div>
             </div>
 
             {/* Center Panel - Game Controls */}
-            <div className="bg-gray-800 p-4 border border-gray-600 rounded-sm">
+            <div className="bg-gray-800 p-4 border-2 border-gray-600">
               
               {/* Username with edit icon */}
-              <div className="flex items-center justify-between mb-4 bg-gray-700 px-3 py-2 border border-gray-600">
+              <div className="flex items-center justify-between mb-4 bg-gray-700 px-3 py-2 border-2 border-gray-600">
                 <span className="text-gray-300 font-retro text-xs">〈Your Username〉</span>
                 <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
               {/* Bet Amount */}
-              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 font-retro border border-gray-400">
+              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 font-retro border-2 border-gray-600">
                 {selectedBetAmount}$
               </div>
               
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="text-white font-bold text-lg py-3 w-full mb-4 font-retro transition-colors border"
+                className="text-white font-bold text-lg py-3 w-full mb-4 font-retro transition-colors border-2"
                 style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#4ac785'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#53d493'}
+                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
+                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
               >
                 PLAY
               </button>
@@ -283,7 +283,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-1 mb-4">
                 <button 
                   onClick={() => setSelectedRegion("EU")}
-                  className={`py-1 px-3 text-xs border font-retro ${
+                  className={`py-1 px-3 text-xs border-2 font-retro ${
                     selectedRegion === "EU" 
                       ? 'bg-blue-600 text-white border-blue-500' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
@@ -291,7 +291,7 @@ export default function Home() {
                 >
                   EU
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-3 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-3 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
                   Friends
                 </button>
               </div>
@@ -310,20 +310,20 @@ export default function Home() {
             </div>
 
             {/* Right Panel - Wallet */}
-            <div className="bg-gray-800 p-4 border border-gray-600 rounded-sm">
+            <div className="bg-gray-800 p-4 border-2 border-gray-600">
               <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="font-bold text-lg mb-4 text-center bg-gray-900 py-3 border border-gray-600 font-retro" style={{color: '#53d493'}}>
+              <div className="font-bold text-lg mb-4 text-center bg-gray-900 py-3 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
               {/* Wallet buttons */}
               <div className="grid grid-cols-2 gap-1">
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-2 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
                   Top Up
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-2 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
                   Withdraw
                 </button>
               </div>
