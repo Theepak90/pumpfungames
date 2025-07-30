@@ -29,6 +29,7 @@ class SmoothSnake {
   boostCooldown: number;
   segmentMass: number;
   minimumMass: number;
+  massPerSegment: number;
   
   constructor(x: number, y: number) {
     this.baseSpeed = 2.4 * 1.2; // 2.88 px/frame (20% faster than previous)
@@ -41,6 +42,7 @@ class SmoothSnake {
     this.isBoosting = false;
     this.boostCooldown = 0;
     this.segmentMass = 1; // Each segment = 1 mass
+    this.massPerSegment = 1; // 1 mass = 1 visible segment
     
     // Initialize with longer starting segments (30-40 like Slither.io)
     this.segments = [];
@@ -66,6 +68,10 @@ class SmoothSnake {
   
   get totalMass() {
     return this.segments.length * this.segmentMass + this.growthRemaining;
+  }
+  
+  get visibleSegments() {
+    return Math.floor(this.totalMass / this.massPerSegment);
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -164,17 +170,22 @@ class SmoothSnake {
       }
     }
     
-    // Remove segments based on movement speed to maintain proper body density
-    const segmentRemovalRate = this.isBoosting ? BOOST_MULTIPLIER : 1;
+    // Control segment count based on total mass
+    const targetSegmentCount = Math.max(15, this.visibleSegments);
     
+    // Add or remove segments to match target count
+    while (this.segments.length < targetSegmentCount && this.growthRemaining >= this.massPerSegment) {
+      // Add new segment at tail when we have enough mass
+      const tail = this.segments[this.segments.length - 1];
+      this.segments.push({ x: tail.x, y: tail.y });
+      this.growthRemaining -= this.massPerSegment;
+    }
+    
+    // Remove excess segments based on movement speed
+    const segmentRemovalRate = this.isBoosting ? BOOST_MULTIPLIER : 1;
     for (let i = 0; i < segmentRemovalRate; i++) {
-      if (this.growthRemaining > 0) {
-        this.growthRemaining -= 1;
-      } else {
-        // Keep minimum length and remove excess
-        if (this.segments.length > 15) {
-          this.segments.pop();
-        }
+      if (this.segments.length > targetSegmentCount) {
+        this.segments.pop();
       }
     }
   }
@@ -489,25 +500,51 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body - uniform segments like Slither.io
+      // Draw snake body with 3D gradient spheres
       const segmentRadius = 12;
-      const segmentColor = "#f55400";
-      const headColor = "#ff6600";
+      const maxVisibleSegments = snake.visibleSegments;
       
-      for (let i = 0; i < snake.segments.length; i++) {
+      for (let i = 0; i < Math.min(snake.segments.length, maxVisibleSegments); i++) {
         const segment = snake.segments[i];
         const isHead = i === 0;
         
+        // Create radial gradient for 3D effect (light top, dark bottom)
+        const gradient = ctx.createRadialGradient(
+          segment.x - 4, segment.y - 4, 0,
+          segment.x, segment.y, segmentRadius
+        );
+        
+        if (isHead) {
+          // Head gradient - brighter orange
+          gradient.addColorStop(0, "#ffaa66");  // Light highlight
+          gradient.addColorStop(0.7, "#ff6600"); // Mid tone
+          gradient.addColorStop(1, "#cc4400");   // Dark shadow
+        } else {
+          // Body gradient - standard orange
+          gradient.addColorStop(0, "#ff8844");  // Light highlight  
+          gradient.addColorStop(0.7, "#f55400"); // Mid tone
+          gradient.addColorStop(1, "#bb3300");   // Dark shadow
+        }
+        
+        // Draw segment sphere
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fillStyle = isHead ? headColor : segmentColor;
         ctx.fill();
         
-        // Add subtle border for definition
+        // Add subtle rim lighting for extra 3D effect
         if (isHead) {
-          ctx.strokeStyle = "#cc4400";
-          ctx.lineWidth = 2;
-          ctx.stroke();
+          const rimGradient = ctx.createRadialGradient(
+            segment.x, segment.y, segmentRadius - 2,
+            segment.x, segment.y, segmentRadius
+          );
+          rimGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+          rimGradient.addColorStop(1, "rgba(255, 255, 255, 0.3)");
+          
+          ctx.fillStyle = rimGradient;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
