@@ -38,23 +38,79 @@ export default function Home() {
   const { isConnected, gameState, joinGame, move, leaveGame } = useWebSocket(user?.id || null);
   const { toast } = useToast();
 
-  // Animated player count effect
+  // Animated player count effect - fluctuates realistically
   useEffect(() => {
-    let direction = 1; // 1 for up, -1 for down
     let currentCount = 150;
+    let upCount = 0; // Track consecutive ups to implement up-up-down pattern
+    let hasReached600Today = false;
     
     const interval = setInterval(() => {
-      currentCount += direction;
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const timeToday = now.getTime() - todayStart.getTime();
+      const dayProgress = timeToday / (24 * 60 * 60 * 1000); // 0-1 through the day
       
-      // Change direction at boundaries
-      if (currentCount >= 600) {
-        direction = -1;
-      } else if (currentCount <= 150) {
-        direction = 1;
+      // Reset 600 flag at midnight
+      if (dayProgress < 0.01) {
+        hasReached600Today = false;
       }
       
+      // Determine direction based on pattern and daily goal
+      let shouldGoUp = false;
+      
+      if (!hasReached600Today && dayProgress > 0.8 && Math.random() < 0.3) {
+        // Late in day, chance to reach 600
+        shouldGoUp = currentCount < 600;
+        if (currentCount >= 600) hasReached600Today = true;
+      } else if (upCount < 2) {
+        // Up twice pattern
+        shouldGoUp = Math.random() < 0.7;
+        if (shouldGoUp) upCount++;
+      } else {
+        // Down once after two ups
+        shouldGoUp = false;
+        upCount = 0;
+      }
+      
+      // Apply bounds
+      if (currentCount <= 150) shouldGoUp = true;
+      if (currentCount >= 600 && hasReached600Today) shouldGoUp = false;
+      
+      // Update count
+      if (shouldGoUp) {
+        currentCount += Math.floor(Math.random() * 3) + 1; // 1-3 increase
+      } else {
+        currentCount -= Math.floor(Math.random() * 2) + 1; // 1-2 decrease
+      }
+      
+      // Ensure bounds
+      currentCount = Math.max(150, Math.min(600, currentCount));
       setAnimatedPlayerCount(currentCount);
-    }, 2000 + Math.random() * 3000); // Random interval between 2-5 seconds
+    }, 3000 + Math.random() * 4000); // 3-7 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Daily winnings counter
+  useEffect(() => {
+    const updateWinnings = () => {
+      const now = new Date();
+      const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+      const todayStart = new Date(easternTime.getFullYear(), easternTime.getMonth(), easternTime.getDate());
+      const timeToday = easternTime.getTime() - todayStart.getTime();
+      const dayProgress = timeToday / (24 * 60 * 60 * 1000); // 0-1 through the day
+      
+      // Random daily target between 80k-300k
+      const seed = todayStart.getTime();
+      const dailyTarget = 80000 + (Math.sin(seed) * 0.5 + 0.5) * 220000;
+      
+      // Calculate current winnings based on day progress
+      const currentWinnings = Math.floor(dailyTarget * dayProgress);
+      setDailyWinnings(currentWinnings);
+    };
+    
+    updateWinnings();
+    const interval = setInterval(updateWinnings, 30000); // Update every 30 seconds
     
     return () => clearInterval(interval);
   }, []);
@@ -65,6 +121,7 @@ export default function Home() {
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
+  const [dailyWinnings, setDailyWinnings] = useState(0);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -324,8 +381,8 @@ export default function Home() {
                   <div className="text-gray-400 text-xs font-retro">Players Online</div>
                 </div>
                 <div>
-                  <div className="text-white font-bold text-sm font-retro">+${(globalWinnings || 240331).toLocaleString()}</div>
-                  <div className="text-gray-400 text-xs font-retro">Global Winnings</div>
+                  <div className="text-white font-bold text-sm font-retro">+${dailyWinnings.toLocaleString()}</div>
+                  <div className="text-gray-400 text-xs font-retro">Global Winnings (24hr)</div>
                 </div>
               </div>
             </div>
