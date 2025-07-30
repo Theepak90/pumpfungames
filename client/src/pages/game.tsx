@@ -132,6 +132,19 @@ class SmoothSnake {
     // Insert new head at the beginning
     this.segments.unshift(newHead);
     
+    // Fix stretching when boosting by adding extra head segments for density
+    if (this.isBoosting && this.totalMass > this.minimumMass) {
+      // Add an extra segment between head positions to prevent stretching
+      const intermediateHead = {
+        x: this.head.x + (this.speed * 0.5) * Math.cos(this.currentAngle),
+        y: this.head.y + (this.speed * 0.5) * Math.sin(this.currentAngle)
+      };
+      this.segments.splice(1, 0, intermediateHead);
+    }
+    
+    // Adjust segment spacing based on boost state
+    const currentSpacing = this.isBoosting ? this.segmentSpacing * 0.7 : this.segmentSpacing;
+    
     // Smooth body following - each segment follows the one before it
     for (let i = 1; i < this.segments.length; i++) {
       const current = this.segments[i];
@@ -141,9 +154,9 @@ class SmoothSnake {
       const dy = previous.y - current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance > this.segmentSpacing) {
+      if (distance > currentSpacing) {
         // Move segment toward the previous one, maintaining proper spacing
-        const moveRatio = (distance - this.segmentSpacing) / distance;
+        const moveRatio = (distance - currentSpacing) / distance;
         this.segments[i] = {
           x: current.x + dx * moveRatio,
           y: current.y + dy * moveRatio
@@ -494,19 +507,20 @@ export default function GamePage() {
         }
       }
 
-      // Draw eyes that follow mouse direction
+      // Draw eyes that follow snake's movement direction
       if (snake.segments.length > 0) {
         const snakeHead = snake.head;
-        const eyeAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
+        // Use snake's currentAngle instead of mouse direction
+        const movementAngle = snake.currentAngle;
         const eyeDistance = 8;
         const eyeSize = 4;
         const pupilSize = 2;
         
         // Eye positions perpendicular to movement direction
-        const eye1X = snakeHead.x + Math.cos(eyeAngle + Math.PI/2) * eyeDistance;
-        const eye1Y = snakeHead.y + Math.sin(eyeAngle + Math.PI/2) * eyeDistance;
-        const eye2X = snakeHead.x + Math.cos(eyeAngle - Math.PI/2) * eyeDistance;
-        const eye2Y = snakeHead.y + Math.sin(eyeAngle - Math.PI/2) * eyeDistance;
+        const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+        const eye1Y = snakeHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+        const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+        const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
         
         // White eyes with slight glow
         ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
@@ -520,20 +534,20 @@ export default function GamePage() {
         ctx.fill();
         ctx.shadowBlur = 0;
         
-        // Black pupils following mouse direction
+        // Black pupils following movement direction
         const pupilOffset = 2;
         ctx.fillStyle = 'black';
         ctx.beginPath();
         ctx.arc(
-          eye1X + Math.cos(eyeAngle) * pupilOffset, 
-          eye1Y + Math.sin(eyeAngle) * pupilOffset, 
+          eye1X + Math.cos(movementAngle) * pupilOffset, 
+          eye1Y + Math.sin(movementAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
         ctx.beginPath();
         ctx.arc(
-          eye2X + Math.cos(eyeAngle) * pupilOffset, 
-          eye2Y + Math.sin(eyeAngle) * pupilOffset, 
+          eye2X + Math.cos(movementAngle) * pupilOffset, 
+          eye2Y + Math.sin(movementAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
