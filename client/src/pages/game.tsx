@@ -203,7 +203,11 @@ class SmoothSnake {
       }
     }
     
-    // Don't auto-extend segments - only add through growth
+    // Trim segments to match actual snake length based on mass
+    const maxSegments = Math.floor(this.totalMass / this.massPerSegment);
+    if (this.segments.length > maxSegments) {
+      this.segments = this.segments.slice(0, maxSegments);
+    }
   }
   
   eatFood(food: Food) {
