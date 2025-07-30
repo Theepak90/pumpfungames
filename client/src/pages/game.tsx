@@ -138,18 +138,20 @@ class SmoothSnake {
       y: this.head.y + this.speed * Math.sin(this.currentAngle)
     };
     
-    // Insert new head at the beginning
-    this.segments.unshift(newHead);
+    // Only add new segment if head moved enough distance to prevent jittering
+    const lastSegment = this.segments[0];
+    const dx = newHead.x - lastSegment.x;
+    const dy = newHead.y - lastSegment.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Fix stretching when boosting by adding extra head segments for density
-    if (this.isBoosting && this.totalMass > this.minimumMass) {
-      // Add an extra segment between head positions to prevent stretching
-      const intermediateHead = {
-        x: this.head.x + (this.speed * 0.5) * Math.cos(this.currentAngle),
-        y: this.head.y + (this.speed * 0.5) * Math.sin(this.currentAngle)
-      };
-      this.segments.splice(1, 0, intermediateHead);
+    if (distance >= this.segmentSpacing) {
+      this.segments.unshift(newHead);
+    } else {
+      // Update head position without adding new segment
+      this.segments[0] = newHead;
     }
+    
+    // Remove extra head segment addition to prevent jittering
     
     // Adjust segment spacing based on boost state
     const currentSpacing = this.isBoosting ? this.segmentSpacing * 0.7 : this.segmentSpacing;
@@ -485,9 +487,17 @@ export default function GamePage() {
       ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
       ctx.setLineDash([]);
 
-      // Draw food
+      // Draw food with gradient effect
       foods.forEach(food => {
-        ctx.fillStyle = food.color;
+        // Create radial gradient for food
+        const gradient = ctx.createRadialGradient(
+          food.x, food.y, 0,
+          food.x, food.y, food.size
+        );
+        gradient.addColorStop(0, "#ffbaba"); // Light center
+        gradient.addColorStop(1, food.color); // Dark edge
+        
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(food.x, food.y, food.size, 0, 2 * Math.PI);
         ctx.fill();
@@ -518,15 +528,15 @@ export default function GamePage() {
         );
         
         if (isHead) {
-          // Head gradient - brighter orange
-          gradient.addColorStop(0, "#ffaa66");  // Light highlight
+          // Head gradient - brighter with consistent highlight
+          gradient.addColorStop(0, "#ffbaba");  // Light center highlight
           gradient.addColorStop(0.7, "#ff6600"); // Mid tone
-          gradient.addColorStop(1, "#cc4400");   // Dark shadow
+          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
         } else {
-          // Body gradient - standard orange
-          gradient.addColorStop(0, "#ff8844");  // Light highlight  
+          // Body gradient - standard with consistent highlight
+          gradient.addColorStop(0, "#ffbaba");  // Light center highlight  
           gradient.addColorStop(0.7, "#f55400"); // Mid tone
-          gradient.addColorStop(1, "#bb3300");   // Dark shadow
+          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
         }
         
         // Draw segment sphere
