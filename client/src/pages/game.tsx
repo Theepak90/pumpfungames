@@ -444,8 +444,8 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Clear canvas
-      ctx.fillStyle = '#2c2c54';
+      // Clear canvas with dark background
+      ctx.fillStyle = '#15161b';
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
       // Save context for camera transform
@@ -454,23 +454,36 @@ export default function GamePage() {
       // Camera follows snake head
       ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
 
-      // Draw map grid
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      // Draw hexagonal pattern like Slither.io
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
-      const gridSize = 50;
+      const hexSize = 40;
+      const hexHeight = hexSize * Math.sqrt(3);
       
-      for (let x = 0; x <= MAP_WIDTH; x += gridSize) {
+      // Function to draw a hexagon at given center
+      const drawHexagon = (centerX: number, centerY: number) => {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, MAP_HEIGHT);
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const x = centerX + hexSize * Math.cos(angle);
+          const y = centerY + hexSize * Math.sin(angle);
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.closePath();
         ctx.stroke();
-      }
+      };
       
-      for (let y = 0; y <= MAP_HEIGHT; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(MAP_WIDTH, y);
-        ctx.stroke();
+      // Draw hexagonal grid pattern
+      for (let row = 0; row * hexHeight * 0.75 < MAP_HEIGHT + hexHeight; row++) {
+        for (let col = 0; col * hexSize * 1.5 < MAP_WIDTH + hexSize * 2; col++) {
+          const x = col * hexSize * 1.5;
+          const y = row * hexHeight * 0.75 + (col % 2) * hexHeight * 0.375;
+          drawHexagon(x, y);
+        }
       }
 
       // Draw map boundaries
@@ -708,7 +721,7 @@ export default function GamePage() {
         width={canvasSize.width}
         height={canvasSize.height}
         className="cursor-default block"
-        style={{ background: '#2c2c54' }}
+        style={{ background: '#15161b' }}
       />
     </div>
   );
