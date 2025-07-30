@@ -37,7 +37,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 8; // Distance between segments
+    this.segmentSpacing = 18; // Distance between segments (slightly less than diameter for overlap)
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
@@ -53,7 +53,7 @@ class SmoothSnake {
     const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * this.segmentSpacing, // Normal spacing for tracking
+        x: x - i * (this.segmentSpacing * 0.5), // Tighter spacing for initialization
         y: y 
       });
     }
@@ -108,12 +108,15 @@ class SmoothSnake {
       this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 5.76 pixels per frame when boosting (double normal)
       this.boostCooldown++;
       
-      // Drop orb every 20 frames (3 per second)
+      // Drop orb every 20 frames (3 per second) just behind the head
       if (this.boostCooldown % BOOST_DROP_INTERVAL === 0 && onDropFood) {
-        const tail = this.segments[this.segments.length - 1];
+        const dropDistance = 20; // pixels behind head
+        const dropX = this.head.x - Math.cos(this.currentAngle) * dropDistance;
+        const dropY = this.head.y - Math.sin(this.currentAngle) * dropDistance;
+        
         onDropFood({
-          x: tail.x,
-          y: tail.y,
+          x: dropX,
+          y: dropY,
           size: 4,
           color: '#f55400',
           mass: BOOST_DROP_MASS
@@ -633,7 +636,7 @@ export default function GamePage() {
     const START_MASS = 45;
     const START_SEGMENTS = 60;
     for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
+      snake.segments.push({ x: 2000 - i * (snake.segmentSpacing * 0.5), y: 2000 });
     }
     snake.currentAngle = 0;
     snake.growthRemaining = START_MASS;
