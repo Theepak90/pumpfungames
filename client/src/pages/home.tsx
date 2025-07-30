@@ -295,26 +295,26 @@ export default function Home() {
               <h3 className="text-yellow-400 text-sm mb-2 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
-              <div className="text-white text-sm space-y-1 font-retro mb-3">
+              <div className="text-white text-xs space-y-1 font-retro mb-3">
                 <div className="flex justify-between items-center">
-                  <span>1. TokyOnTop</span>
-                  <span className="text-right">
-                    <span style={{color: '#53d493'}}>${1600}</span>
-                    <span className="text-orange-400 ml-2">+$420</span>
+                  <span className="truncate">1. TokyOnTop</span>
+                  <span className="text-right flex-shrink-0">
+                    <span style={{color: '#53d493'}} className="mr-1">${1600}</span>
+                    <span className="text-orange-400">$1,420</span>
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>2. Sergio_The_Jew</span>
-                  <span className="text-right">
-                    <span style={{color: '#53d493'}}>${1255}</span>
-                    <span className="text-orange-400 ml-2">+$310</span>
+                  <span className="truncate">2. Sergio_The_Jew</span>
+                  <span className="text-right flex-shrink-0">
+                    <span style={{color: '#53d493'}} className="mr-1">${1255}</span>
+                    <span className="text-orange-400">$1,105</span>
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>3. 1$_to_1k</span>
-                  <span className="text-right">
-                    <span style={{color: '#53d493'}}>${964}</span>
-                    <span className="text-orange-400 ml-2">+$245</span>
+                  <span className="truncate">3. 1$_to_1k</span>
+                  <span className="text-right flex-shrink-0">
+                    <span style={{color: '#53d493'}} className="mr-1">${964}</span>
+                    <span className="text-orange-400">$845</span>
                   </span>
                 </div>
               </div>
