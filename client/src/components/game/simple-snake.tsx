@@ -28,6 +28,9 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
   const CANVAS_HEIGHT = 600;
   const SNAKE_SPEED = 3;
 
+  // Track mouse position
+  const [mousePos, setMousePos] = useState({ x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 });
+
   // Handle mouse movement for direction
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,26 +41,34 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       
-      // Get snake head position
-      const head = snake.segments[0];
-      if (!head) return;
-      
-      // Calculate direction from snake head to mouse
-      const dx = mouseX - head.x;
-      const dy = mouseY - head.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance > 10) { // Only move if mouse is far enough
-        setTargetDirection({
-          x: (dx / distance) * SNAKE_SPEED,
-          y: (dy / distance) * SNAKE_SPEED
-        });
-      }
+      // Update mouse position
+      setMousePos({ x: mouseX, y: mouseY });
     };
 
     canvas.addEventListener('mousemove', handleMouseMove);
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
-  }, [snake.segments]);
+  }, []);
+
+  // Update snake direction based on mouse position
+  useEffect(() => {
+    const head = snake.segments[0];
+    if (!head) return;
+    
+    // Calculate direction from snake head to mouse
+    const dx = mousePos.x - head.x;
+    const dy = mousePos.y - head.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance > 5) { // Only move if mouse is far enough
+      setTargetDirection({
+        x: (dx / distance) * SNAKE_SPEED,
+        y: (dy / distance) * SNAKE_SPEED
+      });
+    } else {
+      // Stop moving when very close to mouse
+      setTargetDirection({ x: 0, y: 0 });
+    }
+  }, [mousePos, snake.segments]);
 
   // Game loop
   useEffect(() => {
@@ -159,15 +170,32 @@ export function SimpleSnake({ onExit }: SimpleSnakeProps) {
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
 
-      // Draw direction indicator
+      // Draw mouse cursor indicator
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.strokeStyle = '#32CD32';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mousePos.x, mousePos.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw line from snake head to mouse
       const head = snake.segments[0];
-      if (head && (Math.abs(snake.direction.x) > 0.1 || Math.abs(snake.direction.y) > 0.1)) {
-        ctx.strokeStyle = '#32CD32';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(head.x, head.y);
-        ctx.lineTo(head.x + snake.direction.x * 10, head.y + snake.direction.y * 10);
-        ctx.stroke();
+      if (head) {
+        const distance = Math.sqrt(
+          (mousePos.x - head.x) ** 2 + (mousePos.y - head.y) ** 2
+        );
+        
+        if (distance > 5) {
+          ctx.strokeStyle = 'rgba(50, 205, 50, 0.5)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(head.x, head.y);
+          ctx.lineTo(mousePos.x, mousePos.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
     };
 
