@@ -22,6 +22,7 @@ class SmoothSnake {
   currentAngle: number;
   turnSpeed: number;
   segmentSpacing: number;
+  growthRemaining: number;
   
   constructor(x: number, y: number) {
     this.speed = 4;
@@ -29,6 +30,7 @@ class SmoothSnake {
     this.currentAngle = 0;
     this.turnSpeed = 0.06; // Smooth turning speed
     this.segmentSpacing = 8; // Distance between segments
+    this.growthRemaining = 0; // Growth counter for eating food
     
     // Initialize with evenly spaced segments
     this.segments = [];
@@ -49,7 +51,7 @@ class SmoothSnake {
     return this.segments.length;
   }
   
-  move(mouseDirectionX: number, mouseDirectionY: number, isGrowing: boolean = false) {
+  move(mouseDirectionX: number, mouseDirectionY: number) {
     // Calculate target angle from mouse direction relative to screen center
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
@@ -89,34 +91,22 @@ class SmoothSnake {
       }
     }
     
-    // Remove excess segments if not growing
-    if (!isGrowing && this.segments.length > 15) {
-      this.segments.pop();
+    // Only remove tail segment if not growing
+    if (this.growthRemaining > 0) {
+      this.growthRemaining--;
+    } else {
+      // Keep minimum length and remove excess
+      if (this.segments.length > 15) {
+        this.segments.pop();
+      }
     }
   }
   
-  grow(amount: number) {
-    const tail = this.segments[this.segments.length - 1];
-    const secondToTail = this.segments[this.segments.length - 2] || tail;
-    
-    // Add new segments extending from the tail
-    for (let i = 0; i < amount; i++) {
-      const dx = tail.x - secondToTail.x;
-      const dy = tail.y - secondToTail.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance > 0) {
-        const normalizedDx = dx / distance;
-        const normalizedDy = dy / distance;
-        
-        this.segments.push({
-          x: tail.x + normalizedDx * this.segmentSpacing * (i + 1),
-          y: tail.y + normalizedDy * this.segmentSpacing * (i + 1)
-        });
-      } else {
-        this.segments.push({ ...tail });
-      }
-    }
+  eatFood(food: Food) {
+    // Growth amount based on food size (larger food = more growth)
+    const growthPerFood = Math.floor(food.size * 2); // Scale with food size
+    this.growthRemaining += growthPerFood;
+    return Math.floor(food.size); // Return score increase
   }
 }
 
@@ -204,22 +194,8 @@ export default function GamePage() {
     let animationId: number;
     
     const gameLoop = () => {
-      // Check if snake will eat food this frame
-      let willGrow = false;
-      const currentHead = snake.head;
-      
-      // Check food collision first to determine if growing
-      for (let i = 0; i < foods.length; i++) {
-        const food = foods[i];
-        const dist = Math.sqrt((currentHead.x - food.x) ** 2 + (currentHead.y - food.y) ** 2);
-        if (dist < snake.radius + food.size) {
-          willGrow = true;
-          break;
-        }
-      }
-
       // Move snake with smooth turning based on mouse direction
-      snake.move(mouseDirection.x, mouseDirection.y, willGrow);
+      snake.move(mouseDirection.x, mouseDirection.y);
 
       // Check map boundaries (death barrier)
       const updatedHead = snake.head;
@@ -228,7 +204,7 @@ export default function GamePage() {
         return;
       }
 
-      // Update food array after eating
+      // Check for food collision and handle eating
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
         let scoreIncrease = 0;
@@ -238,6 +214,9 @@ export default function GamePage() {
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
           if (dist < snake.radius + food.size) {
+            // Snake eats the food - this handles growth internally
+            scoreIncrease += snake.eatFood(food);
+            
             // Remove eaten food and add new one
             newFoods.splice(i, 1);
             newFoods.push({
@@ -246,7 +225,6 @@ export default function GamePage() {
               size: 3 + Math.random() * 8,
               color: `hsl(${Math.random() * 360}, 60%, 60%)`
             });
-            scoreIncrease += Math.floor(food.size);
             break; // Only eat one food per frame
           }
         }
@@ -417,10 +395,11 @@ export default function GamePage() {
     setScore(0);
     // Reset snake to initial length and position
     snake.segments = [];
-    for (let i = 0; i < 10; i++) {
-      snake.segments.push({ x: 2000 - i * 20, y: 2000 });
+    for (let i = 0; i < 15; i++) {
+      snake.segments.push({ x: 2000 - i * snake.segmentSpacing, y: 2000 });
     }
     snake.currentAngle = 0;
+    snake.growthRemaining = 0;
     setMouseDirection({ x: 1, y: 0 });
   };
 
