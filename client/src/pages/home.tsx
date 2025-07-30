@@ -214,178 +214,156 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-dark-bg/90 backdrop-blur-sm border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left side - Welcome */}
-            <div className="flex items-center space-x-3">
-              <span className="text-2xl">🎃</span>
-              <div>
-                <span className="text-white font-semibold">Welcome, </span>
-                <span className="neon-yellow font-bold">{user.username}</span>
-                <span className="text-white font-semibold">!</span>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gray-900 text-white font-mono">
+      {/* Top Bar - Welcome with gaming controller icon */}
+      <div className="flex items-center p-4">
+        <div className="text-green-400 text-xl mr-2">🎮</div>
+        <span className="text-white text-lg">Welcome, </span>
+        <span className="text-green-400 text-lg font-bold">{user.username}</span>
+      </div>
 
-            {/* Right side - User controls */}
-            <div className="flex items-center space-x-4">
-              {/* Wallet balance */}
-              <div className="flex items-center space-x-2 bg-dark-card px-4 py-2 rounded-lg border border-dark-border">
-                <WalletIcon className="w-5 h-5 neon-yellow" />
-                <span className="neon-yellow font-bold">${parseFloat(user.balance).toFixed(2)}</span>
-              </div>
-
-              {/* Sound toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="hover:bg-dark-card"
-              >
-                <Volume2 className={`w-6 h-6 ${soundEnabled ? 'text-white' : 'text-gray-500'}`} />
-              </Button>
-
-              {/* Settings */}
-              <Button variant="ghost" size="icon" className="hover:bg-dark-card">
-                <Settings className="w-6 h-6 text-white" />
-              </Button>
-
-              {/* Logout */}
-              <Button 
-                onClick={logout}
-                className="bg-neon-yellow text-black hover:bg-yellow-400 font-semibold"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
+      {/* Main Content Container */}
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <div className="w-full max-w-4xl px-4">
+          
+          {/* Title Section */}
+          <div className="text-center mb-8">
+            <h1 className="text-white text-5xl font-bold mb-2">
+              PumpGames<span className="text-green-400">.fun</span>
+            </h1>
+            <p className="text-gray-300 text-lg">Skill Based Betting</p>
           </div>
-        </div>
-      </header>
 
-      {/* Main Layout */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-screen">
+          {/* Main Game Area */}
+          <div className="grid grid-cols-3 gap-8">
+            
+            {/* Left Panel - Leaderboard */}
+            <div className="bg-gray-800 p-4 rounded border border-gray-600">
+              <h3 className="text-yellow-400 text-lg mb-3 flex items-center">
+                🏆 Leaderboard
+              </h3>
+              <div className="text-white text-sm space-y-1">
+                <div>1.</div>
+                <div>2.</div>
+                <div>3.</div>
+              </div>
+              <button className="bg-gray-700 text-white px-4 py-1 mt-3 text-sm border border-gray-600 hover:bg-gray-600">
+                View Full Board
+              </button>
+            </div>
 
-          {/* Center Panel */}
-          <main className="lg:col-span-2 space-y-6">
-            {/* Username Block */}
-                <div className="flex items-center justify-center space-x-4">
-                  {/* Score cube */}
-                  <div className="bg-neon-yellow text-black w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl glow-hover">
-                    <span>{user.kills || 0}</span>
-                  </div>
-                  
-                  {/* Username field */}
-                  <div className="flex items-center space-x-2 bg-dark-card px-4 py-2 rounded-lg border border-dark-border">
-                    <span className="text-white font-medium">{user.username}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <Edit3 className="w-4 h-4 text-gray-400 hover:text-white" />
-                    </Button>
-                  </div>
+            {/* Center Panel - Game Controls */}
+            <div className="bg-gray-800 p-6 rounded border border-gray-600">
+              
+              {/* Username with edit icon */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-gray-400">〈Your Username〉</span>
+                <Edit3 className="w-4 h-4 text-gray-400" />
+              </div>
+              
+              {/* Bet Amount */}
+              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-4 rounded">
+                {selectedBetAmount}$
+              </div>
+              
+              {/* Play Button */}
+              <button 
+                onClick={handleStartGame}
+                className="bg-green-500 text-white font-bold text-2xl py-4 w-full mb-4 rounded hover:bg-green-600 transition-colors"
+              >
+                PLAY
+              </button>
+              
+              {/* Region and Friends buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => setSelectedRegion("EU")}
+                  className={`py-2 px-4 text-sm border rounded ${
+                    selectedRegion === "EU" 
+                      ? 'bg-blue-600 text-white border-blue-500' 
+                      : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
+                  }`}
+                >
+                  EU
+                </button>
+                <button className="bg-gray-700 text-white py-2 px-4 text-sm border border-gray-600 rounded hover:bg-gray-600">
+                  Friends
+                </button>
+              </div>
+              
+              {/* Stats at bottom */}
+              <div className="mt-6 grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <div className="text-white font-bold text-xl">{playersInGame || 54}</div>
+                  <div className="text-gray-400 text-xs">Players Online</div>
                 </div>
-
-                {/* Game Amount Buttons */}
-                <div className="flex justify-center space-x-4">
-                  {[1, 5, 20].map((amount) => (
-                    <Button
-                      key={amount}
-                      onClick={() => setSelectedBetAmount(amount)}
-                      className={`px-6 py-3 rounded-full font-bold transition-all ${
-                        selectedBetAmount === amount
-                          ? 'bg-neon-yellow text-black glow-hover'
-                          : 'bg-dark-card text-white border border-dark-border hover:border-neon-yellow'
-                      }`}
-                    >
-                      ${amount}
-                    </Button>
-                  ))}
+                <div>
+                  <div className="text-white font-bold text-xl">+${(globalWinnings || 240331).toLocaleString()}</div>
+                  <div className="text-gray-400 text-xs">Global Player Winnings</div>
                 </div>
+              </div>
+            </div>
 
-                {/* Start Button */}
-                <div className="text-center">
-                  <Button
-                    onClick={handleStartGame}
-                    className="bg-dark-card text-white px-12 py-4 rounded-xl font-bold text-lg border-2 border-dark-border hover:border-neon-green glow-green transition-all duration-300 transform hover:scale-105"
-                  >
-                    PLAY GAME
-                  </Button>
-                </div>
+            {/* Right Panel - Wallet */}
+            <div className="bg-gray-800 p-4 rounded border border-gray-600">
+              <h3 className="text-white text-lg mb-3">Wallet</h3>
+              
+              {/* Balance Display */}
+              <div className="text-green-400 font-bold text-3xl mb-4">
+                ${parseFloat(user.balance).toFixed(2)}
+              </div>
+              
+              {/* Wallet buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button className="bg-gray-700 text-white py-2 px-3 text-sm border border-gray-600 rounded hover:bg-gray-600">
+                  Top Up
+                </button>
+                <button className="bg-gray-700 text-white py-2 px-3 text-sm border border-gray-600 rounded hover:bg-gray-600">
+                  Withdraw
+                </button>
+              </div>
+            </div>
 
-                {/* Region & Lobby Buttons */}
-                <div className="flex justify-center space-x-4">
-                  <Button
-                    onClick={() => setSelectedRegion("EU")}
-                    className={`px-4 py-2 rounded-full font-medium transition-colors ${
-                      selectedRegion === "EU"
-                        ? 'bg-neon-blue text-white hover:bg-blue-600'
-                        : 'bg-dark-card text-white border border-dark-border hover:border-neon-blue'
-                    }`}
-                  >
-                    EU Region
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="px-4 py-2 bg-dark-card text-white rounded-full font-medium border border-dark-border hover:border-neon-blue"
-                  >
-                    Browse Lobbies
-                  </Button>
-                </div>
+          </div>
 
-                {/* Stats Strip */}
-                <Card className="bg-dark-card border-dark-border">
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-2 gap-6 text-center">
-                      <div>
-                        <div className="neon-yellow text-3xl font-bold mb-1">{playersInGame}</div>
-                        <div className="text-gray-400 text-sm">Players in Game</div>
-                      </div>
-                      <div>
-                        <div className="neon-yellow text-3xl font-bold mb-1">${globalWinnings.toLocaleString()}</div>
-                        <div className="text-gray-400 text-sm">Global Player Winnings</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-          </main>
+          {/* Bet Amount Selection */}
+          <div className="flex justify-center mt-8 space-x-4">
+            {[1, 5, 20].map((amount) => (
+              <button
+                key={amount}
+                onClick={() => setSelectedBetAmount(amount)}
+                className={`px-6 py-2 font-bold rounded ${
+                  selectedBetAmount === amount
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-700 text-white border border-gray-600 hover:bg-gray-600'
+                }`}
+              >
+                ${amount}
+              </button>
+            ))}
+          </div>
 
-          {/* Right Panel */}
-          <aside className="lg:col-span-1 space-y-6">
-            <Wallet />
-          </aside>
         </div>
       </div>
 
-      {/* Bottom Bar */}
-      <footer className="mt-12 border-t border-dark-border bg-dark-bg/50">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-center space-x-8">
-            
-            {/* Daily Crate */}
-            <Button
-              onClick={handleClaimDailyCrate}
-              className="bg-dark-card rounded-xl p-4 border border-dark-border hover:border-neon-yellow transition-colors flex items-center space-x-3"
-              variant="ghost"
-            >
-              <div className="w-8 h-8 bg-neon-yellow rounded-lg flex items-center justify-center bounce-slow">
-                <Gift className="w-5 h-5 text-black" />
-              </div>
-              <span className="text-white font-medium">Daily Crate</span>
-            </Button>
-
-            {/* Affiliate (disabled) */}
-            <div className="bg-dark-card rounded-xl p-4 border border-dark-border opacity-50 cursor-not-allowed flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gray-600 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-gray-400" />
-              </div>
-              <span className="text-gray-400 font-medium">Affiliate</span>
-              <span className="text-xs bg-gray-700 px-2 py-1 rounded text-gray-400">Soon</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Bottom Actions */}
+      <div className="flex justify-center space-x-8 p-4">
+        <Button
+          onClick={handleClaimDailyCrate}
+          className="bg-gray-700 text-white px-4 py-2 rounded border border-gray-600 hover:bg-gray-600"
+        >
+          <Gift className="w-4 h-4 mr-2" />
+          Daily Crate
+        </Button>
+        
+        <Button
+          onClick={logout}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Logout
+        </Button>
+      </div>
     </div>
   );
 }
