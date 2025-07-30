@@ -23,13 +23,14 @@ Preferred communication style: Simple, everyday language.
 - **Language**: TypeScript throughout the entire stack
 - **Real-time Communication**: WebSocket server for live game updates
 - **API Design**: RESTful endpoints for CRUD operations
-- **Session Management**: In-memory storage for development (can be extended to Redis)
+- **Storage**: PostgreSQL database with Drizzle ORM (upgraded from in-memory storage)
 
 ### Database Layer
 - **ORM**: Drizzle ORM for type-safe database operations
-- **Database**: PostgreSQL (configured for Neon serverless)
-- **Migrations**: Drizzle Kit for schema management
-- **Schema**: Strongly typed with Zod validation
+- **Database**: PostgreSQL with persistent storage
+- **Migrations**: Drizzle Kit for schema management (`npm run db:push`)
+- **Schema**: Strongly typed with Zod validation and relations
+- **Tables**: users, games, gameParticipants, friendships, dailyCrates, gameStates
 
 ## Key Components
 
@@ -91,7 +92,7 @@ Preferred communication style: Simple, everyday language.
 ### Development
 - Vite dev server for frontend with HMR
 - tsx for running TypeScript server directly
-- In-memory storage for rapid development iteration
+- PostgreSQL database for persistent data storage
 - WebSocket server integrated with Express server
 
 ### Production

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, uuid, jsonb } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -57,6 +58,67 @@ export const dailyCrates = pgTable("daily_crates", {
   reward: decimal("reward", { precision: 10, scale: 4 }).notNull()
 });
 
+// Game states table for storing real-time game data
+export const gameStates = pgTable("game_states", {
+  id: varchar("id").primaryKey(), // matches game id
+  data: jsonb("data").notNull(), // stores full GameState object
+  lastUpdated: timestamp("last_updated").default(sql`now()`).notNull()
+});
+
+// Define relations
+export const usersRelations = relations(users, ({ many }) => ({
+  gameParticipants: many(gameParticipants),
+  friendsInitiated: many(friendships, { relationName: "userFriends" }),
+  friendsReceived: many(friendships, { relationName: "friendUser" }),
+  dailyCrates: many(dailyCrates)
+}));
+
+export const gamesRelations = relations(games, ({ many, one }) => ({
+  participants: many(gameParticipants),
+  gameState: one(gameStates, {
+    fields: [games.id],
+    references: [gameStates.id]
+  })
+}));
+
+export const gameParticipantsRelations = relations(gameParticipants, ({ one }) => ({
+  user: one(users, {
+    fields: [gameParticipants.userId],
+    references: [users.id]
+  }),
+  game: one(games, {
+    fields: [gameParticipants.gameId],
+    references: [games.id]
+  })
+}));
+
+export const friendshipsRelations = relations(friendships, ({ one }) => ({
+  user: one(users, {
+    fields: [friendships.userId],
+    references: [users.id],
+    relationName: "userFriends"
+  }),
+  friend: one(users, {
+    fields: [friendships.friendId],
+    references: [users.id],
+    relationName: "friendUser"
+  })
+}));
+
+export const dailyCratesRelations = relations(dailyCrates, ({ one }) => ({
+  user: one(users, {
+    fields: [dailyCrates.userId],
+    references: [users.id]
+  })
+}));
+
+export const gameStatesRelations = relations(gameStates, ({ one }) => ({
+  game: one(games, {
+    fields: [gameStates.id],
+    references: [games.id]
+  })
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -85,6 +147,10 @@ export const insertFriendshipSchema = createInsertSchema(friendships).omit({
 export const insertDailyCrateSchema = createInsertSchema(dailyCrates).omit({
   id: true,
   claimedAt: true
+});
+
+export const insertGameStateSchema = createInsertSchema(gameStates).omit({
+  lastUpdated: true
 });
 
 // Types

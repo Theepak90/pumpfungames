@@ -10,9 +10,16 @@ import {
   type DailyCrate,
   type InsertDailyCrate,
   type GameState,
-  type Player
+  type Player,
+  users,
+  games,
+  gameParticipants,
+  friendships,
+  dailyCrates,
+  gameStates
 } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc, and, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -47,219 +54,204 @@ export interface IStorage {
   removeGameState(gameId: string): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private games: Map<string, Game>;
-  private gameParticipants: Map<string, GameParticipant>;
-  private friendships: Map<string, Friendship>;
-  private dailyCrates: Map<string, DailyCrate>;
-  private gameStates: Map<string, GameState>;
-
-  constructor() {
-    this.users = new Map();
-    this.games = new Map();
-    this.gameParticipants = new Map();
-    this.friendships = new Map();
-    this.dailyCrates = new Map();
-    this.gameStates = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = {
-      id,
-      username: insertUser.username,
-      password: insertUser.password,
-      balance: insertUser.balance || "0.0000",
-      solBalance: insertUser.solBalance || "0.00000000",
-      totalEarnings: insertUser.totalEarnings || "0.00",
-      gamesPlayed: insertUser.gamesPlayed || 0,
-      kills: insertUser.kills || 0,
-      deaths: insertUser.deaths || 0,
-      snakeColor: insertUser.snakeColor || "#00FF88",
-      isOnline: insertUser.isOnline || false,
-      createdAt: new Date(),
-      lastActive: new Date()
-    };
-    this.users.set(id, user);
-    return user;
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db
+      .insert(users)
+      .values(user)
+      .returning();
+    return newUser;
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updatedUser = { ...user, ...updates, lastActive: new Date() };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    const [updatedUser] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
   }
 
   async updateUserBalance(id: string, amount: number): Promise<User | undefined> {
-    const user = this.users.get(id);
+    const user = await this.getUser(id);
     if (!user) return undefined;
-
-    const currentBalance = parseFloat(user.balance);
-    const newBalance = Math.max(0, currentBalance + amount);
     
-    return this.updateUser(id, { 
-      balance: newBalance.toFixed(4),
-      totalEarnings: amount > 0 ? (parseFloat(user.totalEarnings) + amount).toFixed(2) : user.totalEarnings
-    });
+    const currentBalance = parseFloat(user.balance);
+    const newBalance = currentBalance + amount;
+    
+    return this.updateUser(id, { balance: newBalance.toFixed(4) });
   }
 
-  async getLeaderboard(limit = 10): Promise<User[]> {
-    return Array.from(this.users.values())
-      .sort((a, b) => parseFloat(b.totalEarnings) - parseFloat(a.totalEarnings))
-      .slice(0, limit);
+  async getLeaderboard(limit: number = 10): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.kills), desc(users.totalEarnings))
+      .limit(limit);
   }
 
-  async createGame(insertGame: InsertGame): Promise<Game> {
-    const id = randomUUID();
-    const game: Game = {
-      id,
-      region: insertGame.region,
-      betAmount: insertGame.betAmount,
-      playersCount: insertGame.playersCount || 0,
-      maxPlayers: insertGame.maxPlayers || 20,
-      status: insertGame.status,
-      createdAt: new Date(),
-      startedAt: null,
-      endedAt: null
-    };
-    this.games.set(id, game);
-    return game;
+  // Game operations
+  async createGame(game: InsertGame): Promise<Game> {
+    const [newGame] = await db
+      .insert(games)
+      .values(game)
+      .returning();
+    return newGame;
   }
 
   async getGame(id: string): Promise<Game | undefined> {
-    return this.games.get(id);
+    const [game] = await db.select().from(games).where(eq(games.id, id));
+    return game || undefined;
   }
 
   async getActiveGames(): Promise<Game[]> {
-    return Array.from(this.games.values()).filter(
-      (game) => game.status === 'waiting' || game.status === 'active'
-    );
+    return await db
+      .select()
+      .from(games)
+      .where(or(eq(games.status, 'waiting'), eq(games.status, 'active')));
   }
 
   async updateGame(id: string, updates: Partial<Game>): Promise<Game | undefined> {
-    const game = this.games.get(id);
-    if (!game) return undefined;
-    
-    const updatedGame = { ...game, ...updates };
-    this.games.set(id, updatedGame);
-    return updatedGame;
+    const [updatedGame] = await db
+      .update(games)
+      .set(updates)
+      .where(eq(games.id, id))
+      .returning();
+    return updatedGame || undefined;
   }
 
   async joinGame(gameId: string, userId: string): Promise<GameParticipant> {
-    const id = randomUUID();
-    const participant: GameParticipant = {
-      id,
-      gameId,
-      userId,
-      kills: 0,
-      earnings: "0.00",
-      isAlive: true,
-      joinedAt: new Date(),
-      eliminatedAt: null
-    };
-    this.gameParticipants.set(id, participant);
+    const [participant] = await db
+      .insert(gameParticipants)
+      .values({
+        gameId,
+        userId,
+        kills: 0,
+        earnings: "0.00",
+        isAlive: true
+      })
+      .returning();
     return participant;
   }
 
   async getGameParticipants(gameId: string): Promise<GameParticipant[]> {
-    return Array.from(this.gameParticipants.values()).filter(
-      (participant) => participant.gameId === gameId
-    );
+    return await db
+      .select()
+      .from(gameParticipants)
+      .where(eq(gameParticipants.gameId, gameId));
   }
 
   async updateGameParticipant(id: string, updates: Partial<GameParticipant>): Promise<GameParticipant | undefined> {
-    const participant = this.gameParticipants.get(id);
-    if (!participant) return undefined;
-    
-    const updatedParticipant = { ...participant, ...updates };
-    this.gameParticipants.set(id, updatedParticipant);
-    return updatedParticipant;
+    const [updatedParticipant] = await db
+      .update(gameParticipants)
+      .set(updates)
+      .where(eq(gameParticipants.id, id))
+      .returning();
+    return updatedParticipant || undefined;
   }
 
+  // Friend operations
   async getFriends(userId: string): Promise<User[]> {
-    const friendships = Array.from(this.friendships.values()).filter(
-      (friendship) => 
-        (friendship.userId === userId || friendship.friendId === userId) && 
-        friendship.status === 'accepted'
-    );
+    const userFriendships = await db
+      .select({
+        friendId: friendships.friendId,
+      })
+      .from(friendships)
+      .where(and(eq(friendships.userId, userId), eq(friendships.status, 'accepted')));
 
-    const friendIds = friendships.map((friendship) =>
-      friendship.userId === userId ? friendship.friendId : friendship.userId
-    );
+    if (userFriendships.length === 0) return [];
 
-    return friendIds.map((id) => this.users.get(id)).filter(Boolean) as User[];
+    const friendIds = userFriendships.map((f: any) => f.friendId);
+    return await db
+      .select()
+      .from(users)
+      .where(or(...friendIds.map((id: string) => eq(users.id, id))));
   }
 
   async addFriend(userId: string, friendId: string): Promise<Friendship> {
-    const id = randomUUID();
-    const friendship: Friendship = {
-      id,
-      userId,
-      friendId,
-      status: 'pending',
-      createdAt: new Date()
-    };
-    this.friendships.set(id, friendship);
+    const [friendship] = await db
+      .insert(friendships)
+      .values({
+        userId,
+        friendId,
+        status: 'accepted' // Auto-accept for simplicity
+      })
+      .returning();
     return friendship;
   }
 
   async acceptFriendRequest(userId: string, friendId: string): Promise<Friendship | undefined> {
-    const friendship = Array.from(this.friendships.values()).find(
-      (f) => f.userId === friendId && f.friendId === userId && f.status === 'pending'
-    );
-
-    if (!friendship) return undefined;
-
-    friendship.status = 'accepted';
-    this.friendships.set(friendship.id, friendship);
-    return friendship;
+    const [updatedFriendship] = await db
+      .update(friendships)
+      .set({ status: 'accepted' })
+      .where(and(eq(friendships.userId, friendId), eq(friendships.friendId, userId)))
+      .returning();
+    return updatedFriendship || undefined;
   }
 
+  // Daily crate operations
   async getLastDailyCrate(userId: string): Promise<DailyCrate | undefined> {
-    const userCrates = Array.from(this.dailyCrates.values())
-      .filter((crate) => crate.userId === userId)
-      .sort((a, b) => b.claimedAt.getTime() - a.claimedAt.getTime());
-    
-    return userCrates[0];
+    const [crate] = await db
+      .select()
+      .from(dailyCrates)
+      .where(eq(dailyCrates.userId, userId))
+      .orderBy(desc(dailyCrates.claimedAt))
+      .limit(1);
+    return crate || undefined;
   }
 
   async claimDailyCrate(userId: string, reward: number): Promise<DailyCrate> {
-    const id = randomUUID();
-    const crate: DailyCrate = {
-      id,
-      userId,
-      claimedAt: new Date(),
-      reward: reward.toFixed(4)
-    };
-    this.dailyCrates.set(id, crate);
+    const [crate] = await db
+      .insert(dailyCrates)
+      .values({
+        userId,
+        reward: reward.toFixed(4)
+      })
+      .returning();
     return crate;
   }
 
+  // Game state operations
   async getGameState(gameId: string): Promise<GameState | undefined> {
-    return this.gameStates.get(gameId);
+    const [state] = await db
+      .select()
+      .from(gameStates)
+      .where(eq(gameStates.id, gameId));
+    
+    if (!state) return undefined;
+    return state.data as GameState;
   }
 
   async updateGameState(gameId: string, state: GameState): Promise<void> {
-    this.gameStates.set(gameId, state);
+    await db
+      .insert(gameStates)
+      .values({
+        id: gameId,
+        data: state as any
+      })
+      .onConflictDoUpdate({
+        target: gameStates.id,
+        set: {
+          data: state as any,
+          lastUpdated: new Date()
+        }
+      });
   }
 
   async removeGameState(gameId: string): Promise<void> {
-    this.gameStates.delete(gameId);
+    await db.delete(gameStates).where(eq(gameStates.id, gameId));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

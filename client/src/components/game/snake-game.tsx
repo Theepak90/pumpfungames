@@ -101,21 +101,21 @@ export function SnakeGame({ gameState, onMove, onLeave }: SnakeGameProps) {
       ctx.fillStyle = '#0a0a0a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Update camera to follow current player
+      // Update camera to follow current player (but don't cause re-render)
+      let cameraX = camera.x;
+      let cameraY = camera.y;
       if (currentPlayer && currentPlayer.snake.segments.length > 0) {
         const head = currentPlayer.snake.segments[0];
-        setCamera({
-          x: head.x - canvas.width / 2,
-          y: head.y - canvas.height / 2
-        });
+        cameraX = head.x - canvas.width / 2;
+        cameraY = head.y - canvas.height / 2;
       }
 
       // Save context for camera transform
       ctx.save();
-      ctx.translate(-camera.x, -camera.y);
+      ctx.translate(-cameraX, -cameraY);
 
       // Draw grid pattern
-      drawGrid(ctx, canvas.width, canvas.height);
+      drawGrid(ctx, canvas.width, canvas.height, cameraX, cameraY);
       
       // Draw food
       drawFood(ctx);
@@ -134,29 +134,29 @@ export function SnakeGame({ gameState, onMove, onLeave }: SnakeGameProps) {
     };
 
     render();
-  }, [gameState, currentPlayer, camera]);
+  }, [gameState, currentPlayer]);
 
-  const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number, cameraX: number, cameraY: number) => {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     
     const gridSize = 50;
-    const startX = Math.floor(camera.x / gridSize) * gridSize;
-    const startY = Math.floor(camera.y / gridSize) * gridSize;
+    const startX = Math.floor(cameraX / gridSize) * gridSize;
+    const startY = Math.floor(cameraY / gridSize) * gridSize;
     
     // Vertical lines
-    for (let x = startX; x < camera.x + width + gridSize; x += gridSize) {
+    for (let x = startX; x < cameraX + width + gridSize; x += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(x, camera.y);
-      ctx.lineTo(x, camera.y + height);
+      ctx.moveTo(x, cameraY);
+      ctx.lineTo(x, cameraY + height);
       ctx.stroke();
     }
     
     // Horizontal lines
-    for (let y = startY; y < camera.y + height + gridSize; y += gridSize) {
+    for (let y = startY; y < cameraY + height + gridSize; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(camera.x, y);
-      ctx.lineTo(camera.x + width, y);
+      ctx.moveTo(cameraX, y);
+      ctx.lineTo(cameraX + width, y);
       ctx.stroke();
     }
   };
