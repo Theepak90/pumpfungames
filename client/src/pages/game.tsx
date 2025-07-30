@@ -308,41 +308,27 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body with smooth segments
-      snake.segments.forEach((segment, index) => {
-        const isHead = index === 0;
-        const progress = index / Math.max(1, snake.segments.length - 1);
-        const radius = isHead ? snake.radius : Math.max(4, snake.radius * (1 - progress * 0.4));
+      // Draw snake body - uniform segments like Slither.io
+      const segmentRadius = 12;
+      const segmentColor = "#f55400";
+      const headColor = "#ff6600";
+      
+      for (let i = 0; i < snake.segments.length; i++) {
+        const segment = snake.segments[i];
+        const isHead = i === 0;
         
-        // Create smooth gradient for each segment
-        const gradient = ctx.createRadialGradient(
-          segment.x, segment.y, 0,
-          segment.x, segment.y, radius
-        );
-        
-        if (isHead) {
-          // Head is brighter
-          gradient.addColorStop(0, '#ff9f4a');
-          gradient.addColorStop(0.6, '#ff7a1a');
-          gradient.addColorStop(1, '#d4531a');
-        } else {
-          // Body gets darker toward tail
-          const brightness = 1 - progress * 0.3;
-          gradient.addColorStop(0, `hsl(25, 100%, ${Math.floor(65 * brightness)}%)`);
-          gradient.addColorStop(0.6, `hsl(25, 100%, ${Math.floor(55 * brightness)}%)`);
-          gradient.addColorStop(1, `hsl(25, 100%, ${Math.floor(40 * brightness)}%)`);
-        }
-        
-        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.fillStyle = isHead ? headColor : segmentColor;
         ctx.fill();
         
-        // Subtle border for definition
-        ctx.strokeStyle = isHead ? '#cc4400' : `rgba(153, 68, 0, ${1 - progress * 0.5})`;
-        ctx.lineWidth = isHead ? 2.5 : 1.5;
-        ctx.stroke();
-      });
+        // Add subtle border for definition
+        if (isHead) {
+          ctx.strokeStyle = "#cc4400";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
 
       // Draw eyes that follow mouse direction
       if (snake.segments.length > 0) {
@@ -491,7 +477,7 @@ export default function GamePage() {
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        className="cursor-none block"
+        className="cursor-default block"
         style={{ background: '#2c2c54' }}
       />
     </div>
