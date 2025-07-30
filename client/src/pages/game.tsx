@@ -31,7 +31,7 @@ class SmoothSnake {
   minimumMass: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 2.4; // 20% faster than original (2.0 → 2.4 px/frame)
+    this.baseSpeed = 2.4 * 1.2; // 2.88 px/frame (20% faster than previous)
     this.speed = this.baseSpeed;
     this.radius = 12;
     this.currentAngle = 0;
@@ -85,7 +85,7 @@ class SmoothSnake {
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
     // Handle boost mechanic with minimum mass protection
-    const BOOST_MULTIPLIER = 1.5;
+    const BOOST_MULTIPLIER = 1.3; // 30% faster than base speed
     const BOOST_DROP_INTERVAL = 20; // frames (3 drops per second at 60fps)
     const BOOST_DROP_MASS = 0.5;
     
@@ -95,7 +95,7 @@ class SmoothSnake {
     }
     
     if (this.isBoosting && this.totalMass > this.minimumMass) {
-      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.6 pixels per frame when boosting
+      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 3.744 pixels per frame when boosting
       this.boostCooldown++;
       
       // Drop orb every 20 frames (3 per second)
