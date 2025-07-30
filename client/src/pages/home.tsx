@@ -318,16 +318,16 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
             
             {/* Left Panel - Leaderboard */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col">
               <h3 className="text-yellow-400 text-sm mb-2 font-retro flex items-center">
                 🏆 Leaderboard
               </h3>
-              <div className="text-white text-sm space-y-1 mb-3 font-retro">
+              <div className="text-white text-sm space-y-1 flex-grow font-retro">
                 <div>1.</div>
                 <div>2.</div>
                 <div>3.</div>
               </div>
-              <button className="bg-gray-700 text-white px-2 py-1 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro w-full">
+              <button className="bg-gray-700 text-white px-2 py-1 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro w-full mt-3">
                 View Full Board
               </button>
             </div>
@@ -416,6 +416,8 @@ export default function Home() {
                   className={`py-1 px-3 text-sm border-2 font-retro ${
                     selectedRegion === "EU" 
                       ? 'bg-blue-600 text-white border-blue-500' 
+                      : selectedRegion === "US"
+                      ? 'bg-red-600 text-white border-red-500'
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
                   } transition-colors`}
                 >
@@ -440,16 +442,16 @@ export default function Home() {
             </div>
 
             {/* Right Panel - Wallet */}
-            <div className="bg-gray-800 p-3 border-2 border-gray-600">
-              <h3 className="text-white text-sm mb-2 font-retro">Wallet</h3>
+            <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col">
+              <h3 className="text-white text-sm mb-4 font-retro">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="font-bold text-lg mb-3 text-center bg-gray-900 py-2 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
+              <div className="font-bold text-lg mb-auto text-center bg-gray-900 py-4 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
               {/* Wallet buttons */}
-              <div className="grid grid-cols-2 gap-1">
+              <div className="grid grid-cols-2 gap-1 mt-4">
                 <button className="bg-gray-700 text-white py-1 px-2 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro">
                   Top Up
                 </button>
