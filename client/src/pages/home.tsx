@@ -215,7 +215,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
+    <div className="min-h-screen bg-gray-900 text-white font-retro-light" style={{backgroundColor: '#15161b'}}>
       {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center p-4">
         <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
@@ -232,7 +232,7 @@ export default function Home() {
             <h1 className="text-white text-4xl font-bold mb-2 font-retro tracking-wider">
               PumpGames<span style={{color: '#53d493'}}>.fun</span>
             </h1>
-            <p className="text-gray-300 text-lg font-retro">Skill Based Betting</p>
+            <p className="text-gray-300 text-lg font-retro-light">Skill Based Betting</p>
           </div>
 
           {/* Main Game Area - Three Column Layout */}
@@ -240,15 +240,15 @@ export default function Home() {
             
             {/* Left Panel - Leaderboard */}
             <div className="bg-gray-800 p-3 border-2 border-gray-600">
-              <h3 className="text-yellow-400 text-xs mb-2 font-retro flex items-center">
+              <h3 className="text-yellow-400 text-sm mb-2 font-retro-light flex items-center">
                 🏆 Leaderboard
               </h3>
-              <div className="text-white text-xs space-y-1 mb-3 font-retro">
+              <div className="text-white text-sm space-y-1 mb-3 font-retro-light">
                 <div>1.</div>
                 <div>2.</div>
                 <div>3.</div>
               </div>
-              <button className="bg-gray-700 text-white px-2 py-1 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro w-full">
+              <button className="bg-gray-700 text-white px-2 py-1 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro-light w-full">
                 View Full Board
               </button>
             </div>
@@ -258,19 +258,19 @@ export default function Home() {
               
               {/* Username with edit icon */}
               <div className="flex items-center justify-between mb-3 bg-gray-700 px-3 py-2 border-2 border-gray-600">
-                <span className="text-gray-300 font-retro text-xs">〈Your Username〉</span>
+                <span className="text-gray-300 font-retro-light text-sm">〈Your Username〉</span>
                 <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
               {/* Bet Amount */}
-              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-3 font-retro border-2 border-gray-600">
+              <div className="bg-white text-black p-2 text-center font-bold text-lg mb-3 font-retro-light border-2 border-gray-600">
                 {selectedBetAmount}$
               </div>
               
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
+                className="text-white font-bold text-lg py-3 w-full mb-3 font-retro-light transition-colors border-2"
                 style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
                 onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
                 onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
@@ -282,7 +282,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-1 mb-3">
                 <button 
                   onClick={() => setSelectedRegion("EU")}
-                  className={`py-1 px-3 text-xs border-2 font-retro ${
+                  className={`py-1 px-3 text-sm border-2 font-retro-light ${
                     selectedRegion === "EU" 
                       ? 'bg-blue-600 text-white border-blue-500' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
@@ -290,7 +290,7 @@ export default function Home() {
                 >
                   EU
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-3 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-3 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro-light">
                   Friends
                 </button>
               </div>
@@ -298,31 +298,31 @@ export default function Home() {
               {/* Stats at bottom */}
               <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-600 pt-2">
                 <div>
-                  <div className="text-white font-bold text-sm font-retro">{playersInGame || 54}</div>
-                  <div className="text-gray-400 text-xs font-retro">Players Online</div>
+                  <div className="text-white font-bold text-base font-retro-light">{playersInGame || 54}</div>
+                  <div className="text-gray-400 text-sm font-retro-light">Players Online</div>
                 </div>
                 <div>
-                  <div className="text-white font-bold text-sm font-retro">+${(globalWinnings || 240331).toLocaleString()}</div>
-                  <div className="text-gray-400 text-xs font-retro">Global Player Winnings</div>
+                  <div className="text-white font-bold text-base font-retro-light">+${(globalWinnings || 240331).toLocaleString()}</div>
+                  <div className="text-gray-400 text-sm font-retro-light">Global Player Winnings</div>
                 </div>
               </div>
             </div>
 
             {/* Right Panel - Wallet */}
             <div className="bg-gray-800 p-3 border-2 border-gray-600">
-              <h3 className="text-white text-xs mb-2 font-retro">Wallet</h3>
+              <h3 className="text-white text-sm mb-2 font-retro-light">Wallet</h3>
               
               {/* Balance Display */}
-              <div className="font-bold text-base mb-3 text-center bg-gray-900 py-2 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
+              <div className="font-bold text-lg mb-3 text-center bg-gray-900 py-2 border-2 border-gray-600 font-retro-light" style={{color: '#53d493'}}>
                 ${parseFloat(user.balance).toFixed(2)}
               </div>
               
               {/* Wallet buttons */}
               <div className="grid grid-cols-2 gap-1">
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-2 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro-light">
                   Top Up
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-2 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro">
+                <button className="bg-gray-700 text-white py-1 px-2 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro-light">
                   Withdraw
                 </button>
               </div>
