@@ -296,9 +296,27 @@ export default function Home() {
                 🏆 Leaderboard
               </h3>
               <div className="text-white text-sm space-y-1 font-retro mb-3">
-                <div>1.</div>
-                <div>2.</div>
-                <div>3.</div>
+                <div className="flex justify-between items-center">
+                  <span>1. TokyOnTop</span>
+                  <span className="text-right">
+                    <span style={{color: '#53d493'}}>${1600}</span>
+                    <span className="text-orange-400 ml-2">+$420</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>2. Sergio_The_Jew</span>
+                  <span className="text-right">
+                    <span style={{color: '#53d493'}}>${1255}</span>
+                    <span className="text-orange-400 ml-2">+$310</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>3. 1$_to_1k</span>
+                  <span className="text-right">
+                    <span style={{color: '#53d493'}}>${964}</span>
+                    <span className="text-orange-400 ml-2">+$245</span>
+                  </span>
+                </div>
               </div>
               <button className="bg-gray-700 text-white px-2 py-1 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro w-full">
                 View Full Board
