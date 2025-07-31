@@ -842,6 +842,7 @@ export default function GamePage() {
     
     // Background movement when tab is inactive
     const handleVisibilityChange = () => {
+      console.log('Tab visibility changed:', document.hidden ? 'hidden' : 'visible');
       setGameIsVisible(!document.hidden);
     };
     
@@ -850,6 +851,8 @@ export default function GamePage() {
     // Background movement timer - only moves snake when tab is inactive
     backgroundMovementInterval = window.setInterval(() => {
       if (document.hidden && !gameOver) {
+        console.log('Background movement active - snake moving in hidden tab');
+        
         // Only update snake position, nothing else
         const dx = Math.cos(snake.currentAngle) * snake.speed;
         const dy = Math.sin(snake.currentAngle) * snake.speed;
@@ -865,6 +868,9 @@ export default function GamePage() {
         if (snake.segmentTrail.length > maxTrailLength) {
           snake.segmentTrail.length = maxTrailLength;
         }
+        
+        // Update visible segments so snake appears properly when tab becomes active
+        snake.updateVisibleSegments();
       }
     }, 30); // 30ms interval for smooth background movement
     
