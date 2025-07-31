@@ -35,6 +35,8 @@ interface BotSnake {
   targetAngle: number;
   lastDirectionChange: number;
   targetFood: Food | null;
+  target: { x: number; y: number };
+  wobble: number;
 }
 
 // Death drop utility function
@@ -78,6 +80,12 @@ function createBotSnake(id: string): BotSnake {
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
   
+  // Generate random target position
+  const targetAngle = Math.random() * Math.PI * 2;
+  const targetDistance = 100 + Math.random() * 300; // Target within reasonable range
+  const targetX = x + Math.cos(targetAngle) * targetDistance;
+  const targetY = y + Math.sin(targetAngle) * targetDistance;
+
   return {
     id,
     head: { x, y },
@@ -89,7 +97,9 @@ function createBotSnake(id: string): BotSnake {
     color: colors[Math.floor(Math.random() * colors.length)],
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
-    targetFood: null
+    targetFood: null,
+    target: { x: targetX, y: targetY },
+    wobble: 0
   };
 }
 
@@ -114,38 +124,45 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.targetFood = nearestFood;
   }
   
-  // Calculate target angle based on AI behavior
-  if (bot.targetFood) {
-    bot.targetAngle = Math.atan2(bot.targetFood.y - bot.head.y, bot.targetFood.x - bot.head.x);
-  } else {
-    // Wander randomly if no food target
-    bot.lastDirectionChange++;
-    if (bot.lastDirectionChange > 60) {
-      bot.targetAngle = Math.random() * Math.PI * 2;
-      bot.lastDirectionChange = 0;
+  // Use target position system for intelligent movement
+  const dx = bot.target.x - bot.head.x;
+  const dy = bot.target.y - bot.head.y;
+  const distToTarget = Math.sqrt(dx * dx + dy * dy);
+  
+  // When close to target, pick a new random target
+  if (distToTarget < 80) {
+    const targetAngle = Math.random() * Math.PI * 2;
+    const targetDistance = 150 + Math.random() * 200;
+    bot.target.x = bot.head.x + Math.cos(targetAngle) * targetDistance;
+    bot.target.y = bot.head.y + Math.sin(targetAngle) * targetDistance;
+    
+    // Keep target within map bounds
+    const distFromCenter = Math.sqrt((bot.target.x - MAP_CENTER_X) ** 2 + (bot.target.y - MAP_CENTER_Y) ** 2);
+    if (distFromCenter > MAP_RADIUS - 200) {
+      bot.target.x = MAP_CENTER_X + (bot.target.x - MAP_CENTER_X) * (MAP_RADIUS - 200) / distFromCenter;
+      bot.target.y = MAP_CENTER_Y + (bot.target.y - MAP_CENTER_Y) * (MAP_RADIUS - 200) / distFromCenter;
     }
   }
   
-  // Avoid going too close to map edge
-  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 300) {
-    bot.targetAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-  }
+  // Calculate desired angle toward target
+  const desiredAngle = Math.atan2(dy, dx);
   
-  // Add random drift to prevent circles and make movement more natural
-  bot.targetAngle += (Math.random() - 0.5) * 0.15; // Random drift
+  // Add wobble for organic movement
+  bot.wobble += (Math.random() - 0.5) * 0.1;
+  const wobbleEffect = Math.sin(bot.wobble) * 0.02;
   
-  // Smooth angle interpolation
-  let angleDiff = bot.targetAngle - bot.currentAngle;
-  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-  bot.currentAngle += angleDiff * 0.05; // Smoother turning
+  // Smooth turn toward target
+  let angleDiff = desiredAngle - bot.currentAngle;
+  // Normalize angle difference to [-PI, PI]
+  angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+  
+  bot.currentAngle += angleDiff * 0.05 + wobbleEffect; // Smooth turning with wobble
   
   // Move bot head
-  const dx = Math.cos(bot.currentAngle) * bot.speed;
-  const dy = Math.sin(bot.currentAngle) * bot.speed;
-  bot.head.x += dx;
-  bot.head.y += dy;
+  const moveDx = Math.cos(bot.currentAngle) * bot.speed;
+  const moveDy = Math.sin(bot.currentAngle) * bot.speed;
+  bot.head.x += moveDx;
+  bot.head.y += moveDy;
   
   // Update trail
   bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
