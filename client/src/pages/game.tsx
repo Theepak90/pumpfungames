@@ -178,6 +178,9 @@ class SmoothSnake {
   SEGMENT_RADIUS: number;
   MIN_MASS_TO_BOOST: number;
   
+  // Money system
+  money: number;
+  
   constructor(x: number, y: number) {
     // Movement properties
     this.head = { x, y };
@@ -203,6 +206,9 @@ class SmoothSnake {
     this.growthRemaining = 0;
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    
+    // Initialize money
+    this.money = 1.00;
     
     this.updateVisibleSegments();
   }
@@ -825,6 +831,37 @@ export default function GamePage() {
           }
         }
       }
+      
+      // Check if player snake kills any bot snakes
+      for (let i = botSnakes.length - 1; i >= 0; i--) {
+        const bot = botSnakes[i];
+        const botBaseRadius = 8;
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
+        
+        for (const segment of snake.visibleSegments) {
+          const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
+          if (dist < snake.getSegmentRadius() + botRadius) {
+            // Player killed a bot - award money
+            const killReward = Math.max(0.50, bot.totalMass * 0.05); // $0.50 minimum, or 5% of bot's mass
+            snake.money += killReward;
+            
+            // Drop food where bot died
+            dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
+            
+            // Remove the killed bot
+            setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
+            
+            // Spawn a new bot to replace the killed one
+            setTimeout(() => {
+              setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
+            }, 3000); // 3 second delay before respawn
+            
+            break;
+          }
+        }
+      }
 
       // Let bot snakes eat food
       setBotSnakes(prevBots => {
@@ -1159,6 +1196,25 @@ export default function GamePage() {
       
       // Reset global alpha
       ctx.globalAlpha = 1.0;
+
+      // Draw money balance above snake head
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
+        const scaleFactor = snake.getScaleFactor();
+        
+        ctx.font = `${14 * scaleFactor}px Arial, sans-serif`;
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 2 * scaleFactor;
+        ctx.textAlign = "center";
+        
+        const moneyText = `$${snake.money.toFixed(2)}`;
+        const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+        
+        // Draw text outline for better visibility
+        ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
+        ctx.fillText(moneyText, snakeHead.x, snakeHead.y - offsetY);
+      }
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
       if (snake.visibleSegments.length > 0) {
