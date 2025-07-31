@@ -37,6 +37,7 @@ class SmoothSnake {
   visibleSegments: Position[];
   totalMass: number;
   growthRemaining: number;
+  distanceBuffer: number;
   
   // Constants
   START_MASS: number;
@@ -68,6 +69,7 @@ class SmoothSnake {
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
     this.growthRemaining = 0;
+    this.distanceBuffer = 0;
     
     this.updateVisibleSegments();
   }
@@ -125,17 +127,18 @@ class SmoothSnake {
     this.head.x += dx;
     this.head.y += dy;
     
-    // Record trail based on distance for body segments only
-    if (this.segmentTrail.length === 0) {
-      // Initialize trail with head position
-      this.segmentTrail.push({ x: this.head.x, y: this.head.y });
-    } else {
-      const lastTrailPoint = this.segmentTrail[0];
-      const dist = Math.hypot(this.head.x - lastTrailPoint.x, this.head.y - lastTrailPoint.y);
+    // Track distance moved using buffer system
+    this.distanceBuffer += Math.sqrt(dx * dx + dy * dy);
+    
+    // Add segment to trail when distance threshold is reached
+    if (this.distanceBuffer >= this.SEGMENT_SPACING) {
+      this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+      this.distanceBuffer = 0; // Reset buffer
       
-      if (dist >= this.SEGMENT_SPACING) {
-        // Add current head position to trail for body to follow
-        this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+      // Ensure trail isn't longer than needed
+      const maxSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+      if (this.segmentTrail.length > maxSegments) {
+        this.segmentTrail.length = maxSegments;
       }
     }
     
@@ -606,9 +609,9 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body segments (skip head - index 0)
-      for (let i = 1; i < snake.visibleSegments.length; i++) {
-        const segment = snake.visibleSegments[i];
+      // Draw snake body segments from trail (skip head)
+      for (let i = 1; i < snake.segmentTrail.length; i++) {
+        const segment = snake.segmentTrail[i];
         const segmentRadius = snake.getSegmentRadius();
         
         // Create radial gradient for 3D effect
@@ -719,6 +722,7 @@ export default function GamePage() {
     snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
     snake.totalMass = snake.START_MASS;
     snake.growthRemaining = 0;
+    snake.distanceBuffer = 0;
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;
