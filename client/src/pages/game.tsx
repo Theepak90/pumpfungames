@@ -61,7 +61,7 @@ class SmoothSnake {
     // Snake system constants
     this.START_MASS = 6; // Start with just 6 segments instead of 30
     this.MASS_PER_SEGMENT = 1;
-    this.SEGMENT_SPACING = 7.5; // Maximum overlap to mask inner outlines (0.75 * radius for heavy overlap)
+    this.SEGMENT_SPACING = 6.5; // Ultra-tight overlap (0.65 * radius) to eliminate inner white outlines
     this.SEGMENT_RADIUS = 10;
     this.MIN_MASS_TO_BOOST = 4;
     
@@ -714,21 +714,24 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw each segment with individual white outline circles
+      // Draw segments with outlines only on head and tail to eliminate inner white lines
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         const outlineSize = 2;
+        const isEdgeSegment = i === 0 || i === snake.visibleSegments.length - 1; // Head or tail
         
         ctx.globalAlpha = segment.opacity;
         
-        // Draw white outline circle (slightly larger)
-        ctx.fillStyle = "white";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + outlineSize, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw white outline only for edge segments (head and tail)
+        if (isEdgeSegment) {
+          ctx.fillStyle = "white";
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius + outlineSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
         
-        // Draw segment body on top
+        // Draw segment body
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
