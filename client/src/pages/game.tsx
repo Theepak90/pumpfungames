@@ -23,215 +23,157 @@ interface Food {
 }
 
 class SmoothSnake {
-  segments: Position[];
-  speed: number;
-  baseSpeed: number;
-  radius: number;
+  head: Position;
   currentAngle: number;
   turnSpeed: number;
-  segmentSpacing: number;
-  growthRemaining: number;
+  speed: number;
+  baseSpeed: number;
+  boostMultiplier: number;
   isBoosting: boolean;
   boostCooldown: number;
-  segmentMass: number;
-  minimumMass: number;
-  massPerSegment: number;
-  baseSegmentRadius: number;
-  maxSegmentRadius: number;
+  
+  // Trail and segment system
+  segmentTrail: Position[];
+  visibleSegments: Position[];
+  totalMass: number;
+  growthRemaining: number;
+  
+  // Constants
+  START_MASS: number;
+  MASS_PER_SEGMENT: number;
+  SEGMENT_SPACING: number;
+  SEGMENT_RADIUS: number;
+  MIN_MASS_TO_BOOST: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 2.4 * 1.2; // 2.88 px/frame (20% faster than previous)
-    this.speed = this.baseSpeed;
-    this.radius = 12;
+    // Movement properties
+    this.head = { x, y };
     this.currentAngle = 0;
-    this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 24; // Connected segments like a worm
-    this.growthRemaining = 0; // Growth counter for eating food
+    this.turnSpeed = 0.04;
+    this.baseSpeed = 2.4;
+    this.boostMultiplier = 1.3;
+    this.speed = this.baseSpeed;
     this.isBoosting = false;
     this.boostCooldown = 0;
-    this.segmentMass = 1; // Each segment = 1 mass
-    this.massPerSegment = 5; // 5 mass = 1 new segment
-    this.baseSegmentRadius = 14; // Fixed segment radius
-    this.maxSegmentRadius = 14; // Keep consistent size
     
-    // Start with 6 balls (30 mass total)
-    this.segments = [];
-    const START_MASS = 30; // 6 balls x 5 mass each
-    this.growthRemaining = START_MASS;
+    // Snake system constants
+    this.START_MASS = 30;
+    this.MASS_PER_SEGMENT = 1;
+    this.SEGMENT_SPACING = 20;
+    this.SEGMENT_RADIUS = 10;
+    this.MIN_MASS_TO_BOOST = 15;
     
-    // Initialize exactly 6 segments with proper spacing (no touching)
-    const START_SEGMENTS = 6;
-    const BALL_SPACING = 32; // Increased spacing so balls don't touch
-    for (let i = 0; i < START_SEGMENTS; i++) {
-      this.segments.push({ 
-        x: x - i * BALL_SPACING, 
-        y: y 
-      });
+    // Initialize trail and segments
+    this.segmentTrail = [{ x, y }];
+    this.visibleSegments = [];
+    this.totalMass = this.START_MASS;
+    this.growthRemaining = 0;
+    
+    this.updateVisibleSegments();
+  }
+  
+  updateVisibleSegments() {
+    const totalSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
+    // Ensure enough trail points exist
+    while (this.segmentTrail.length < totalSegments) {
+      const lastPoint = this.segmentTrail[this.segmentTrail.length - 1];
+      this.segmentTrail.push({ x: lastPoint.x, y: lastPoint.y });
     }
     
-    // Set segment spacing for movement
-    this.segmentSpacing = BALL_SPACING;
-    
-    // Set minimum mass (cannot go below starting size)
-    this.minimumMass = START_MASS;
+    // Create visible segments from trail
+    this.visibleSegments = [];
+    for (let i = 0; i < totalSegments; i++) {
+      if (i < this.segmentTrail.length) {
+        this.visibleSegments.push(this.segmentTrail[i]);
+      }
+    }
   }
   
-  get head() {
-    return this.segments[0];
+  applyGrowth() {
+    if (this.growthRemaining > 0.05) {
+      this.totalMass += 0.05;
+      this.growthRemaining -= 0.05;
+      this.updateVisibleSegments();
+    }
   }
   
-  get length() {
-    return this.segments.length;
-  }
-  
-  get totalMass() {
-    return this.growthRemaining; // Mass is now tracked purely in growthRemaining
-  }
-  
-  get visibleSegments() {
-    return Math.floor(this.totalMass / this.massPerSegment);
-  }
-  
-  // All segments have consistent size - no gradual size increase
-  getSegmentRadius(segmentIndex: number) {
-    return this.baseSegmentRadius; // Fixed size for all segments
-  }
-  
-  // Add new segment when mass threshold is reached
-  addSegment() {
-    if (this.segments.length < 2) return;
-    
-    // Duplicate from second-to-last segment position
-    const secondLast = this.segments[this.segments.length - 2];
-    const last = this.segments[this.segments.length - 1];
-    
-    // Calculate direction from second-last to last
-    const dx = last.x - secondLast.x;
-    const dy = last.y - secondLast.y;
-    const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing;
-    
-    // Place new segment behind the last one
-    const newX = last.x + (dx / length) * this.segmentSpacing;
-    const newY = last.y + (dy / length) * this.segmentSpacing;
-    
-    this.segments.push({ x: newX, y: newY });
+  getSegmentRadius() {
+    return this.SEGMENT_RADIUS;
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
-    // Calculate target angle from mouse direction relative to screen center
+    // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
-    // Robust angle difference calculation to prevent 180° flips
+    // Smooth angle interpolation
     let angleDiff = targetAngle - this.currentAngle;
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
     
-    // Smoothly interpolate toward target angle
     this.currentAngle += angleDiff * this.turnSpeed;
     
-    // Keep currentAngle in proper range to prevent accumulation
+    // Keep angle in range
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
-    // Handle boost mechanic with minimum mass protection
-    const BOOST_MULTIPLIER = 2.0; // Double the normal speed
-    const BOOST_DROP_INTERVAL = 20; // frames (3 drops per second at 60fps)
-    const BOOST_DROP_MASS = 0.5;
+    // Handle boost mechanics
+    this.applyBoost(onDropFood);
     
-    // Prevent boosting if below 50% of spawn mass
-    if (this.totalMass <= this.minimumMass) {
-      this.isBoosting = false;
+    // Move head
+    const dx = Math.cos(this.currentAngle) * this.speed;
+    const dy = Math.sin(this.currentAngle) * this.speed;
+    
+    this.head.x += dx;
+    this.head.y += dy;
+    
+    // Record trail based on distance
+    const lastTrailPoint = this.segmentTrail[0];
+    const dist = Math.hypot(this.head.x - lastTrailPoint.x, this.head.y - lastTrailPoint.y);
+    
+    if (dist >= this.SEGMENT_SPACING) {
+      this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
     }
     
-    if (this.isBoosting && this.totalMass > this.minimumMass) {
-      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 5.76 pixels per frame when boosting (double normal)
+    // Apply gradual growth
+    this.applyGrowth();
+  }
+  
+  applyBoost(onDropFood?: (food: Food) => void) {
+    if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST) {
+      this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Drop orb every 20 frames (3 per second) just behind the head
-      if (this.boostCooldown % BOOST_DROP_INTERVAL === 0 && onDropFood) {
-        const dropDistance = 20; // pixels behind head
-        const dropX = this.head.x - Math.cos(this.currentAngle) * dropDistance;
-        const dropY = this.head.y - Math.sin(this.currentAngle) * dropDistance;
+      // Drop mass every 20 frames
+      if (this.boostCooldown % 20 === 0 && onDropFood) {
+        const dropX = this.head.x - Math.cos(this.currentAngle) * 20;
+        const dropY = this.head.y - Math.sin(this.currentAngle) * 20;
         
         onDropFood({
           x: dropX,
           y: dropY,
           size: 4,
           color: '#f55400',
-          mass: BOOST_DROP_MASS
+          mass: 0.5
         });
-      }
-      
-      // Continuous mass loss while boosting (0.025 per frame = 1.5 per second at 60fps)
-      const boostMassLoss = BOOST_DROP_MASS / BOOST_DROP_INTERVAL;
-      if (this.growthRemaining >= boostMassLoss) {
-        this.growthRemaining -= boostMassLoss;
-      } else {
-        // Cap at minimum mass, don't go below
-        this.growthRemaining = Math.max(0, this.growthRemaining - boostMassLoss);
+        
+        this.totalMass -= 0.5;
+        this.updateVisibleSegments();
       }
     } else {
       this.speed = this.baseSpeed;
+      this.isBoosting = false;
     }
-    
-    // Move head in current direction
-    const newHead = {
-      x: this.head.x + this.speed * Math.cos(this.currentAngle),
-      y: this.head.y + this.speed * Math.sin(this.currentAngle)
-    };
-    
-    // Always update head position for smooth movement
-    this.segments.unshift(newHead);
-    
-    // Remove extra head segment addition to prevent jittering
-    
-    // Keep consistent spacing regardless of boost state to prevent stretching
-    const currentSpacing = this.segmentSpacing;
-    
-    // Smooth body following - each segment follows the one before it
-    for (let i = 1; i < this.segments.length; i++) {
-      const current = this.segments[i];
-      const previous = this.segments[i - 1];
-      
-      const dx = previous.x - current.x;
-      const dy = previous.y - current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance > currentSpacing) {
-        // Move segment toward the previous one, maintaining proper spacing
-        const moveRatio = (distance - currentSpacing) / distance;
-        this.segments[i] = {
-          x: current.x + dx * moveRatio,
-          y: current.y + dy * moveRatio
-        };
-      }
-    }
-    
-    // Don't auto-grow segments, only grow through addSegment() when eating food
-    // This prevents the snake from spawning with all segments at once
   }
   
   eatFood(food: Food) {
-    // Growth based on food mass
-    const mass = food.mass || 1; // Default to 1 if no mass specified
-    const oldMass = this.growthRemaining;
+    const mass = food.mass || 1;
     this.growthRemaining += mass;
-    
-    // Check if we should add a new segment (every 5 mass), but limit growth rate
-    const oldSegments = Math.floor(oldMass / this.massPerSegment);
-    const newSegments = Math.floor(this.growthRemaining / this.massPerSegment);
-    
-    // Only add one segment at a time when threshold is exactly reached
-    if (newSegments > oldSegments && newSegments === oldSegments + 1) {
-      this.addSegment();
-    }
-    
-    return mass; // Return score increase based on mass
+    return mass; // Return score increase
   }
   
   setBoost(boosting: boolean) {
-    // Only allow boosting if above 50% of spawn mass
-    if (boosting && this.totalMass <= this.minimumMass) {
+    if (boosting && this.totalMass <= this.MIN_MASS_TO_BOOST) {
       this.isBoosting = false;
       return;
     }
@@ -534,7 +476,7 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          if (dist < snake.radius + food.size) {
+          if (dist < snake.getSegmentRadius() + food.size) {
             // Snake eats the food - this handles growth internally
             scoreIncrease += snake.eatFood(food);
             
@@ -660,61 +602,31 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body with consistent sized spheres
-      const actualSegments = snake.segments.length;
-      
-      // Draw all actual segments (no spacing calculation needed)
-      for (let i = 0; i < actualSegments; i++) {
-        const segment = snake.segments[i];
-        const isHead = i === 0;
-        const segmentRadius = snake.getSegmentRadius(i);
+      // Draw snake body segments
+      for (let i = 0; i < snake.visibleSegments.length; i++) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
         
-        // Create radial gradient for 3D effect (light top, dark bottom)
+        // Create radial gradient for 3D effect
         const gradient = ctx.createRadialGradient(
-          segment.x - 4, segment.y - 4, 0,
+          segment.x, segment.y, 0,
           segment.x, segment.y, segmentRadius
         );
         
-        if (isHead) {
-          // Head gradient - bright orange center, darker edges
-          gradient.addColorStop(0, "#ff8800");  // Bright orange center
-          gradient.addColorStop(0.6, "#ff6600"); // Medium orange
-          gradient.addColorStop(0.8, "#cc4400"); // Darker orange
-          gradient.addColorStop(1, "#992200");   // Dark orange/red edge
-        } else {
-          // Body gradient - bright orange center, darker edges for 3D effect
-          gradient.addColorStop(0, "#ff8800");  // Bright orange center
-          gradient.addColorStop(0.6, "#ff6600"); // Medium orange
-          gradient.addColorStop(0.8, "#cc4400"); // Darker orange
-          gradient.addColorStop(1, "#992200");   // Dark orange/red edge
-        }
+        // Orange gradient from bright center to dark edges
+        gradient.addColorStop(0, "#ffbaba");    // Light center
+        gradient.addColorStop(0.7, "#ff6600");  // Medium orange
+        gradient.addColorStop(1, "#c43d00");    // Dark orange edge
         
-        // Draw segment sphere
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Add subtle rim lighting for extra 3D effect
-        if (isHead) {
-          const rimGradient = ctx.createRadialGradient(
-            segment.x, segment.y, segmentRadius - 2,
-            segment.x, segment.y, segmentRadius
-          );
-          rimGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
-          rimGradient.addColorStop(1, "rgba(255, 255, 255, 0.3)");
-          
-          ctx.fillStyle = rimGradient;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
 
       // Draw eyes that follow snake's movement direction
-      if (snake.segments.length > 0) {
+      if (snake.visibleSegments.length > 0) {
         const snakeHead = snake.head;
-        // Use snake's currentAngle instead of mouse direction
         const movementAngle = snake.currentAngle;
         const eyeDistance = 8;
         const eyeSize = 4;
@@ -764,7 +676,8 @@ export default function GamePage() {
       ctx.fillStyle = 'white';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Segments: ${snake.segments.length}`, 20, 70);
+      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
+      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
       
 
 
@@ -778,18 +691,16 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (6 segments, 30 mass to start) with new spacing
-    snake.segments = [];
-    const START_MASS = 30;
-    const START_SEGMENTS = 6;
-    snake.segmentSpacing = 32; // Ensure spacing is updated on reset (no touching balls)
-    for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: MAP_CENTER_X - i * 32, y: MAP_CENTER_Y }); // Use fixed spacing
-    }
+    // Reset snake to initial state using new system
+    snake.head = { x: MAP_CENTER_X, y: MAP_CENTER_Y };
     snake.currentAngle = 0;
-    snake.growthRemaining = START_MASS;
-    snake.minimumMass = START_MASS; // Reset minimum mass (cannot go below starting)
-    snake.setBoost(false);
+    snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
+    snake.totalMass = snake.START_MASS;
+    snake.growthRemaining = 0;
+    snake.isBoosting = false;
+    snake.boostCooldown = 0;
+    snake.speed = snake.baseSpeed;
+    snake.updateVisibleSegments();
     setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
   };
@@ -839,13 +750,13 @@ export default function GamePage() {
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Segments: {snake.segments.length}</div>
+          <div className="text-white text-sm">Segments: {snake.visibleSegments.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
-          <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass.toFixed(1)} (50% spawn)</div>
+          <div className="text-gray-400 text-xs">Min Mass: {snake.MIN_MASS_TO_BOOST} (boost threshold)</div>
           {isBoosting && (
             <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
           )}
-          {snake.totalMass <= snake.minimumMass && (
+          {snake.totalMass <= snake.MIN_MASS_TO_BOOST && (
             <div className="text-red-400 text-xs">Cannot boost - too small!</div>
           )}
         </div>
@@ -865,7 +776,7 @@ export default function GamePage() {
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
             <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Segments: {snake.segments.length}</div>
+            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
             <div className="flex gap-4">
               <Button
                 onClick={resetGame}
