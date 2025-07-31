@@ -81,7 +81,7 @@ class SmoothSnake {
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
     // Smoothly animate currentSegmentCount toward target
-    const transitionSpeed = 0.15; // Adjust for faster/slower animation
+    const transitionSpeed = 0.2; // Slightly faster for smoother transitions
     if (this.currentSegmentCount < targetSegmentCount) {
       this.currentSegmentCount += transitionSpeed;
     } else if (this.currentSegmentCount > targetSegmentCount) {
@@ -89,8 +89,8 @@ class SmoothSnake {
     }
     this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
     
-    // Use the animated segment count for rendering
-    const renderCount = Math.floor(this.currentSegmentCount);
+    // Round once per frame to prevent flickering
+    const renderCount = Math.round(this.currentSegmentCount);
     
     this.visibleSegments = [];
     let distanceSoFar = 0;
