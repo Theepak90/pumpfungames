@@ -35,6 +35,39 @@ interface BotSnake {
   targetAngle: number;
   lastDirectionChange: number;
   targetFood: Food | null;
+  target: { x: number; y: number };
+  wobble: number;
+}
+
+// Death drop utility function
+function dropDeathFood(snake: SmoothSnake | BotSnake): Food[] {
+  const deathFoods: Food[] = [];
+  const segments = 'visibleSegments' in snake ? snake.visibleSegments : [];
+  const mass = snake.totalMass;
+  const amount = Math.floor(mass / 10);
+  
+  if (segments.length === 0 || amount === 0) return deathFoods;
+  
+  const segmentSpacing = Math.max(1, Math.floor(segments.length / amount));
+  
+  for (let i = 0; i < amount && i * segmentSpacing < segments.length; i++) {
+    const segIndex = i * segmentSpacing;
+    const segment = segments[segIndex];
+    
+    // Add slight randomness to prevent perfect stacking
+    const offsetX = (Math.random() - 0.5) * 20;
+    const offsetY = (Math.random() - 0.5) * 20;
+    
+    deathFoods.push({
+      x: segment.x + offsetX,
+      y: segment.y + offsetY,
+      size: 8,
+      color: '#ff8800', // Orange death food
+      mass: 10
+    });
+  }
+  
+  return deathFoods;
 }
 
 // Bot snake utility functions
@@ -47,6 +80,12 @@ function createBotSnake(id: string): BotSnake {
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
   
+  // Generate random target position
+  const targetAngle = Math.random() * Math.PI * 2;
+  const targetDistance = 100 + Math.random() * 300; // Target within reasonable range
+  const targetX = x + Math.cos(targetAngle) * targetDistance;
+  const targetY = y + Math.sin(targetAngle) * targetDistance;
+
   return {
     id,
     head: { x, y },
@@ -58,7 +97,9 @@ function createBotSnake(id: string): BotSnake {
     color: colors[Math.floor(Math.random() * colors.length)],
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
-    targetFood: null
+    targetFood: null,
+    target: { x: targetX, y: targetY },
+    wobble: 0
   };
 }
 
@@ -83,35 +124,45 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.targetFood = nearestFood;
   }
   
-  // Calculate target angle based on AI behavior
-  if (bot.targetFood) {
-    bot.targetAngle = Math.atan2(bot.targetFood.y - bot.head.y, bot.targetFood.x - bot.head.x);
-  } else {
-    // Wander randomly if no food target
-    bot.lastDirectionChange++;
-    if (bot.lastDirectionChange > 60) {
-      bot.targetAngle = Math.random() * Math.PI * 2;
-      bot.lastDirectionChange = 0;
+  // Use target position system for intelligent movement
+  const dx = bot.target.x - bot.head.x;
+  const dy = bot.target.y - bot.head.y;
+  const distToTarget = Math.sqrt(dx * dx + dy * dy);
+  
+  // When close to target, pick a new random target
+  if (distToTarget < 80) {
+    const targetAngle = Math.random() * Math.PI * 2;
+    const targetDistance = 150 + Math.random() * 200;
+    bot.target.x = bot.head.x + Math.cos(targetAngle) * targetDistance;
+    bot.target.y = bot.head.y + Math.sin(targetAngle) * targetDistance;
+    
+    // Keep target within map bounds
+    const distFromCenter = Math.sqrt((bot.target.x - MAP_CENTER_X) ** 2 + (bot.target.y - MAP_CENTER_Y) ** 2);
+    if (distFromCenter > MAP_RADIUS - 200) {
+      bot.target.x = MAP_CENTER_X + (bot.target.x - MAP_CENTER_X) * (MAP_RADIUS - 200) / distFromCenter;
+      bot.target.y = MAP_CENTER_Y + (bot.target.y - MAP_CENTER_Y) * (MAP_RADIUS - 200) / distFromCenter;
     }
   }
   
-  // Avoid going too close to map edge
-  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 300) {
-    bot.targetAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-  }
+  // Calculate desired angle toward target
+  const desiredAngle = Math.atan2(dy, dx);
   
-  // Smooth angle interpolation
-  let angleDiff = bot.targetAngle - bot.currentAngle;
-  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-  bot.currentAngle += angleDiff * 0.024; // 20% slower turning (0.03 * 0.8), maintaining slower than player
+  // Add wobble for organic movement
+  bot.wobble += (Math.random() - 0.5) * 0.1;
+  const wobbleEffect = Math.sin(bot.wobble) * 0.02;
+  
+  // Smooth turn toward target
+  let angleDiff = desiredAngle - bot.currentAngle;
+  // Normalize angle difference to [-PI, PI]
+  angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+  
+  bot.currentAngle += angleDiff * 0.05 + wobbleEffect; // Smooth turning with wobble
   
   // Move bot head
-  const dx = Math.cos(bot.currentAngle) * bot.speed;
-  const dy = Math.sin(bot.currentAngle) * bot.speed;
-  bot.head.x += dx;
-  bot.head.y += dy;
+  const moveDx = Math.cos(bot.currentAngle) * bot.speed;
+  const moveDy = Math.sin(bot.currentAngle) * bot.speed;
+  bot.head.x += moveDx;
+  bot.head.y += moveDy;
   
   // Update trail
   bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
@@ -709,22 +760,145 @@ export default function GamePage() {
         return;
       }
 
-      // Check collision between player snake and bot snakes
+      // Check collision: Player head vs Bot bodies (exclude bot heads - last 10 segments)
       for (const bot of botSnakes) {
-        // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, 5);
         const botRadius = botBaseRadius * botScaleFactor;
         
-        for (const segment of bot.visibleSegments) {
-          const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
+        // Only check against bot BODY segments (exclude last 10 to avoid head collision)
+        // Make sure we have enough segments to exclude the head
+        if (bot.visibleSegments.length <= 10) continue; // Skip bots that are too small
+        
+        const botBodySegments = bot.visibleSegments.slice(0, bot.visibleSegments.length - 10);
+        
+        for (const segment of botBodySegments) {
+          const dx = updatedHead.x - segment.x;
+          const dy = updatedHead.y - segment.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // Use tighter collision detection with proper radius calculation
+          const collisionRadius = (snake.getSegmentRadius() + botRadius) * 0.8; // Tighter collision
+          
+          if (dist < collisionRadius) {
+            // Player head hit bot body - player dies
+            console.log(`Player collision with bot body at distance: ${dist}, threshold: ${collisionRadius}`);
+            const deathFoods = dropDeathFood(snake);
+            setFoods(prevFoods => [...prevFoods, ...deathFoods]);
             setGameOver(true);
             return;
           }
         }
       }
+
+      // Check self-collision: Player head vs Player body (exclude own head - last 15 segments for safety)
+      if (snake.visibleSegments.length > 15) { // Only check self-collision if snake is long enough
+        const playerBodySegments = snake.visibleSegments.slice(0, snake.visibleSegments.length - 15);
+        
+        for (const segment of playerBodySegments) {
+          const dx = updatedHead.x - segment.x;
+          const dy = updatedHead.y - segment.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // Self-collision needs to be tighter to prevent false positives
+          const selfCollisionRadius = snake.getSegmentRadius() * 1.2;
+          
+          if (dist < selfCollisionRadius) {
+            // Player head hit own body - player dies
+            console.log(`Player self-collision at distance: ${dist}, threshold: ${selfCollisionRadius}`);
+            const deathFoods = dropDeathFood(snake);
+            setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+            setGameOver(true);
+            return;
+          }
+        }
+      }
+
+      // Check bot collisions: Bot heads vs other snake bodies only
+      setBotSnakes(prevBots => {
+        const newBots = [...prevBots];
+        const botsToKill: number[] = [];
+        
+        for (let i = 0; i < newBots.length; i++) {
+          if (botsToKill.includes(i)) continue;
+          
+          const bot = newBots[i];
+          const botRadius = 8 * Math.min(1 + (bot.totalMass - 10) / 100, 5);
+          
+          // Bot head vs Player body (exclude player head - last 10 segments)
+          const playerBodySegments = snake.visibleSegments.slice(0, Math.max(0, snake.visibleSegments.length - 10));
+          for (const segment of playerBodySegments) {
+            const dx = bot.head.x - segment.x;
+            const dy = bot.head.y - segment.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < botRadius + snake.getSegmentRadius()) {
+              // Bot head hit player body - bot dies
+              botsToKill.push(i);
+              break;
+            }
+          }
+          
+          if (botsToKill.includes(i)) continue;
+          
+          // Bot head vs Other bot bodies (exclude their heads - last 10 segments)
+          for (let j = 0; j < newBots.length; j++) {
+            if (i === j || botsToKill.includes(j)) continue;
+            
+            const otherBot = newBots[j];
+            const otherBotRadius = 8 * Math.min(1 + (otherBot.totalMass - 10) / 100, 5);
+            
+            // Only check against other bot's BODY segments (exclude last 10)
+            const otherBotBodySegments = otherBot.visibleSegments.slice(0, Math.max(0, otherBot.visibleSegments.length - 10));
+            
+            for (const segment of otherBotBodySegments) {
+              const dx = bot.head.x - segment.x;
+              const dy = bot.head.y - segment.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              if (dist < botRadius + otherBotRadius) {
+                // Bot head hit other bot body - this bot dies
+                botsToKill.push(i);
+                break;
+              }
+            }
+            if (botsToKill.includes(i)) break;
+          }
+          
+          if (botsToKill.includes(i)) continue;
+          
+          // Bot head vs Own body (self-collision, exclude own head - last 10 segments)
+          const ownBodySegments = bot.visibleSegments.slice(0, Math.max(0, bot.visibleSegments.length - 10));
+          for (const segment of ownBodySegments) {
+            const dx = bot.head.x - segment.x;
+            const dy = bot.head.y - segment.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < botRadius * 1.5) {
+              // Bot head hit own body - bot dies
+              botsToKill.push(i);
+              break;
+            }
+          }
+        }
+        
+        // Create death food for killed bots
+        botsToKill.forEach(index => {
+          const deadBot = newBots[index];
+          const deathFoods = dropDeathFood(deadBot);
+          setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+        });
+        
+        // Remove dead bots and spawn new ones
+        const survivingBots = newBots.filter((_, index) => !botsToKill.includes(index));
+        
+        // Spawn new bots to maintain BOT_COUNT
+        while (survivingBots.length < BOT_COUNT) {
+          survivingBots.push(createBotSnake(`bot_${Date.now()}_${Math.random()}`));
+        }
+        
+        return survivingBots;
+      });
 
       // Let bot snakes eat food
       setBotSnakes(prevBots => {
@@ -986,6 +1160,41 @@ export default function GamePage() {
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
+        }
+        
+        // Draw bot eyes (similar to player)
+        if (bot.visibleSegments.length > 0) {
+          const botHead = bot.visibleSegments[0];
+          const movementAngle = bot.currentAngle;
+          const eyeDistance = 5 * botScaleFactor;
+          const eyeSize = 3 * botScaleFactor;
+          const pupilSize = 1.5 * botScaleFactor;
+          
+          // Eye positions perpendicular to movement direction
+          const eye1X = botHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+          const eye1Y = botHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+          const eye2X = botHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+          const eye2Y = botHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+          
+          // Draw rotated square eyes
+          [
+            { x: eye1X, y: eye1Y },
+            { x: eye2X, y: eye2Y }
+          ].forEach(eye => {
+            ctx.save();
+            ctx.translate(eye.x, eye.y);
+            ctx.rotate(movementAngle);
+            
+            // White eye square
+            ctx.fillStyle = "white";
+            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+            
+            // Black pupil square
+            ctx.fillStyle = "black";
+            ctx.fillRect(-pupilSize, -pupilSize, pupilSize * 2, pupilSize * 2);
+            
+            ctx.restore();
+          });
         }
       });
       
