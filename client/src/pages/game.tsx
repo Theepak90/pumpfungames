@@ -455,7 +455,8 @@ export default function GamePage() {
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
-  const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [zoom, setZoom] = useState(2); // Start at 2× zoomed-inn
   const [lastFrameTime, setLastFrameTime] = useState(Date.now());
   
   // Zoom parameters
@@ -951,30 +952,21 @@ export default function GamePage() {
           );
           
           if (foodDistance < headRadius + food.size) {
-            // Food eaten - add mass for gradual growth
-            snake.growthRemaining += food.mass;
-            setScore(prevScore => prevScore + food.mass);
+            if (food.type === 'money') {
+              // Money crate collected
+              snake.money += food.value || 0;
+            } else {
+              // Regular food eaten - add mass for gradual growth
+              snake.growthRemaining += food.mass || 1;
+              setScore(prevScore => prevScore + (food.mass || 1));
+            }
             return false; // Remove food
           }
           return true; // Keep food
         });
       });
 
-      // Money crate collision detection
-      setMoneyCrates(prevCrates => {
-        return prevCrates.filter(crate => {
-          const crateDistance = Math.sqrt(
-            (snake.head.x - crate.x) ** 2 + (snake.head.y - crate.y) ** 2
-          );
-          
-          if (crateDistance < headRadius + 10) { // 10 is crate radius
-            // Money collected
-            snake.money += crate.value;
-            return false; // Remove crate
-          }
-          return true; // Keep crate
-        });
-      });
+      // Money crates are now handled as food items with type: 'money' in the food collision above
 
       // Bot collision detection (kill bots on contact)
       setBotSnakes(prevBots => {
@@ -1062,6 +1054,214 @@ export default function GamePage() {
           }
         }
       }
+
+      // Clear canvas with dark background
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+
+      // Draw background pattern if available
+      if (backgroundImage) {
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+        }
+      }
+
+      // Set up camera variables that are used in rendering
+      let cameraX = snake.head.x;
+      let cameraY = snake.head.y;
+      let currentZoom = Math.max(0.5, 1 - snake.visibleSegments.length * 0.005);
+
+      // Draw food
+      foods.forEach(food => {
+        if (food.type === 'money') {
+          // Draw money crate
+          ctx.fillStyle = food.color;
+          const wobble = Math.sin(Date.now() * 0.01) * 0.5;
+          const crateSize = food.size + wobble;
+          
+          // Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.fillRect(food.x - crateSize/2 + 2, food.y - crateSize/2 + 2, crateSize, crateSize);
+          
+          // Main crate
+          ctx.fillStyle = food.color;
+          ctx.fillRect(food.x - crateSize/2, food.y - crateSize/2, crateSize, crateSize);
+          
+          // Dollar sign overlay
+          if (dollarSignImage) {
+            ctx.drawImage(dollarSignImage, food.x - crateSize/2, food.y - crateSize/2, crateSize, crateSize);
+          }
+        } else {
+          // Draw regular food with glow
+          const glowRadius = food.size + 2;
+          
+          // Glow effect
+          const gradient = ctx.createRadialGradient(food.x, food.y, 0, food.x, food.y, glowRadius);
+          gradient.addColorStop(0, food.color);
+          gradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, glowRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Main food
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
+
+      // Draw bot snakes
+      botSnakes.forEach(bot => {
+        // Draw bot segments with scaling
+        bot.visibleSegments.forEach((segment, index) => {
+          const isHead = index === 0;
+          const botBaseRadius = 8;
+          const maxScale = 5;
+          const scaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+          const radius = botBaseRadius * scaleFactor;
+          
+          // Apply glow effect for head
+          if (isHead) {
+            const glowRadius = radius + 3;
+            const gradient = ctx.createRadialGradient(segment.x, segment.y, 0, segment.x, segment.y, glowRadius);
+            gradient.addColorStop(0, bot.color);
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, glowRadius, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          
+          // Main segment
+          ctx.fillStyle = bot.color;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      });
+
+      // Draw player snake with enhanced visual effects
+      snake.visibleSegments.forEach((segment, index) => {
+        const isHead = index === 0;
+        const radius = snake.getSegmentRadius();
+        
+        // Apply shadow when not boosting
+        if (!snake.isBoosting) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.beginPath();
+          ctx.arc(segment.x + 3, segment.y + 3, radius, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+        
+        // Apply boost glow effect
+        if (snake.isBoosting) {
+          const glowRadius = radius + 5;
+          const gradient = ctx.createRadialGradient(segment.x, segment.y, 0, segment.x, segment.y, glowRadius);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+          gradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, glowRadius, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+        
+        // Main segment
+        ctx.fillStyle = isHead ? '#00ff88' : '#0088ff';
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+
+      // Draw eyes on snake head
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
+        const movementAngle = snake.currentAngle;
+        // Dynamic eye scaling based on mass (same scale as segments)
+        const scaleFactor = snake.getScaleFactor();
+        const eyeDistance = 5 * scaleFactor; // Scale distance from center
+        const eyeSize = 3 * scaleFactor; // Scale eye size
+        const pupilSize = 1.5 * scaleFactor; // Scale pupil size
+        
+        // Calculate cursor direction using mouse direction vector
+        const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
+        
+        // Eye positions perpendicular to movement direction
+        const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+        const eye1Y = snakeHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+        const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+        const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+        
+        // Draw rotated square eyes
+        ctx.save();
+        
+        // Draw first eye with rotation
+        ctx.translate(eye1X, eye1Y);
+        ctx.rotate(movementAngle);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+        
+        // Draw first pupil (rotated relative to eye)
+        const pupilOffset = 1.2;
+        ctx.fillStyle = 'black';
+        ctx.fillRect(
+          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          pupilSize * 2, 
+          pupilSize * 2
+        );
+        ctx.restore();
+        
+        // Draw second eye with rotation
+        ctx.save();
+        ctx.translate(eye2X, eye2Y);
+        ctx.rotate(movementAngle);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+        
+        // Draw second pupil (rotated relative to eye)
+        ctx.fillStyle = 'black';
+        ctx.fillRect(
+          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          pupilSize * 2, 
+          pupilSize * 2
+        );
+        ctx.restore();
+      }
+
+      // Draw money balance above snake head
+      if (snake.visibleSegments.length > 0) {
+        const head = snake.visibleSegments[0];
+        const scaleFactor = snake.getScaleFactor();
+        const offsetY = -25 * scaleFactor; // Scale the offset distance
+        const fontSize = Math.max(12, 16 * scaleFactor); // Scale font size with snake
+        
+        ctx.fillStyle = 'black'; // Outline
+        ctx.font = `bold ${fontSize + 2}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`$${snake.money.toFixed(2)}`, head.x, head.y + offsetY);
+        
+        ctx.fillStyle = '#00ff00'; // Green money text
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillText(`$${snake.money.toFixed(2)}`, head.x, head.y + offsetY);
+      }
+
+      // Restore context
+      ctx.restore();
+
+      // Draw UI (fixed position)
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 24px Arial';
+      ctx.fillText(`Score: ${score}`, 20, 40);
+      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
+      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
 
       // Let bot snakes eat food
       setBotSnakes(prevBots => {
@@ -1223,308 +1423,142 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Calculate target zoom based on snake segments (capped at 130 segments)
-      const segmentCount = snake.visibleSegments.length;
-      const maxSegmentZoom = 130;
-      const cappedSegmentCount = Math.min(segmentCount, maxSegmentZoom);
-      const zoomSteps = Math.floor(cappedSegmentCount / 5);
-      const targetZoom = Math.max(minZoom, 2.0 - zoomSteps * 0.03);
-      
-      // Smoothly interpolate toward target zoom
-      setZoom(prevZoom => prevZoom + (targetZoom - prevZoom) * zoomSmoothing);
+      // Clear canvas and render everything
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-      // Clear canvas with background image pattern or dark fallback
-      if (backgroundImage) {
-        // Create repeating pattern from background image
-        const pattern = ctx.createPattern(backgroundImage, 'repeat');
-        if (pattern) {
-          ctx.fillStyle = pattern;
-          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-        }
-      } else {
-        // Fallback to solid color if image not loaded
-        ctx.fillStyle = '#15161b';
-        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-      }
-
-      // Save context for camera transform
+      // Apply camera transform
       ctx.save();
-
-      // Apply zoom and camera following snake head
       ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
-      ctx.scale(zoom, zoom);
-      ctx.translate(-snake.head.x, -snake.head.y);
+      ctx.scale(currentZoom, currentZoom);
+      ctx.translate(-cameraX, -cameraY);
 
-      // Draw background image across the full map area if loaded
-      if (backgroundImage) {
-        const mapSize = MAP_RADIUS * 2.5;
-        // Draw background image tiled across the entire game area
-        const pattern = ctx.createPattern(backgroundImage, 'repeat');
-        if (pattern) {
-          ctx.fillStyle = pattern;
-          ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
-        }
-      }
-      
-      // Draw green overlay only outside the play area (death barrier region)
-      ctx.save();
-      
-      // Create a clipping path for the area outside the safe zone
-      const mapSize = MAP_RADIUS * 2.5;
-      ctx.beginPath();
-      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
-      ctx.clip();
-      
-      // Fill only the clipped area (outside the circle) with green overlay
-      ctx.fillStyle = 'rgba(82, 164, 122, 0.4)'; // Semi-transparent green overlay
-      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
-      
-      ctx.restore();
-
-      // Draw thin death barrier line
-      ctx.strokeStyle = '#53d392';
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Draw food items
-      foods.forEach((food, index) => {
+      // Draw food
+      foods.forEach(food => {
         if (food.type === 'money') {
-          // Draw money crates with dollar sign image, shadow, and wobble
-          const time = Date.now() * 0.003; // Time for animation
-          const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
-          const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
-          
-          const drawX = food.x + wobbleX;
-          const drawY = food.y + wobbleY;
-          
-          // Draw shadow first
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 3;
-          ctx.shadowOffsetY = 3;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-          ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
-          
-          // Reset shadow for main square
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-          
-          // Draw green background square (20x20px)
+          // Draw money crate
           ctx.fillStyle = food.color;
-          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+          const wobble = Math.sin(Date.now() * 0.01) * 0.5;
+          const crateSize = food.size + wobble;
           
-          // Draw dollar sign image if loaded (20x20px)
-          if (dollarSignImage && dollarSignImage.complete) {
-            ctx.drawImage(
-              dollarSignImage,
-              drawX - 10,
-              drawY - 10,
-              20,
-              20
-            );
+          // Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.fillRect(food.x - crateSize/2 + 2, food.y - crateSize/2 + 2, crateSize, crateSize);
+          
+          // Main crate
+          ctx.fillStyle = food.color;
+          ctx.fillRect(food.x - crateSize/2, food.y - crateSize/2, crateSize, crateSize);
+          
+          // Dollar sign overlay
+          if (dollarSignImage) {
+            ctx.drawImage(dollarSignImage, food.x - crateSize/2, food.y - crateSize/2, crateSize, crateSize);
           }
         } else {
-          // Draw regular food as circles with glow effect
-          ctx.shadowColor = food.color;
-          ctx.shadowBlur = 15;
-          ctx.fillStyle = food.color;
+          // Draw regular food with glow
+          const glowRadius = food.size + 2;
+          
+          // Glow effect
+          const gradient = ctx.createRadialGradient(food.x, food.y, 0, food.x, food.y, glowRadius);
+          gradient.addColorStop(0, food.color);
+          gradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.arc(food.x, food.y, glowRadius, 0, 2 * Math.PI);
           ctx.fill();
           
-          // Draw the solid circle on top (no shadow)
-          ctx.shadowBlur = 0;
+          // Main food
           ctx.fillStyle = food.color;
           ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.arc(food.x, food.y, food.size, 0, 2 * Math.PI);
           ctx.fill();
         }
       });
 
-      // Draw bot snakes first (behind player)
+      // Draw bot snakes
       botSnakes.forEach(bot => {
-        // Bot dynamic scaling based on mass (caps at 5x width)
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
-        const botOutlineThickness = 2 * botScaleFactor;
-        
-        // Bot outline
-        ctx.fillStyle = "white";
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
+        bot.visibleSegments.forEach((segment, index) => {
+          const isHead = index === 0;
+          const botBaseRadius = 8;
+          const maxScale = 5;
+          const scaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+          const radius = botBaseRadius * scaleFactor;
+          
+          // Apply glow effect for head
+          if (isHead) {
+            const glowRadius = radius + 3;
+            const gradient = ctx.createRadialGradient(segment.x, segment.y, 0, segment.x, segment.y, glowRadius);
+            gradient.addColorStop(0, bot.color);
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, glowRadius, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          
+          // Main segment
+          ctx.fillStyle = bot.color;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
           ctx.fill();
-        }
-        
-        // Bot body
-        ctx.fillStyle = bot.color;
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        });
       });
-      
-      ctx.globalAlpha = 1.0;
 
-      // Draw single glowing outline behind the whole snake when boosting
-      if (snake.isBoosting && snake.visibleSegments.length > 0) {
-        ctx.save();
-        ctx.beginPath();
+      // Draw player snake
+      snake.visibleSegments.forEach((segment, index) => {
+        const isHead = index === 0;
+        const radius = snake.getSegmentRadius();
         
-        const segmentRadius = snake.getSegmentRadius();
-        const scaleFactor = snake.getScaleFactor();
-        
-        // Create a composite path for all segments
-        for (let i = 0; i < snake.visibleSegments.length; i++) {
-          const segment = snake.visibleSegments[i];
-          ctx.moveTo(segment.x + segmentRadius, segment.y);
-          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        // Apply shadow when not boosting
+        if (!snake.isBoosting) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.beginPath();
+          ctx.arc(segment.x + 3, segment.y + 3, radius, 0, 2 * Math.PI);
+          ctx.fill();
         }
         
-        // Apply single glow effect to the entire snake outline
-        ctx.shadowColor = "white";
-        ctx.shadowBlur = 15;
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 3 * scaleFactor;
-        ctx.stroke();
-        ctx.restore();
-      }
-      
-      // Draw snake segments with appropriate shadow effects
-      ctx.save();
-      
-      if (!snake.isBoosting) {
-        // Add subtle drop shadow when not boosting
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-      } else {
-        // Ensure no shadow when boosting (glow effect is already applied)
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-      }
-      
-      for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
+        // Apply boost glow effect
+        if (snake.isBoosting) {
+          const glowRadius = radius + 5;
+          const gradient = ctx.createRadialGradient(segment.x, segment.y, 0, segment.x, segment.y, glowRadius);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+          gradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, glowRadius, 0, 2 * Math.PI);
+          ctx.fill();
+        }
         
-        ctx.globalAlpha = segment.opacity;
-        
-        // Draw solid segment
-        ctx.fillStyle = "#d55400";
+        // Main segment
+        ctx.fillStyle = isHead ? '#00ff88' : '#0088ff';
         ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.arc(segment.x, segment.y, radius, 0, 2 * Math.PI);
         ctx.fill();
-      }
-      
-      ctx.restore();
-      
-      // Reset global alpha
-      ctx.globalAlpha = 1.0;
+      });
 
       // Draw money balance above snake head
       if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.visibleSegments[0];
+        const head = snake.visibleSegments[0];
         const scaleFactor = snake.getScaleFactor();
+        const offsetY = -25 * scaleFactor;
+        const fontSize = Math.max(12, 16 * scaleFactor);
         
-        ctx.font = `${14 * scaleFactor}px Arial, sans-serif`;
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 2 * scaleFactor;
-        ctx.textAlign = "center";
+        ctx.fillStyle = 'black'; // Outline
+        ctx.font = `bold ${fontSize + 2}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`$${snake.money.toFixed(2)}`, head.x, head.y + offsetY);
         
-        const moneyText = `$${snake.money.toFixed(2)}`;
-        const offsetY = 35 * scaleFactor; // Scale the offset with snake size
-        
-        // Draw text outline for better visibility
-        ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
-        ctx.fillText(moneyText, snakeHead.x, snakeHead.y - offsetY);
-      }
-
-      // Draw eyes that track the cursor smoothly (after head is drawn)
-      if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.visibleSegments[0];
-        const movementAngle = snake.currentAngle;
-        // Dynamic eye scaling based on mass (same scale as segments)
-        const scaleFactor = snake.getScaleFactor();
-        const eyeDistance = 5 * scaleFactor; // Scale distance from center
-        const eyeSize = 3 * scaleFactor; // Scale eye size
-        const pupilSize = 1.5 * scaleFactor; // Scale pupil size
-        
-        // Calculate cursor direction using mouse direction vector
-        const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
-        
-        // Eye positions perpendicular to movement direction
-        const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
-        const eye1Y = snakeHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
-        const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
-        const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
-        
-        // Draw rotated square eyes
-        ctx.save();
-        
-        // Draw first eye with rotation
-        ctx.translate(eye1X, eye1Y);
-        ctx.rotate(movementAngle);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-        
-        // Draw first pupil (rotated relative to eye)
-        const pupilOffset = 1.2;
-        ctx.fillStyle = 'black';
-        ctx.fillRect(
-          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          pupilSize * 2, 
-          pupilSize * 2
-        );
-        ctx.restore();
-        
-        // Draw second eye with rotation
-        ctx.save();
-        ctx.translate(eye2X, eye2Y);
-        ctx.rotate(movementAngle);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-        
-        // Draw second pupil (rotated relative to eye)
-        ctx.fillStyle = 'black';
-        ctx.fillRect(
-          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          pupilSize * 2, 
-          pupilSize * 2
-        );
-        ctx.restore();
+        ctx.fillStyle = '#00ff00'; // Green money text
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillText(`$${snake.money.toFixed(2)}`, head.x, head.y + offsetY);
       }
 
       // Restore context
       ctx.restore();
 
-      // Draw UI (fixed position)
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
-      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
-      
-
-
+      // Continue with next frame
       animationId = requestAnimationFrame(gameLoop);
     };
 
@@ -1533,126 +1567,75 @@ export default function GamePage() {
       cancelAnimationFrame(animationId);
       clearInterval(movementInterval);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
-
-  const resetGame = () => {
-    setGameOver(false);
-    setScore(0);
-    // Reset snake to initial state using new system
-    snake.head = { x: MAP_CENTER_X, y: MAP_CENTER_Y };
-    snake.currentAngle = 0;
-    snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
-    snake.totalMass = snake.START_MASS;
-    snake.growthRemaining = 0;
-    snake.partialGrowth = 0; // Reset partialGrowth for faster mass conversion
-    snake.distanceBuffer = 0;
-    snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
-    snake.money = 1.00; // Reset money to starting amount
-    snake.isBoosting = false;
-    snake.boostCooldown = 0;
-    snake.speed = snake.baseSpeed;
-    snake.updateVisibleSegments();
-    setIsBoosting(false);
-    setMouseDirection({ x: 1, y: 0 });
-  };
-
-  const exitGame = () => {
-    setLocation('/');
-  };
+  }, [gameOver, canvasSize, foods, botSnakes, score, backgroundImage, dollarSignImage, lastFrameTime, mouseDirection]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-      {/* Exit Button */}
-      <div className="absolute top-4 left-4 z-10">
+    <div className="w-screen h-screen bg-gray-900 flex flex-col">
+      {/* Exit Game Button */}
+      <div className="absolute top-4 left-4 z-50">
         <Button
-          onClick={exitGame}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
+          onClick={() => navigate('/')}
+          variant="destructive"
+          size="sm"
+          className="flex items-center gap-2"
         >
           <X className="w-4 h-4" />
           Exit Game
         </Button>
       </div>
 
-      {/* Volume Controls */}
-      <div className="absolute top-4 left-40 z-10 flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm px-3 py-2 border border-gray-600 rounded">
-        <button 
-          onClick={toggleSound}
-          className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
+      {/* Audio Toggle Button */}
+      <div className="absolute top-4 right-4 z-50">
+        <Button
+          onClick={() => setAudioEnabled(!audioEnabled)}
+          variant={audioEnabled ? "default" : "secondary"}
+          size="sm"
+          className="flex items-center gap-2"
         >
-          <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
-          {soundEnabled ? 'ON' : 'OFF'}
-        </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.1"
-          value={volume}
-          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-          className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
-          }}
-        />
-        <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
+          <Volume2 className="w-4 h-4" />
+          {audioEnabled ? 'ON' : 'OFF'}
+        </Button>
       </div>
-      
-      {/* Score Display */}
-      <div className="absolute top-4 right-4 z-10">
-        <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
-          <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Segments: {snake.visibleSegments.length}</div>
-          <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
-          <div className="text-gray-400 text-xs">Min Mass: {snake.MIN_MASS_TO_BOOST} (boost threshold)</div>
-          {isBoosting && (
-            <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
-          )}
-          {snake.totalMass <= snake.MIN_MASS_TO_BOOST && (
-            <div className="text-red-400 text-xs">Cannot boost - too small!</div>
-          )}
-        </div>
-      </div>
-      
-      {/* Controls Instructions */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
-          <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
-          <div className="text-gray-400 text-xs">Drops 3 orbs/sec (0.5 mass each)</div>
-          <div className="text-blue-400 text-xs">Red=2 mass, Green=1 mass, Blue=0.5 mass</div>
-        </div>
-      </div>
-      
-      {gameOver && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-          <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
-            <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
-            <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
-            <div className="flex gap-4">
-              <Button
-                onClick={resetGame}
-                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Play Again
-              </Button>
-              <Button
-                onClick={exitGame}
-                className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-              >
-                Exit
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      
+
+      {/* Canvas */}
       <canvas
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        className="cursor-default block"
-        style={{ background: '#15161b' }}
+        className="bg-gray-900 cursor-none"
+        tabIndex={0}
       />
+
+      {/* Game UI Overlay */}
+      <div className="absolute bottom-6 left-6 text-white text-lg">
+        <div className="bg-black/50 rounded-lg p-4 space-y-2">
+          <div>Segments: {snake?.visibleSegments.length || 0}</div>
+          <div>Total Mass: {Math.floor(snake?.totalMass || 0)}</div>
+          <div>Min Mass: 4 (boost threshold)</div>
+        </div>
+      </div>
+
+      {/* Instructions */}
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-white text-center">
+        <div className="bg-black/50 rounded-lg p-4">
+          <div>Hold Shift or Mouse to Boost</div>
+          <div>Drops 3 orbs/s (0.5 mass each)</div>
+          <div>Red=1 mass, Green=1 mass, Blue=0.5 mass</div>
+        </div>
+      </div>
+
+      {/* Game Over Overlay */}
+      {gameOver && (
+        <div className="absolute inset-0 bg-black/75 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg p-8 text-center space-y-4">
+            <h2 className="text-2xl font-bold text-red-600">Game Started!</h2>
+            <p className="text-gray-700">Starting snake game with ${betAmount} bet.</p>
+            <Button onClick={() => navigate('/')}>
+              Return to Home
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
