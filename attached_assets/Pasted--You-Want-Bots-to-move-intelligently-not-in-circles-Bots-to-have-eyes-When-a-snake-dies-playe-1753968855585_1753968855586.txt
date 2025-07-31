@@ -1,0 +1,87 @@
+✅ You Want:
+Bots to move intelligently (not in circles)
+
+Bots to have eyes
+
+When a snake dies (player or bot):
+
+Drops orange food
+
+Each piece is worth 10 mass
+
+Number of pieces = mass / 10
+
+Drops are spread along the dead snake’s path
+
+✅ Step-by-Step Implementation Instructions:
+🧠 1. Fix Bot Movement (No More Circles)
+Bots need a random roaming + avoidance system, so they explore more realistically.
+
+✅ Suggested Movement Logic:
+js
+Copy
+Edit
+bot.targetAngle += (Math.random() - 0.5) * 0.2; // drift a little
+bot.angle += (bot.targetAngle - bot.angle) * 0.05; // smooth turn
+bot.x += Math.cos(bot.angle) * speed;
+bot.y += Math.sin(bot.angle) * speed;
+You can also change targetAngle every few seconds randomly for variation.
+
+👀 2. Give Bots Eyes
+For each bot snake, render eyes on their head (same way as the player):
+
+js
+Copy
+Edit
+drawEyes(bot.headX, bot.headY, bot.angle);
+Make sure eye position is calculated relative to the head and rotated using the snake's direction (angle).
+
+💀 3. Death Drop Logic
+When any snake dies (player or bot):
+
+Drop Math.floor(snake.mass / 10) orange food particles
+Spread them evenly along the snake’s body path
+
+✅ How to Drop Orange Food:
+js
+Copy
+Edit
+function dropDeathFood(snake) {
+  const amount = Math.floor(snake.mass / 10);
+  const segmentSpacing = Math.floor(snake.segments.length / amount);
+
+  for (let i = 0; i < amount; i++) {
+    const segIndex = i * segmentSpacing;
+    const seg = snake.segments[segIndex];
+
+    food.push({
+      x: seg.x,
+      y: seg.y,
+      color: 'orange',
+      value: 10,
+      size: 6,
+    });
+  }
+}
+✅ This drops food along the body, not in one clump.
+
+✅ Works for both bots and players — just call it in your onSnakeDeath(snake) function.
+
+✅ What to Tell Replit:
+Update bot AI so bots wander realistically:
+
+Randomly drift and change target angle every few seconds
+
+Smooth turning and consistent speed
+
+Add eyes to bots just like the player, based on the head position and direction
+
+When a snake dies:
+
+Drop mass / 10 orange food pieces
+
+Distribute them evenly along the snake’s body
+
+Each food piece is worth 10 mass
+
+Make sure this works for both the player and AI snakes.
