@@ -862,6 +862,15 @@ export default function GamePage() {
         // Move bot snakes too
         setBotSnakes(prevBots => {
           return prevBots.map(bot => {
+            // Simple bot AI - occasionally change direction
+            if (Math.random() < 0.02) { // 2% chance per frame to change direction
+              bot.targetAngle = bot.currentAngle + (Math.random() - 0.5) * 0.5;
+            }
+            
+            // Smooth angle interpolation
+            const angleDiff = ((bot.targetAngle - bot.currentAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+            bot.currentAngle += angleDiff * 0.1;
+            
             // Move bot forward in its current direction
             const dx = Math.cos(bot.currentAngle) * bot.speed * 0.05;
             const dy = Math.sin(bot.currentAngle) * bot.speed * 0.05;
@@ -917,10 +926,10 @@ export default function GamePage() {
         // When tab becomes visible again, force a render to show updated positions
         if (!gameOver) {
           // Update camera position to follow snake
-          const newCameraX = snake.head.x - canvasSize.width / 2;
-          const newCameraY = snake.head.y - canvasSize.height / 2;
-          setCameraX(newCameraX);
-          setCameraY(newCameraY);
+          setCameraPosition({
+            x: snake.head.x - canvasSize.width / 2,
+            y: snake.head.y - canvasSize.height / 2
+          });
         }
       }
     };
