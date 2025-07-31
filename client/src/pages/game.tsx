@@ -58,7 +58,7 @@ class SmoothSnake {
     this.boostCooldown = 0;
     
     // Snake system constants
-    this.START_MASS = 30;
+    this.START_MASS = 6; // Start with just 6 segments instead of 30
     this.MASS_PER_SEGMENT = 1;
     this.SEGMENT_SPACING = 20;
     this.SEGMENT_RADIUS = 10;
@@ -75,19 +75,9 @@ class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    const totalSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
-    
-    // Ensure enough trail points exist
-    while (this.segmentTrail.length < totalSegments - 1) { // -1 because head is separate
-      const lastPoint = this.segmentTrail[this.segmentTrail.length - 1] || this.head;
-      this.segmentTrail.push({ x: lastPoint.x, y: lastPoint.y });
-    }
-    
-    // Create visible segments: head + body segments from trail
-    this.visibleSegments = [this.head]; // Head is always first
-    for (let i = 0; i < Math.min(totalSegments - 1, this.segmentTrail.length); i++) {
-      this.visibleSegments.push(this.segmentTrail[i]);
-    }
+    // The visible segments are just the trail - no additional processing needed
+    // Head is drawn separately, body uses the trail
+    this.visibleSegments = [...this.segmentTrail];
   }
   
   applyGrowth() {
@@ -127,19 +117,21 @@ class SmoothSnake {
     this.head.x += dx;
     this.head.y += dy;
     
-    // Track distance moved using buffer system
-    this.distanceBuffer += Math.sqrt(dx * dx + dy * dy);
-    
-    // Add segment to trail when distance threshold is reached
+    // Add to trail when enough distance has passed
+    const lastPoint = this.segmentTrail[0] || { x: this.head.x, y: this.head.y };
+    const trailDx = this.head.x - lastPoint.x;
+    const trailDy = this.head.y - lastPoint.y;
+    this.distanceBuffer += Math.sqrt(trailDx * trailDx + trailDy * trailDy);
+
     if (this.distanceBuffer >= this.SEGMENT_SPACING) {
       this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
-      this.distanceBuffer = 0; // Reset buffer
-      
-      // Ensure trail isn't longer than needed
-      const maxSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
-      if (this.segmentTrail.length > maxSegments) {
-        this.segmentTrail.length = maxSegments;
-      }
+      this.distanceBuffer = 0;
+    }
+
+    // Cap the trail length based on current mass
+    const segmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    if (this.segmentTrail.length > segmentCount) {
+      this.segmentTrail.length = segmentCount;
     }
     
     // Apply gradual growth
@@ -701,7 +693,7 @@ export default function GamePage() {
       ctx.fillStyle = 'white';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
+      ctx.fillText(`Segments: ${snake.segmentTrail.length}`, 20, 70);
       ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
       
 
@@ -776,7 +768,7 @@ export default function GamePage() {
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Segments: {snake.visibleSegments.length}</div>
+          <div className="text-white text-sm">Segments: {snake.segmentTrail.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
           <div className="text-gray-400 text-xs">Min Mass: {snake.MIN_MASS_TO_BOOST} (boost threshold)</div>
           {isBoosting && (
@@ -802,7 +794,7 @@ export default function GamePage() {
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
             <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
+            <div className="text-white text-lg mb-6">Final Segments: {snake.segmentTrail.length}</div>
             <div className="flex gap-4">
               <Button
                 onClick={resetGame}
