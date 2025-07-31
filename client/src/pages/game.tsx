@@ -75,9 +75,27 @@ class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    // The visible segments are just the trail - no additional processing needed
-    // Head is drawn separately, body uses the trail
-    this.visibleSegments = [...this.segmentTrail];
+    // Sample segments at fixed distance intervals from the trail
+    this.visibleSegments = [];
+    let distanceSoFar = 0;
+    const targetSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
+    for (let i = 0; i < this.segmentTrail.length && this.visibleSegments.length < targetSegments; i++) {
+      const point = this.segmentTrail[i];
+      
+      // Add segment if we've covered enough distance
+      if (distanceSoFar >= this.visibleSegments.length * this.SEGMENT_SPACING) {
+        this.visibleSegments.push(point);
+      }
+
+      // Calculate distance to next point
+      if (i < this.segmentTrail.length - 1) {
+        const nextPoint = this.segmentTrail[i + 1];
+        const dx = point.x - nextPoint.x;
+        const dy = point.y - nextPoint.y;
+        distanceSoFar += Math.sqrt(dx * dx + dy * dy);
+      }
+    }
   }
   
   applyGrowth() {
@@ -117,22 +135,17 @@ class SmoothSnake {
     this.head.x += dx;
     this.head.y += dy;
     
-    // Add to trail when enough distance has passed
-    const lastPoint = this.segmentTrail[0] || { x: this.head.x, y: this.head.y };
-    const trailDx = this.head.x - lastPoint.x;
-    const trailDy = this.head.y - lastPoint.y;
-    this.distanceBuffer += Math.sqrt(trailDx * trailDx + trailDy * trailDy);
+    // Add head position to trail every frame for smooth following
+    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
 
-    if (this.distanceBuffer >= this.SEGMENT_SPACING) {
-      this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
-      this.distanceBuffer = 0;
+    // Remove excess trail length (keep enough to render full snake)
+    const maxTrailLength = Math.floor((this.totalMass / this.MASS_PER_SEGMENT) * this.SEGMENT_SPACING * 2);
+    if (this.segmentTrail.length > maxTrailLength) {
+      this.segmentTrail.length = maxTrailLength;
     }
 
-    // Cap the trail length based on current mass
-    const segmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
-    if (this.segmentTrail.length > segmentCount) {
-      this.segmentTrail.length = segmentCount;
-    }
+    // Sample segments at fixed spacing from the trail
+    this.updateVisibleSegments();
     
     // Apply gradual growth
     this.applyGrowth();
@@ -601,9 +614,9 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body segments from trail (skip head)
-      for (let i = 1; i < snake.segmentTrail.length; i++) {
-        const segment = snake.segmentTrail[i];
+      // Draw snake body segments (from back to front, skip head)
+      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
+        const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
         // Create radial gradient for 3D effect
@@ -623,27 +636,28 @@ export default function GamePage() {
         ctx.fill();
       }
 
-      // Draw head separately at current head position (not from segments)
+      // Draw head at real-time position (index 0 of visible segments or actual head)
+      const headSeg = snake.visibleSegments[0] || snake.head;
       const headRadius = snake.getSegmentRadius();
       const headGradient = ctx.createRadialGradient(
-        snake.head.x, snake.head.y, 0,
-        snake.head.x, snake.head.y, headRadius
+        headSeg.x, headSeg.y, 0,
+        headSeg.x, headSeg.y, headRadius
       );
       
       // Head has a brighter, more distinctive gradient
-      headGradient.addColorStop(0, "#fff");        // White center
+      headGradient.addColorStop(0, "#ffffff");     // White center
       headGradient.addColorStop(0.3, "#ffbaba");   // Light pink
       headGradient.addColorStop(0.7, "#ff6600");   // Medium orange
       headGradient.addColorStop(1, "#d55400");     // Dark orange edge
       
       ctx.fillStyle = headGradient;
       ctx.beginPath();
-      ctx.arc(snake.head.x, snake.head.y, headRadius, 0, Math.PI * 2);
+      ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
       ctx.fill();
 
       // Draw eyes that follow snake's movement direction
       if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.head;
+        const snakeHead = snake.visibleSegments[0] || snake.head;
         const movementAngle = snake.currentAngle;
         const eyeDistance = 8;
         const eyeSize = 4;
@@ -693,7 +707,7 @@ export default function GamePage() {
       ctx.fillStyle = 'white';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Segments: ${snake.segmentTrail.length}`, 20, 70);
+      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
       ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
       
 
@@ -768,7 +782,7 @@ export default function GamePage() {
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Segments: {snake.segmentTrail.length}</div>
+          <div className="text-white text-sm">Segments: {snake.visibleSegments.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
           <div className="text-gray-400 text-xs">Min Mass: {snake.MIN_MASS_TO_BOOST} (boost threshold)</div>
           {isBoosting && (
@@ -794,7 +808,7 @@ export default function GamePage() {
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
             <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Segments: {snake.segmentTrail.length}</div>
+            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
             <div className="flex gap-4">
               <Button
                 onClick={resetGame}
