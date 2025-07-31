@@ -166,7 +166,9 @@ class SmoothSnake {
   }
   
   getSegmentRadius() {
-    return this.SEGMENT_RADIUS;
+    // Dynamic scaling based on mass (baseline at mass=10, max 1.5x scale)
+    const scale = 1 + Math.min((this.totalMass - 10) / 200, 0.5);
+    return this.SEGMENT_RADIUS * scale;
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -300,8 +302,8 @@ export default function GamePage() {
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
-  // Fixed zoom level
-  const zoom = 1.2;
+  // Dynamic zoom level based on snake mass (zooms out as snake grows)
+  const zoom = Math.max(0.3, 1.2 - (snake.totalMass - 10) / 500);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -788,9 +790,11 @@ export default function GamePage() {
       if (snake.visibleSegments.length > 0) {
         const snakeHead = snake.visibleSegments[0];
         const movementAngle = snake.currentAngle;
-        const eyeDistance = 5; // Smaller distance from center
-        const eyeSize = 3; // Smaller eyes
-        const pupilSize = 1.5; // Smaller pupils
+        // Dynamic eye scaling based on mass (same scale as segments)
+        const scale = 1 + Math.min((snake.totalMass - 10) / 200, 0.5);
+        const eyeDistance = 5 * scale; // Scale distance from center
+        const eyeSize = 3 * scale; // Scale eye size
+        const pupilSize = 1.5 * scale; // Scale pupil size
         
         // Calculate cursor direction using mouse direction vector
         const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
