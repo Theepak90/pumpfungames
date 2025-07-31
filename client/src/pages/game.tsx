@@ -1029,35 +1029,30 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food as squares with gradient effect
+      // Draw food as circles with gradient effect
       foods.forEach(food => {
-        // Create linear gradient for square food
-        const gradient = ctx.createLinearGradient(
-          food.x - food.size, food.y - food.size,
-          food.x + food.size, food.y + food.size
+        // Create radial gradient for circular food
+        const gradient = ctx.createRadialGradient(
+          food.x, food.y, 0,
+          food.x, food.y, food.size
         );
-        gradient.addColorStop(0, "#ffbaba"); // Light corner
-        gradient.addColorStop(1, food.color); // Dark corner
+        gradient.addColorStop(0, "#ffffff"); // Light center
+        gradient.addColorStop(0.7, food.color); // Main color
+        gradient.addColorStop(1, "#000000"); // Dark edge
         
         ctx.fillStyle = gradient;
         
-        // Draw square food
-        ctx.fillRect(
-          food.x - food.size, 
-          food.y - food.size, 
-          food.size * 2, 
-          food.size * 2
-        );
+        // Draw circular food
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
         
         // Food glow effect
         ctx.shadowColor = food.color;
-        ctx.shadowBlur = 10;
-        ctx.fillRect(
-          food.x - food.size, 
-          food.y - food.size, 
-          food.size * 2, 
-          food.size * 2
-        );
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
         ctx.shadowBlur = 0;
       });
 
