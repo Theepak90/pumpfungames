@@ -208,7 +208,7 @@ export default function Home() {
             <h1 className="text-white text-4xl font-bold mb-2 font-retro tracking-wider">
               PumpGames<span style={{color: '#53d493'}}>.fun</span>
             </h1>
-            <p className="text-gray-300 text-lg font-retro">Play, Earn, Have Fun.</p>
+            <p className="text-gray-300 text-lg font-retro">Play Earn Have Fun</p>
           </div>
 
           {/* Main Game Area - Three Column Layout */}
