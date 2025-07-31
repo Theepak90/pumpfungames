@@ -668,17 +668,22 @@ export default function GamePage() {
         }
       }
       
-      // Fill area outside death barrier with semi-transparent darker overlay
+      // Draw death zone outside the safe area only
       const mapSize = MAP_RADIUS * 2.5;
-      ctx.fillStyle = 'rgba(82, 164, 122, 0.3)'; // Semi-transparent green overlay
-      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+      ctx.save();
       
-      // Cut out the safe zone circle
-      ctx.globalCompositeOperation = 'destination-out';
+      // Create a path for the outer rectangle
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+      
+      // Create a path for the inner circle (safe zone) - but in reverse direction to create a hole
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true);
+      
+      // Fill only the area between outer rect and inner circle
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.3)'; // Semi-transparent green overlay
+      ctx.fill('evenodd'); // Use even-odd rule to create the hole
+      
+      ctx.restore();
 
       // Draw thin death barrier line
       ctx.strokeStyle = '#53d392';
