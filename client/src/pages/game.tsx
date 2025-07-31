@@ -668,15 +668,17 @@ export default function GamePage() {
         );
         
         if (isHead) {
-          // Head gradient - brighter with consistent highlight
-          gradient.addColorStop(0, "#ffbaba");  // Light center highlight
-          gradient.addColorStop(0.7, "#ff6600"); // Mid tone
-          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
+          // Head gradient - bright orange center, darker edges
+          gradient.addColorStop(0, "#ff8800");  // Bright orange center
+          gradient.addColorStop(0.6, "#ff6600"); // Medium orange
+          gradient.addColorStop(0.8, "#cc4400"); // Darker orange
+          gradient.addColorStop(1, "#992200");   // Dark orange/red edge
         } else {
-          // Body gradient - standard with consistent highlight
-          gradient.addColorStop(0, "#ffbaba");  // Light center highlight  
-          gradient.addColorStop(0.7, "#f55400"); // Mid tone
-          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
+          // Body gradient - bright orange center, darker edges for 3D effect
+          gradient.addColorStop(0, "#ff8800");  // Bright orange center
+          gradient.addColorStop(0.6, "#ff6600"); // Medium orange
+          gradient.addColorStop(0.8, "#cc4400"); // Darker orange
+          gradient.addColorStop(1, "#992200");   // Dark orange/red edge
         }
         
         // Draw segment sphere
