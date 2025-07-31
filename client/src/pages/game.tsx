@@ -300,7 +300,7 @@ class SmoothSnake {
     return Math.min(1 + (this.totalMass - 10) / 100, maxScale);
   }
   
-  updateAngle(mouseDirectionX: number, mouseDirectionY: number) {
+  move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
     // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
@@ -322,7 +322,26 @@ class SmoothSnake {
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
-    // Update visible segments based on current trail
+    // Handle boost mechanics
+    this.applyBoost(onDropFood);
+    
+    // Move head
+    const dx = Math.cos(this.currentAngle) * this.speed;
+    const dy = Math.sin(this.currentAngle) * this.speed;
+    
+    this.head.x += dx;
+    this.head.y += dy;
+    
+    // Add head position to trail every frame for smooth following
+    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+
+    // Remove excess trail length (keep enough to render full snake)
+    const maxTrailLength = Math.floor((this.totalMass / this.MASS_PER_SEGMENT) * this.SEGMENT_SPACING * 2);
+    if (this.segmentTrail.length > maxTrailLength) {
+      this.segmentTrail.length = maxTrailLength;
+    }
+
+    // Sample segments at fixed spacing from the trail
     this.updateVisibleSegments();
     
     // Apply gradual growth
@@ -822,35 +841,25 @@ export default function GamePage() {
     let animationId: number;
     let realTimeMovementInterval: number;
     
-    // Real-time movement system that works regardless of tab activity
-    const updateSnakePosition = (deltaTime: number) => {
-      if (gameOver) return;
-      
-      const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
-      
-      // Update snake position based on real elapsed time
-      snake.head.x += Math.cos(snake.currentAngle) * speed * deltaTime;
-      snake.head.y += Math.sin(snake.currentAngle) * speed * deltaTime;
-      
-      // Add to trail for smooth movement
-      snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
-      
-      // Keep trail manageable
-      const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
-      if (snake.segmentTrail.length > maxTrailLength) {
-        snake.segmentTrail.length = maxTrailLength;
-      }
-    };
-    
-    // Time-based movement that runs regardless of tab focus
-    let lastTickTime = performance.now();
+    // Background movement timer - lightweight position updates when tab is inactive
     realTimeMovementInterval = window.setInterval(() => {
-      const now = performance.now();
-      const delta = (now - lastTickTime) / 1000; // delta in seconds
-      lastTickTime = now;
-      
-      updateSnakePosition(delta);
-    }, 50); // 20fps is enough for consistent background movement
+      if (document.hidden && !gameOver) {
+        // Simple background movement - just update head position
+        const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
+        const delta = 1 / 60; // Fixed deltaTime for consistent movement
+        
+        snake.head.x += Math.cos(snake.currentAngle) * speed * delta;
+        snake.head.y += Math.sin(snake.currentAngle) * speed * delta;
+        
+        // Add to trail for continuity when tab becomes active again
+        snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
+        
+        // Keep trail manageable
+        if (snake.segmentTrail.length > 1000) {
+          snake.segmentTrail.length = 500;
+        }
+      }
+    }, 1000 / 60); // 60fps background movement
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -861,9 +870,8 @@ export default function GamePage() {
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Update snake angle and boost mechanics (movement is handled by real-time interval)
-      snake.updateAngle(mouseDirection.x, mouseDirection.y);
-      snake.applyBoost((droppedFood: Food) => {
+      // Move snake normally - this ensures visibility and game mechanics work
+      snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
         // Add dropped food from boosting to the food array
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
@@ -1280,6 +1288,8 @@ export default function GamePage() {
         ctx.stroke();
         ctx.restore();
       }
+      
+
       
       // Draw snake segments with appropriate shadow effects
       ctx.save();
