@@ -38,6 +38,7 @@ class SmoothSnake {
   totalMass: number;
   growthRemaining: number;
   distanceBuffer: number;
+  currentSegmentCount: number; // Smoothly animated segment count
   
   // Constants
   START_MASS: number;
@@ -70,20 +71,33 @@ class SmoothSnake {
     this.totalMass = this.START_MASS;
     this.growthRemaining = 0;
     this.distanceBuffer = 0;
+    this.currentSegmentCount = this.START_MASS; // Start with initial segment count
     
     this.updateVisibleSegments();
   }
   
   updateVisibleSegments() {
-    // Calculate how many segments we should have based on mass
+    // Calculate target segment count based on mass
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
+    // Smoothly animate currentSegmentCount toward target
+    const transitionSpeed = 0.15; // Adjust for faster/slower animation
+    if (this.currentSegmentCount < targetSegmentCount) {
+      this.currentSegmentCount += transitionSpeed;
+    } else if (this.currentSegmentCount > targetSegmentCount) {
+      this.currentSegmentCount -= transitionSpeed;
+    }
+    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    
+    // Use the animated segment count for rendering
+    const renderCount = Math.floor(this.currentSegmentCount);
     
     this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
     
     // Walk through the trail and interpolate segment positions smoothly
-    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < targetSegmentCount; i++) {
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < renderCount; i++) {
       const a = this.segmentTrail[i - 1];
       const b = this.segmentTrail[i];
       
@@ -92,7 +106,7 @@ class SmoothSnake {
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
       // Check if we need to place a segment in this trail section
-      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < targetSegmentCount) {
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < renderCount) {
         const targetDistance = segmentIndex * this.SEGMENT_SPACING;
         const overshoot = targetDistance - distanceSoFar;
         const t = segmentDist > 0 ? overshoot / segmentDist : 0;
@@ -774,6 +788,7 @@ export default function GamePage() {
     snake.totalMass = snake.START_MASS;
     snake.growthRemaining = 0;
     snake.distanceBuffer = 0;
+    snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;
