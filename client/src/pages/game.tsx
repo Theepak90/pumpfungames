@@ -315,7 +315,7 @@ export default function GamePage() {
   // Load background image
   useEffect(() => {
     const img = new Image();
-    img.src = '/background.png';
+    img.src = '/backggorun.png';
     img.onload = () => {
       console.log('Background image loaded successfully');
       setBackgroundImage(img);
@@ -668,17 +668,21 @@ export default function GamePage() {
         }
       }
       
-      // Fill area outside death barrier with semi-transparent darker overlay
+      // Draw green overlay only outside the play area (death barrier region)
+      ctx.save();
+      
+      // Create a clipping path for the area outside the safe zone
       const mapSize = MAP_RADIUS * 2.5;
-      ctx.fillStyle = 'rgba(82, 164, 122, 0.3)'; // Semi-transparent green overlay
+      ctx.beginPath();
+      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
+      ctx.clip();
+      
+      // Fill only the clipped area (outside the circle) with green overlay
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.4)'; // Semi-transparent green overlay
       ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
       
-      // Cut out the safe zone circle
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
 
       // Draw thin death barrier line
       ctx.strokeStyle = '#53d392';
