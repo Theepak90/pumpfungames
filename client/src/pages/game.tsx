@@ -45,7 +45,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 12; // Reduced spacing for half-overlap effect
+    this.segmentSpacing = 45; // Increased spacing for more stretched appearance
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
