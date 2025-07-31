@@ -170,6 +170,7 @@ class SmoothSnake {
   visibleSegments: Array<{ x: number; y: number; opacity: number }>; // Segments with opacity for fading
   totalMass: number;
   growthRemaining: number;
+  partialGrowth: number; // For faster mass-to-segment conversion
   distanceBuffer: number;
   currentSegmentCount: number; // Smoothly animated segment count
   
@@ -206,6 +207,7 @@ class SmoothSnake {
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
     this.growthRemaining = 0;
+    this.partialGrowth = 0; // Initialize partialGrowth for faster mass conversion
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
     
@@ -388,6 +390,22 @@ class SmoothSnake {
     return mass; // Return score increase
   }
   
+  // Process growth at 10 mass per second rate
+  processGrowth(deltaTime: number) {
+    const growthRate = 10; // max 10 mass per second
+    const maxGrowthThisFrame = growthRate * deltaTime;
+    
+    const growthThisFrame = Math.min(this.growthRemaining, maxGrowthThisFrame);
+    this.partialGrowth += growthThisFrame;
+    this.growthRemaining -= growthThisFrame;
+    
+    // Add segments when we have enough partial growth
+    while (this.partialGrowth >= 1) {
+      this.totalMass += 1;
+      this.partialGrowth -= 1;
+    }
+  }
+  
   setBoost(boosting: boolean) {
     if (boosting && this.totalMass <= this.MIN_MASS_TO_BOOST) {
       this.isBoosting = false;
@@ -431,6 +449,7 @@ export default function GamePage() {
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
+  const [lastFrameTime, setLastFrameTime] = useState(Date.now());
   
   // Zoom parameters
   const minZoom = 0.3; // Maximum zoom-out (0.3×)
@@ -795,6 +814,14 @@ export default function GamePage() {
     let animationId: number;
     
     const gameLoop = () => {
+      // Calculate delta time for smooth growth processing
+      const currentTime = Date.now();
+      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.033); // Cap at 33ms (30fps minimum)
+      setLastFrameTime(currentTime);
+      
+      // Process growth at 10 mass per second rate
+      snake.processGrowth(deltaTime);
+      
       // Move snake with smooth turning based on mouse direction
       snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
         // Add dropped food from boosting to the food array
@@ -1030,12 +1057,12 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Calculate target zoom based on snake mass
-      const snakeMass = snake.totalMass;
-      const targetZoom = Math.max(
-        minZoom,
-        2 - (snakeMass * 0.008) // 0.008 controls how fast it zooms out
-      );
+      // Calculate target zoom based on snake segments (capped at 130 segments)
+      const segmentCount = snake.visibleSegments.length;
+      const maxSegmentZoom = 130;
+      const cappedSegmentCount = Math.min(segmentCount, maxSegmentZoom);
+      const zoomSteps = Math.floor(cappedSegmentCount / 5);
+      const targetZoom = Math.max(minZoom, 2.0 - zoomSteps * 0.03);
       
       // Smoothly interpolate toward target zoom
       setZoom(prevZoom => prevZoom + (targetZoom - prevZoom) * zoomSmoothing);
@@ -1348,6 +1375,7 @@ export default function GamePage() {
     snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
     snake.totalMass = snake.START_MASS;
     snake.growthRemaining = 0;
+    snake.partialGrowth = 0; // Reset partialGrowth for faster mass conversion
     snake.distanceBuffer = 0;
     snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
     snake.money = 1.00; // Reset money to starting amount
