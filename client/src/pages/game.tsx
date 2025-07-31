@@ -442,7 +442,15 @@ export default function GamePage() {
       const foodType = Math.random();
       let food: Food;
       
-      if (foodType < 0.1) { // 10% big food
+      if (foodType < 0.05) { // 5% orange test food (40 mass)
+        food = {
+          x: x,
+          y: y,
+          size: 15,
+          mass: 40,
+          color: '#ff8800'
+        };
+      } else if (foodType < 0.15) { // 10% big food
         food = {
           x: x,
           y: y,
@@ -450,7 +458,7 @@ export default function GamePage() {
           mass: 2,
           color: '#ff4444'
         };
-      } else if (foodType < 0.4) { // 30% medium food
+      } else if (foodType < 0.45) { // 30% medium food
         food = {
           x: x,
           y: y,
@@ -458,7 +466,7 @@ export default function GamePage() {
           mass: 1,
           color: '#44ff44'
         };
-      } else { // 60% small food
+      } else { // 55% small food
         food = {
           x: x,
           y: y,
@@ -615,7 +623,15 @@ export default function GamePage() {
             const newX = MAP_CENTER_X + Math.cos(angle) * radius;
             const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
             
-            if (foodType < 0.1) { // 10% big food
+            if (foodType < 0.05) { // 5% orange test food (40 mass)
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 15,
+                mass: 40,
+                color: '#ff8800'
+              };
+            } else if (foodType < 0.15) { // 10% big food
               newFood = {
                 x: newX,
                 y: newY,
@@ -623,7 +639,7 @@ export default function GamePage() {
                 mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
                 color: '#ff4444'
               };
-            } else if (foodType < 0.4) { // 30% medium food
+            } else if (foodType < 0.45) { // 30% medium food
               newFood = {
                 x: newX,
                 y: newY,
@@ -631,7 +647,7 @@ export default function GamePage() {
                 mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
                 color: '#44ff44'
               };
-            } else { // 60% small food
+            } else { // 55% small food
               newFood = {
                 x: newX,
                 y: newY,
