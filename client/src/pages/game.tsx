@@ -389,18 +389,9 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    
-    // Limit total queued growth to prevent excessive accumulation
-    const maxQueuedGrowth = 10; // Maximum 10 mass can be queued
-    if (this.growthRemaining < maxQueuedGrowth) {
-      this.growthRemaining += mass;
-      this.lastFoodEaten = Date.now();
-      console.log(`Snake eating food: +${mass} mass, growthRemaining now: ${this.growthRemaining.toFixed(2)}`);
-      return mass; // Return score increase
-    } else {
-      console.log(`Growth queue full (${this.growthRemaining.toFixed(2)}), ignoring food`);
-      return 0; // Don't add more growth if queue is full
-    }
+    this.growthRemaining += mass;
+    console.log(`Snake eating food: +${mass} mass, growthRemaining now: ${this.growthRemaining.toFixed(2)}`);
+    return mass; // Return score increase
   }
   
   setBoost(boosting: boolean) {
@@ -965,63 +956,66 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          // Check collision with reasonable collision detection and cooldown
-          const now = Date.now();
-          if (dist < snake.getSegmentRadius() + food.size && (now - snake.lastFoodEaten) > 100) { // 100ms cooldown
+          // Check collision with reasonable collision detection
+          if (dist < snake.getSegmentRadius() + food.size) {
             // Snake eats the food - growth handled internally
-            scoreIncrease += snake.eatFood(food);
+            const massGained = snake.eatFood(food);
             
-            // Remove eaten food and spawn new one immediately
-            newFoods.splice(i, 1);
-            hasEatenFood = true;
-            
-            // Spawn new food to replace eaten one
-            const foodType = Math.random();
-            let newFood: Food;
-            
-            // Generate new food within circular boundary
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * (MAP_RADIUS - 100);
-            const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-            const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-            
-            if (foodType < 0.05) { // 5% orange test food (40 mass)
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 15,
-                mass: 40,
-                color: '#ff8800'
-              };
-            } else if (foodType < 0.15) { // 10% big food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 10,
-                mass: 2,
-                color: '#ff4444'
-              };
-            } else if (foodType < 0.45) { // 30% medium food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 6,
-                mass: 1,
-                color: '#44ff44'
-              };
-            } else { // 55% small food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 4,
-                mass: 0.5,
-                color: '#4444ff'
-              };
+            if (massGained > 0) {
+              scoreIncrease += massGained;
+              
+              // Remove eaten food - this should make it disappear
+              newFoods.splice(i, 1);
+              hasEatenFood = true;
+              
+              console.log(`Ate food! Mass gained: ${food.mass}, Total mass: ${snake.totalMass}, Foods left: ${newFoods.length}`);
+              
+              // Spawn new food to replace eaten one
+              const foodType = Math.random();
+              let newFood: Food;
+              
+              // Generate new food within circular boundary
+              const angle = Math.random() * Math.PI * 2;
+              const radius = Math.random() * (MAP_RADIUS - 100);
+              const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+              const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+              
+              if (foodType < 0.05) { // 5% orange test food (40 mass)
+                newFood = {
+                  x: newX,
+                  y: newY,
+                  size: 15,
+                  mass: 40,
+                  color: '#ff8800'
+                };
+              } else if (foodType < 0.15) { // 10% big food
+                newFood = {
+                  x: newX,
+                  y: newY,
+                  size: 10,
+                  mass: 2,
+                  color: '#ff4444'
+                };
+              } else if (foodType < 0.45) { // 30% medium food
+                newFood = {
+                  x: newX,
+                  y: newY,
+                  size: 6,
+                  mass: 1,
+                  color: '#44ff44'
+                };
+              } else { // 55% small food
+                newFood = {
+                  x: newX,
+                  y: newY,
+                  size: 4,
+                  mass: 0.5,
+                  color: '#4444ff'
+                };
+              }
+              
+              newFoods.push(newFood);
             }
-            
-            newFoods.push(newFood);
-            
-            console.log(`Ate food! Mass gained: ${food.mass}, Total mass: ${snake.totalMass}`);
           }
         }
         
