@@ -440,18 +440,18 @@ export default function GamePage() {
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
-  // Dynamic zoom level with slower, smoother zoom-out
+  // Dynamic zoom level with more aggressive zoom-out
   const calculateZoom = (mass: number) => {
-    const maxZoomOut = 0.3;
-    const minZoomOutTriggerMass = 200;
-    const maxZoomTriggerMass = 1000;
+    const maxZoomOut = 0.2; // Zoom out further (was 0.3)
+    const minZoomOutTriggerMass = 150; // Start zooming earlier (was 200)
+    const maxZoomTriggerMass = 800; // Reach max zoom sooner (was 1000)
     
     if (mass <= minZoomOutTriggerMass) {
       return 1; // No zoom-out for small snakes
     }
     
     const factor = Math.min((mass - minZoomOutTriggerMass) / (maxZoomTriggerMass - minZoomOutTriggerMass), 1);
-    return 1 - factor * (1 - maxZoomOut); // Smoothly goes from 1 → 0.3
+    return 1 - factor * (1 - maxZoomOut); // Smoothly goes from 1 → 0.2
   };
   
   const zoom = calculateZoom(snake.totalMass);
