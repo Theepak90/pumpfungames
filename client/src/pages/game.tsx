@@ -52,7 +52,7 @@ class SmoothSnake {
     this.currentAngle = 0;
     this.turnSpeed = 0.04;
     this.baseSpeed = 2.4;
-    this.boostMultiplier = 1.3;
+    this.boostMultiplier = 2.0;
     this.speed = this.baseSpeed;
     this.isBoosting = false;
     this.boostCooldown = 0;
