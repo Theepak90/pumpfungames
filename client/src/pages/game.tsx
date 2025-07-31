@@ -760,7 +760,7 @@ export default function GamePage() {
         return;
       }
 
-      // Check collision between player snake and bot snakes
+      // Check collision between player snake head and bot snake bodies
       for (const bot of botSnakes) {
         // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
@@ -768,9 +768,11 @@ export default function GamePage() {
         const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
         const botRadius = botBaseRadius * botScaleFactor;
         
-        for (const segment of bot.visibleSegments) {
+        // Skip the head segments to avoid head-to-head collisions (last 3 segments)
+        const bodySegments = bot.visibleSegments.slice(0, -3);
+        for (const segment of bodySegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
+          if (dist < (snake.getSegmentRadius() + botRadius) * 0.9) { // Slightly tighter collision
             // Player died - drop death food
             const deathFoods = dropDeathFood(snake);
             setFoods(prevFoods => [...prevFoods, ...deathFoods]);
@@ -780,42 +782,78 @@ export default function GamePage() {
         }
       }
 
-      // Check collision between bot snakes (bot vs bot)
+      // Check collision between player snake head and player snake body (self-collision)
+      const playerBodySegments = snake.visibleSegments.slice(0, -10); // Skip head and near-head segments
+      for (const segment of playerBodySegments) {
+        const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
+        if (dist < snake.getSegmentRadius() * 1.8) { // Self collision threshold
+          // Player died from self-collision
+          const deathFoods = dropDeathFood(snake);
+          setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+          setGameOver(true);
+          return;
+        }
+      }
+
+      // Check collision between bot snakes (bot vs bot and bot vs player body)
       setBotSnakes(prevBots => {
         const newBots = [...prevBots];
         const botsToRemove: number[] = [];
         
         for (let i = 0; i < newBots.length; i++) {
-          for (let j = i + 1; j < newBots.length; j++) {
-            const bot1 = newBots[i];
-            const bot2 = newBots[j];
+          const bot = newBots[i];
+          if (botsToRemove.includes(i)) continue;
+          
+          const botRadius = 8 * Math.min(1 + (bot.totalMass - 10) / 100, 5);
+          
+          // Check bot head vs player body
+          const playerBodySegments = snake.visibleSegments.slice(0, -3); // Skip player head
+          for (const segment of playerBodySegments) {
+            const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+            if (dist < (botRadius + snake.getSegmentRadius()) * 0.9) {
+              // Bot dies hitting player
+              const deathFoods = dropDeathFood(bot);
+              setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+              botsToRemove.push(i);
+              break;
+            }
+          }
+          
+          if (botsToRemove.includes(i)) continue;
+          
+          // Check bot head vs other bot bodies
+          for (let j = 0; j < newBots.length; j++) {
+            if (i === j || botsToRemove.includes(j)) continue;
             
-            // Check if bot1 head hits bot2 body
-            const bot1Radius = 8 * Math.min(1 + (bot1.totalMass - 10) / 100, 5);
-            const bot2Radius = 8 * Math.min(1 + (bot2.totalMass - 10) / 100, 5);
+            const otherBot = newBots[j];
+            const otherBotRadius = 8 * Math.min(1 + (otherBot.totalMass - 10) / 100, 5);
             
-            for (const segment of bot2.visibleSegments) {
-              const dist = Math.sqrt((bot1.head.x - segment.x) ** 2 + (bot1.head.y - segment.y) ** 2);
-              if (dist < bot1Radius + bot2Radius) {
-                // Bot1 dies
-                const deathFoods = dropDeathFood(bot1);
+            // Skip head segments to avoid head-to-head (use body only)
+            const otherBotBodySegments = otherBot.visibleSegments.slice(0, -3);
+            for (const segment of otherBotBodySegments) {
+              const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+              if (dist < (botRadius + otherBotRadius) * 0.9) {
+                // Bot dies hitting other bot's body
+                const deathFoods = dropDeathFood(bot);
                 setFoods(prevFoods => [...prevFoods, ...deathFoods]);
                 botsToRemove.push(i);
                 break;
               }
             }
-            
-            // Check if bot2 head hits bot1 body (if bot1 not already dead)
-            if (!botsToRemove.includes(i)) {
-              for (const segment of bot1.visibleSegments) {
-                const dist = Math.sqrt((bot2.head.x - segment.x) ** 2 + (bot2.head.y - segment.y) ** 2);
-                if (dist < bot1Radius + bot2Radius) {
-                  // Bot2 dies
-                  const deathFoods = dropDeathFood(bot2);
-                  setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-                  botsToRemove.push(j);
-                  break;
-                }
+            if (botsToRemove.includes(i)) break;
+          }
+          
+          // Check bot head vs own body (self-collision)
+          if (!botsToRemove.includes(i)) {
+            const ownBodySegments = bot.visibleSegments.slice(0, -10); // Skip head and near-head
+            for (const segment of ownBodySegments) {
+              const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+              if (dist < botRadius * 1.8) {
+                // Bot self-collision
+                const deathFoods = dropDeathFood(bot);
+                setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+                botsToRemove.push(i);
+                break;
               }
             }
           }
