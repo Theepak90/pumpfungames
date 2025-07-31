@@ -180,9 +180,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(crate);
   });
 
+  // Game state for multiplayer snake
+  const snakeGameState = {
+    players: new Map<string, {
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      angle: number;
+      segments: Array<{ x: number; y: number; opacity?: number }>;
+      totalMass: number;
+      money: number;
+      color: string;
+      isAlive: boolean;
+      lastUpdate: number;
+    }>(),
+    foods: [] as Array<{
+      x: number;
+      y: number;
+      size: number;
+      color: string;
+      mass: number;
+      isMedical?: boolean;
+    }>
+  };
+
+  // Initialize food for the snake game
+  function initializeSnakeFood() {
+    const MAP_CENTER_X = 2000;
+    const MAP_CENTER_Y = 2000;
+    const MAP_RADIUS = 1800;
+    const FOOD_COUNT = 200;
+    
+    snakeGameState.foods = [];
+    
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MAP_RADIUS - 100);
+      const x = MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+      
+      const foodType = Math.random();
+      let food;
+      
+      if (foodType < 0.05) {
+        food = { x, y, size: 15, mass: 40, color: '#ff8800' };
+      } else if (foodType < 0.15) {
+        food = { x, y, size: 10, mass: 2, color: '#ff4444' };
+      } else if (foodType < 0.45) {
+        food = { x, y, size: 6, mass: 1, color: '#44ff44' };
+      } else {
+        food = { x, y, size: 4, mass: 0.5, color: '#4444ff' };
+      }
+      
+      snakeGameState.foods.push(food);
+    }
+  }
+
+  initializeSnakeFood();
+
+  // Drop death food when snake dies
+  function dropDeathFood(deathX: number, deathY: number, snakeMass: number, snakeColor: string) {
+    const MAP_CENTER_X = 2000;
+    const MAP_CENTER_Y = 2000;
+    const MAP_RADIUS = 1800;
+    const foodValue = 5;
+    const foodCount = Math.floor(snakeMass / foodValue);
+    
+    // Add regular death food
+    for (let i = 0; i < foodCount; i++) {
+      const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5;
+      const radius = 30 + Math.random() * 100;
+      
+      const x = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, 
+        Math.min(MAP_CENTER_X + MAP_RADIUS - 50, deathX + Math.cos(angle) * radius));
+      const y = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, 
+        Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, deathY + Math.sin(angle) * radius));
+      
+      snakeGameState.foods.push({
+        x, y, size: 7.5, mass: foodValue, color: snakeColor
+      });
+    }
+    
+    // Add 5 medical cross foods
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * 2 * Math.PI + Math.random() * 0.3;
+      const radius = 40 + Math.random() * 60;
+      
+      const x = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, 
+        Math.min(MAP_CENTER_X + MAP_RADIUS - 50, deathX + Math.cos(angle) * radius));
+      const y = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, 
+        Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, deathY + Math.sin(angle) * radius));
+      
+      snakeGameState.foods.push({
+        x, y, size: 12, mass: 10, color: '#00ff44', isMedical: true
+      });
+    }
+  }
+
   // WebSocket handling
   wss.on('connection', (ws: AuthenticatedWebSocket) => {
     console.log('New WebSocket connection');
+    let snakePlayerId: string = '';
     
     ws.on('message', async (data: Buffer) => {
       try {
@@ -194,7 +293,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ws.userId = message.payload.userId;
             console.log('Authenticated user:', ws.userId);
             break;
+
+          // Snake game messages
+          case 'join_snake_game':
+            snakePlayerId = message.payload.playerId || `player_${Date.now()}`;
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#d55400'];
             
+            snakeGameState.players.set(snakePlayerId, {
+              id: snakePlayerId,
+              name: message.payload.name || `Player${snakePlayerId.slice(0, 6)}`,
+              x: 2000 + (Math.random() - 0.5) * 200,
+              y: 2000 + (Math.random() - 0.5) * 200,
+              angle: Math.random() * Math.PI * 2,
+              segments: [],
+              totalMass: 6,
+              money: 1.00,
+              color: colors[Math.floor(Math.random() * colors.length)],
+              isAlive: true,
+              lastUpdate: Date.now()
+            });
+            
+            ws.send(JSON.stringify({
+              type: 'snake_game_state',
+              playerId: snakePlayerId,
+              players: Array.from(snakeGameState.players.values()),
+              foods: snakeGameState.foods
+            }));
+            break;
+            
+          case 'snake_player_update':
+            if (snakeGameState.players.has(snakePlayerId)) {
+              const player = snakeGameState.players.get(snakePlayerId)!;
+              Object.assign(player, message.payload.player, { lastUpdate: Date.now() });
+            }
+            break;
+            
+          case 'snake_player_death':
+            if (snakeGameState.players.has(snakePlayerId)) {
+              const player = snakeGameState.players.get(snakePlayerId)!;
+              player.isAlive = false;
+              
+              // Drop food where player died
+              dropDeathFood(player.x, player.y, player.totalMass, player.color);
+              
+              // Award money to killer if provided
+              if (message.payload.killerId && snakeGameState.players.has(message.payload.killerId)) {
+                const killer = snakeGameState.players.get(message.payload.killerId)!;
+                const reward = Math.max(1.00, player.totalMass * 0.1);
+                killer.money += reward;
+              }
+            }
+            break;
+            
+          case 'snake_respawn':
+            if (snakeGameState.players.has(snakePlayerId)) {
+              const player = snakeGameState.players.get(snakePlayerId)!;
+              player.x = 2000 + (Math.random() - 0.5) * 200;
+              player.y = 2000 + (Math.random() - 0.5) * 200;
+              player.totalMass = 6;
+              player.money = 1.00;
+              player.isAlive = true;
+              player.segments = [];
+            }
+            break;
+            
+          // Legacy game handling
           case 'join_game':
             console.log('Processing join_game request');
             await handleJoinGame(ws, message);
@@ -214,11 +377,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     ws.on('close', () => {
+      if (snakePlayerId) {
+        snakeGameState.players.delete(snakePlayerId);
+      }
       if (ws.userId) {
         storage.updateUser(ws.userId, { isOnline: false });
       }
     });
   });
+
+  // Broadcast snake game state to all clients
+  setInterval(() => {
+    if (wss.clients.size > 0 && snakeGameState.players.size > 0) {
+      const gameStateMessage = JSON.stringify({
+        type: 'snake_game_state',
+        players: Array.from(snakeGameState.players.values()),
+        foods: snakeGameState.foods
+      });
+      
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(gameStateMessage);
+        }
+      });
+    }
+  }, 1000 / 60); // 60 FPS
 
   // Game logic functions
   async function handleJoinGame(ws: AuthenticatedWebSocket, message: WebSocketMessage) {

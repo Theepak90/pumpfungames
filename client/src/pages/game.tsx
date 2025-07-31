@@ -409,7 +409,19 @@ export default function GamePage() {
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
-  const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
+  const [otherPlayers, setOtherPlayers] = useState<Array<{
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    segments: Array<{ x: number; y: number; opacity?: number }>;
+    totalMass: number;
+    money: number;
+    color: string;
+    isAlive: boolean;
+  }>>([]);
+  const [playerId, setPlayerId] = useState<string>('');
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
@@ -702,12 +714,54 @@ export default function GamePage() {
     }
     setFoods(initialFoods);
     
-    // Initialize bot snakes
-    const initialBots: BotSnake[] = [];
-    for (let i = 0; i < BOT_COUNT; i++) {
-      initialBots.push(createBotSnake(`bot_${i}`));
-    }
-    setBotSnakes(initialBots);
+    // Initialize WebSocket connection for multiplayer
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+    
+    let newPlayerId = '';
+    
+    socket.onopen = () => {
+      console.log('Connected to multiplayer server');
+      newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setPlayerId(newPlayerId);
+      
+      // Join the snake game
+      socket.send(JSON.stringify({
+        type: 'join_snake_game',
+        payload: {
+          playerId: newPlayerId,
+          name: `Player${newPlayerId.slice(7, 13)}`
+        }
+      }));
+    };
+    
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'snake_game_state') {
+          // Update food from server
+          setFoods(data.foods || []);
+          
+          // Update other players (exclude self)
+          const others = data.players.filter((p: any) => p.id !== newPlayerId);
+          setOtherPlayers(others);
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    };
+    
+    socket.onclose = () => {
+      console.log('Disconnected from multiplayer server');
+    };
+    
+    setWs(socket);
+    
+    return () => {
+      socket.close();
+    };
   }, []);
 
   // Mouse tracking
@@ -796,10 +850,23 @@ export default function GamePage() {
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
 
-      // Update bot snakes
-      setBotSnakes(prevBots => {
-        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
-      });
+      // Send player update to server
+      if (ws && playerId) {
+        ws.send(JSON.stringify({
+          type: 'snake_player_update',
+          payload: {
+            player: {
+              x: snake.head.x,
+              y: snake.head.y,
+              angle: snake.currentAngle,
+              segments: snake.visibleSegments,
+              totalMass: snake.totalMass,
+              money: snake.money,
+              isAlive: true
+            }
+          }
+        }));
+      }
 
       // Check circular map boundaries (death barrier)
       const updatedHead = snake.head;
@@ -813,52 +880,56 @@ export default function GamePage() {
         return;
       }
 
-      // Check collision between player snake and bot snakes
-      for (const bot of botSnakes) {
-        // Calculate bot's current radius based on mass (caps at 5x width)
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
+      // Check collision with other players (death condition)
+      for (const player of otherPlayers) {
+        if (!player.isAlive) continue;
         
-        for (const segment of bot.visibleSegments) {
+        const playerBaseRadius = 8;
+        const maxScale = 5;
+        const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
+        
+        for (const segment of player.segments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
-            // Drop food when snake dies from collision
-            dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+          if (dist < snake.getSegmentRadius() + playerRadius) {
+            // Send death message to server
+            if (ws) {
+              ws.send(JSON.stringify({
+                type: 'snake_player_death',
+                payload: {
+                  killerId: player.id
+                }
+              }));
+            }
             setGameOver(true);
             return;
           }
         }
       }
       
-      // Check if player snake kills any bot snakes
-      for (let i = botSnakes.length - 1; i >= 0; i--) {
-        const bot = botSnakes[i];
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
+      // Check if player snake kills any other players
+      for (const player of otherPlayers) {
+        if (!player.isAlive) continue;
         
-        for (const segment of snake.visibleSegments) {
-          const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
-            // Player killed a bot - award money
-            const killReward = Math.max(0.50, bot.totalMass * 0.05); // $0.50 minimum, or 5% of bot's mass
-            snake.money += killReward;
-            
-            // Drop food where bot died
-            dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
-            
-            // Remove the killed bot
-            setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
-            
-            // Spawn a new bot to replace the killed one
-            setTimeout(() => {
-              setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
-            }, 3000); // 3 second delay before respawn
-            
-            break;
+        const playerBaseRadius = 8;
+        const maxScale = 5;
+        const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
+        
+        const dist = Math.sqrt((snake.head.x - player.x) ** 2 + (snake.head.y - player.y) ** 2);
+        if (dist < snake.getSegmentRadius() + playerRadius) {
+          // Award money for kill
+          const killReward = Math.max(1.00, player.totalMass * 0.1);
+          snake.money += killReward;
+          
+          // The server will handle dropping food and removing the killed player
+          if (ws) {
+            ws.send(JSON.stringify({
+              type: 'snake_player_death',
+              payload: {
+                killerId: playerId
+              }
+            }));
           }
         }
       }
@@ -1119,33 +1190,51 @@ export default function GamePage() {
         }
       });
 
-      // Draw bot snakes first (behind player)
-      botSnakes.forEach(bot => {
-        // Bot dynamic scaling based on mass (caps at 5x width)
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
-        const botOutlineThickness = 2 * botScaleFactor;
+      // Draw other players first (behind current player)
+      otherPlayers.forEach(player => {
+        if (!player.isAlive) return;
         
-        // Bot outline
+        // Player dynamic scaling based on mass (caps at 5x width)
+        const playerBaseRadius = 8;
+        const maxScale = 5;
+        const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
+        const playerOutlineThickness = 2 * playerScaleFactor;
+        
+        // Player outline
         ctx.fillStyle = "white";
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
+        for (let i = player.segments.length - 1; i >= 0; i--) {
+          const segment = player.segments[i];
+          ctx.globalAlpha = segment.opacity || 1.0;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, playerRadius + playerOutlineThickness, 0, Math.PI * 2);
           ctx.fill();
         }
         
-        // Bot body
-        ctx.fillStyle = bot.color;
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
+        // Player body
+        ctx.fillStyle = player.color;
+        for (let i = player.segments.length - 1; i >= 0; i--) {
+          const segment = player.segments[i];
+          ctx.globalAlpha = segment.opacity || 1.0;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, playerRadius, 0, Math.PI * 2);
           ctx.fill();
+        }
+        
+        // Draw player's money balance
+        if (player.segments.length > 0) {
+          const playerHead = player.segments[0];
+          ctx.font = `${14 * playerScaleFactor}px Arial, sans-serif`;
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = 2 * playerScaleFactor;
+          ctx.textAlign = "center";
+          
+          const moneyText = `$${player.money.toFixed(2)}`;
+          const offsetY = 35 * playerScaleFactor;
+          
+          ctx.strokeText(moneyText, playerHead.x, playerHead.y - offsetY);
+          ctx.fillText(moneyText, playerHead.x, playerHead.y - offsetY);
         }
       });
       
