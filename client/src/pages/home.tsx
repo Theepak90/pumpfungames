@@ -140,7 +140,8 @@ export default function Home() {
   useEffect(() => {
     // Create background music audio element
     const audio = new Audio();
-    audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt6H1MBjSFutu9YAU3';
+    audio.src = '/audio/background-music.mp3';
+    audio.preload = 'auto';
     audio.loop = true;
     audio.volume = 0.3;
     setBackgroundMusic(audio);
