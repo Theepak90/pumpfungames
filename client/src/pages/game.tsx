@@ -426,22 +426,22 @@ export default function GamePage() {
     return saved ? parseFloat(saved) : 0.25;
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const [currentZoom, setCurrentZoom] = useState(2); // Current zoom with smooth transitions
   
-  // Dynamic zoom level with more aggressive zoom-out
+  // Dynamic zoom level starting at 2× and zooming out as snake grows
   const calculateZoom = (mass: number) => {
-    const maxZoomOut = 0.2; // Zoom out further (was 0.3)
-    const minZoomOutTriggerMass = 150; // Start zooming earlier (was 200)
-    const maxZoomTriggerMass = 800; // Reach max zoom sooner (was 1000)
+    const baseZoom = 2; // Start at 2× zoomed-in
+    const maxZoomOut = 0.3; // Minimum zoom value (don't go too far out)
+    const minZoomOutTriggerMass = 80; // Start zooming out early
+    const maxZoomTriggerMass = 400; // Reach max zoom at this mass
     
     if (mass <= minZoomOutTriggerMass) {
-      return 1; // No zoom-out for small snakes
+      return baseZoom; // Stay at 2× zoom for small snakes
     }
     
     const factor = Math.min((mass - minZoomOutTriggerMass) / (maxZoomTriggerMass - minZoomOutTriggerMass), 1);
-    return 1 - factor * (1 - maxZoomOut); // Smoothly goes from 1 → 0.2
+    return baseZoom - factor * (baseZoom - maxZoomOut); // Smoothly goes from 2 → 0.3
   };
-  
-  const zoom = calculateZoom(snake.totalMass);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -973,6 +973,13 @@ export default function GamePage() {
         return newFoods;
       });
 
+      // Update smooth zoom transition
+      const targetZoom = calculateZoom(snake.totalMass);
+      setCurrentZoom(prevZoom => {
+        // Smooth zoom transition
+        return prevZoom + (targetZoom - prevZoom) * 0.1;
+      });
+
       // Clear canvas with background image pattern or dark fallback
       if (backgroundImage) {
         // Create repeating pattern from background image
@@ -990,9 +997,9 @@ export default function GamePage() {
       // Save context for camera transform
       ctx.save();
 
-      // Apply zoom and camera following snake head
+      // Apply smooth zoom and camera following snake head
       ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
-      ctx.scale(zoom, zoom);
+      ctx.scale(currentZoom, currentZoom);
       ctx.translate(-snake.head.x, -snake.head.y);
 
       // Draw background image across the full map area if loaded
