@@ -851,28 +851,22 @@ export default function GamePage() {
     // Background movement timer - only moves snake when tab is inactive
     backgroundMovementInterval = window.setInterval(() => {
       if (document.hidden && !gameOver) {
-        console.log('Background movement active - snake moving in hidden tab');
+        // Simple background movement - just update head position
+        const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
+        const delta = 1 / 60; // Fixed deltaTime for consistent movement
         
-        // Only update snake position, nothing else
-        const dx = Math.cos(snake.currentAngle) * snake.speed;
-        const dy = Math.sin(snake.currentAngle) * snake.speed;
+        snake.head.x += Math.cos(snake.currentAngle) * speed * delta;
+        snake.head.y += Math.sin(snake.currentAngle) * speed * delta;
         
-        snake.head.x += dx;
-        snake.head.y += dy;
-        
-        // Add to trail for smooth movement
+        // Add to trail for continuity when tab becomes active again
         snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
         
-        // Keep trail length reasonable
-        const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
-        if (snake.segmentTrail.length > maxTrailLength) {
-          snake.segmentTrail.length = maxTrailLength;
+        // Keep trail manageable
+        if (snake.segmentTrail.length > 1000) {
+          snake.segmentTrail.length = 500;
         }
-        
-        // Update visible segments so snake appears properly when tab becomes active
-        snake.updateVisibleSegments();
       }
-    }, 30); // 30ms interval for smooth background movement
+    }, 1000 / 60); // 60fps background movement
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
