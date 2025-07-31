@@ -465,6 +465,7 @@ export default function GamePage() {
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [gameIsVisible, setGameIsVisible] = useState(!document.hidden);
+  const [hiddenStartTime, setHiddenStartTime] = useState<number | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -840,57 +841,51 @@ export default function GamePage() {
     let animationId: number;
     let backgroundMovementTimer: number;
     
-    // Background movement timer - runs every 50ms (20fps)
+    // Simple background movement - just run the game loop slower when hidden
     backgroundMovementTimer = window.setInterval(() => {
       if (document.hidden && !gameOver) {
-        console.log('Moving snake in background');
+        // Simulate one game frame at 20fps when tab is hidden
+        const deltaTime = 0.05; // 50ms
+        const currentTime = performance.now();
         
-        // Move snake when tab is inactive - use correct speed calculation
+        // Move snake forward  
         const currentSpeed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
-        const deltaTime = 0.05; // 50ms = 0.05 seconds
+        const newX = snake.head.x + Math.cos(snake.currentAngle) * currentSpeed * deltaTime;
+        const newY = snake.head.y + Math.sin(snake.currentAngle) * currentSpeed * deltaTime;
         
-        snake.head.x += Math.cos(snake.currentAngle) * currentSpeed * deltaTime;
-        snake.head.y += Math.sin(snake.currentAngle) * currentSpeed * deltaTime;
+        // Update snake position
+        snake.head.x = newX;
+        snake.head.y = newY;
+        snake.segmentTrail.unshift({ x: newX, y: newY });
         
-        // Add to trail for smooth continuity
-        snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
-        
-        // Keep trail manageable
-        const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
-        if (snake.segmentTrail.length > maxTrailLength) {
-          snake.segmentTrail.length = maxTrailLength;
+        // Keep trail reasonable size
+        if (snake.segmentTrail.length > 200) {
+          snake.segmentTrail.length = 100;
         }
         
-        // Update visible segments so they're ready when tab becomes active
         snake.updateVisibleSegments();
         
-        // Move bot snakes too
+        // Move bots too
         setBotSnakes(prevBots => {
           return prevBots.map(bot => {
-            // Simple bot AI - occasionally change direction
-            if (Math.random() < 0.02) { // 2% chance per frame to change direction
+            // Simple bot movement
+            if (Math.random() < 0.02) {
               bot.targetAngle = bot.currentAngle + (Math.random() - 0.5) * 0.5;
             }
             
-            // Smooth angle interpolation
             const angleDiff = ((bot.targetAngle - bot.currentAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
             bot.currentAngle += angleDiff * 0.1;
             
-            // Move bot forward in its current direction - use correct speed
-            const botSpeed = bot.speed || bot.baseSpeed || 120; // Fallback speed
-            const dx = Math.cos(bot.currentAngle) * botSpeed * 0.05;
-            const dy = Math.sin(bot.currentAngle) * botSpeed * 0.05;
-            bot.head.x += dx;
-            bot.head.y += dy;
+            const botSpeed = bot.speed || 120;
+            bot.head.x += Math.cos(bot.currentAngle) * botSpeed * deltaTime;
+            bot.head.y += Math.sin(bot.currentAngle) * botSpeed * deltaTime;
             
-            // Update bot trail
             bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
-            const maxBotTrailLength = Math.floor((bot.totalMass / 1) * 10 * 2);
-            if (bot.segmentTrail.length > maxBotTrailLength) {
-              bot.segmentTrail.length = maxBotTrailLength;
+            if (bot.segmentTrail.length > 100) {
+              bot.segmentTrail.length = 50;
             }
             
-            // Update bot visible segments
+            // Update bot segments
             bot.visibleSegments = [];
             let distanceSoFar = 0;
             let segmentIndex = 0;
@@ -922,13 +917,29 @@ export default function GamePage() {
             return bot;
           });
         });
+        
+        console.log('Background frame executed - snake at:', snake.head.x, snake.head.y);
       }
-    }, 50); // Every 50ms
+    }, 50);
     
-    // Add visibility change listener to track tab switching
+    // Track tab visibility changes
     const handleVisibilityChange = () => {
-      console.log('Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
-      // No need to manually update camera - it will update in the next frame
+      if (document.hidden) {
+        setHiddenStartTime(performance.now());
+        console.log('Tab HIDDEN - starting background movement');
+      } else {
+        if (hiddenStartTime !== null) {
+          const timeHidden = performance.now() - hiddenStartTime;
+          console.log(`Tab VISIBLE - was hidden for ${timeHidden}ms`);
+          setHiddenStartTime(null);
+          
+          // Force a render immediately to show new positions
+          if (!gameOver) {
+            // Trigger re-render by updating a dummy state
+            setGameIsVisible(true);
+          }
+        }
+      }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1495,7 +1506,7 @@ export default function GamePage() {
       clearInterval(backgroundMovementTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenStartTime, gameIsVisible]);
 
   const resetGame = () => {
     setGameOver(false);
