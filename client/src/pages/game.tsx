@@ -1303,6 +1303,7 @@ export default function GamePage() {
     snake.growthRemaining = 0;
     snake.distanceBuffer = 0;
     snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
+    snake.money = 1.00; // Reset money to starting amount
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;

@@ -8,6 +8,21 @@ This is a multiplayer snake game application built with a modern web stack. The 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Money Balance System (Latest)
+- Added money balance display above snake head starting at $1.00
+- Money only increases when killing other snakes (minimum $0.50 or 5% of bot's mass)
+- Money resets to $1.00 when game restarts
+- Display scales with snake size and has outline for visibility
+
+### Enhanced Death Food System
+- Death food drops along snake body segments (not just at death location)
+- Regular death food is half size (7.5) and matches snake's color
+- Added 5 special medical cross items when snake dies worth 10 mass each
+- Medical cross image displays with green glow effect
+- Food distribution spreads across entire snake path for realistic death mechanics
+
 ## System Architecture
 
 ### Frontend Architecture
