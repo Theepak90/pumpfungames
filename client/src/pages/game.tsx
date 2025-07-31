@@ -843,6 +843,7 @@ export default function GamePage() {
     // Simple background movement timer - runs every 50ms
     backgroundMovementTimer = window.setInterval(() => {
       if (document.hidden && !gameOver) {
+        console.log('Background movement: moving snake', snake.head.x, snake.head.y);
         // Only update snake position when tab is inactive
         snake.head.x += Math.cos(snake.currentAngle) * snake.speed * 0.05;
         snake.head.y += Math.sin(snake.currentAngle) * snake.speed * 0.05;
@@ -856,6 +857,13 @@ export default function GamePage() {
         }
       }
     }, 50); // Every 50ms
+    
+    // Add visibility change listener to track tab switching
+    const handleVisibilityChange = () => {
+      console.log('Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -1417,6 +1425,7 @@ export default function GamePage() {
     return () => {
       cancelAnimationFrame(animationId);
       clearInterval(backgroundMovementTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
