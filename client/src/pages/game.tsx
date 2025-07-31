@@ -840,12 +840,17 @@ export default function GamePage() {
     let animationId: number;
     let backgroundMovementTimer: number;
     
-    // Background movement timer - runs every 50ms
+    // Background movement timer - runs every 50ms (20fps)
     backgroundMovementTimer = window.setInterval(() => {
       if (document.hidden && !gameOver) {
-        // Move snake when tab is inactive
-        snake.head.x += Math.cos(snake.currentAngle) * snake.speed * 0.05;
-        snake.head.y += Math.sin(snake.currentAngle) * snake.speed * 0.05;
+        console.log('Moving snake in background');
+        
+        // Move snake when tab is inactive - use correct speed calculation
+        const currentSpeed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
+        const deltaTime = 0.05; // 50ms = 0.05 seconds
+        
+        snake.head.x += Math.cos(snake.currentAngle) * currentSpeed * deltaTime;
+        snake.head.y += Math.sin(snake.currentAngle) * currentSpeed * deltaTime;
         
         // Add to trail for smooth continuity
         snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
@@ -871,9 +876,10 @@ export default function GamePage() {
             const angleDiff = ((bot.targetAngle - bot.currentAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
             bot.currentAngle += angleDiff * 0.1;
             
-            // Move bot forward in its current direction
-            const dx = Math.cos(bot.currentAngle) * bot.speed * 0.05;
-            const dy = Math.sin(bot.currentAngle) * bot.speed * 0.05;
+            // Move bot forward in its current direction - use correct speed
+            const botSpeed = bot.speed || bot.baseSpeed || 120; // Fallback speed
+            const dx = Math.cos(bot.currentAngle) * botSpeed * 0.05;
+            const dy = Math.sin(bot.currentAngle) * botSpeed * 0.05;
             bot.head.x += dx;
             bot.head.y += dy;
             
@@ -922,16 +928,7 @@ export default function GamePage() {
     // Add visibility change listener to track tab switching
     const handleVisibilityChange = () => {
       console.log('Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
-      if (!document.hidden) {
-        // When tab becomes visible again, force a render to show updated positions
-        if (!gameOver) {
-          // Update camera position to follow snake
-          setCameraPosition({
-            x: snake.head.x - canvasSize.width / 2,
-            y: snake.head.y - canvasSize.height / 2
-          });
-        }
-      }
+      // No need to manually update camera - it will update in the next frame
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
