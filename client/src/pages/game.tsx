@@ -170,6 +170,9 @@ class SmoothSnake {
   distanceBuffer: number;
   currentSegmentCount: number; // Smoothly animated segment count
   
+  // Traveling food system
+  travelingFood: Array<{ progress: number; speed: number; mass: number; color: string }>;
+  
   // Constants
   START_MASS: number;
   MASS_PER_SEGMENT: number;
@@ -202,6 +205,9 @@ class SmoothSnake {
     this.growthRemaining = 0;
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    
+    // Initialize traveling food system
+    this.travelingFood = [];
     
     this.updateVisibleSegments();
   }
@@ -344,6 +350,9 @@ class SmoothSnake {
     // Sample segments at fixed spacing from the trail
     this.updateVisibleSegments();
     
+    // Update traveling food packets
+    this.updateTravelingFood();
+    
     // Apply gradual growth
     this.applyGrowth();
   }
@@ -393,8 +402,52 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    this.growthRemaining += mass;
+    
+    // Spawn traveling food that follows snake body
+    this.travelingFood.push({
+      progress: 0, // Start at head (segment 0)
+      speed: 0.08, // Travel speed along segments
+      mass: mass,
+      color: food.color
+    });
+    
     return mass; // Return score increase
+  }
+  
+  updateTravelingFood() {
+    // Update all traveling food packets
+    this.travelingFood = this.travelingFood.filter(packet => {
+      packet.progress += packet.speed;
+      
+      // If reached the tail, convert to growth
+      if (packet.progress >= this.visibleSegments.length - 1) {
+        this.growthRemaining += packet.mass;
+        return false; // Remove this packet
+      }
+      
+      return true; // Keep this packet
+    });
+  }
+  
+  getTravelingFoodPositions() {
+    return this.travelingFood.map(packet => {
+      if (this.visibleSegments.length < 2) {
+        return { x: this.head.x, y: this.head.y, color: packet.color, mass: packet.mass };
+      }
+      
+      // Calculate position between segments
+      const index = Math.floor(packet.progress);
+      const t = packet.progress % 1;
+      
+      // Ensure we don't go out of bounds
+      const segA = this.visibleSegments[Math.min(index, this.visibleSegments.length - 1)];
+      const segB = this.visibleSegments[Math.min(index + 1, this.visibleSegments.length - 1)];
+      
+      const x = segA.x + (segB.x - segA.x) * t;
+      const y = segA.y + (segB.y - segA.y) * t;
+      
+      return { x, y, color: packet.color, mass: packet.mass };
+    });
   }
   
   setBoost(boosting: boolean) {
@@ -1065,6 +1118,35 @@ export default function GamePage() {
       }
       
       // Reset global alpha
+      ctx.globalAlpha = 1.0;
+
+      // Draw traveling food effects along snake body
+      const travelingFoodPositions = snake.getTravelingFoodPositions();
+      travelingFoodPositions.forEach(foodPacket => {
+        // Create pulsing glow effect
+        const time = Date.now() * 0.01;
+        const pulseSize = 3 + Math.sin(time) * 1.5;
+        
+        // Outer glow
+        ctx.shadowColor = foodPacket.color;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = foodPacket.color;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(foodPacket.x, foodPacket.y, pulseSize + 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner bright core
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(foodPacket.x, foodPacket.y, pulseSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.shadowBlur = 0;
+      });
+      
       ctx.globalAlpha = 1.0;
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
