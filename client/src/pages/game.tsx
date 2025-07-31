@@ -7,8 +7,8 @@ import { X, Volume2 } from 'lucide-react';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
-const FOOD_COUNT = 150;
-const BOT_COUNT = 5;
+const FOOD_COUNT = 300; // More small foods for better collection experience
+const BOT_COUNT = 3; // Fewer bots, more focus on food collection
 
 interface Position {
   x: number;
@@ -316,42 +316,9 @@ class SmoothSnake {
   }
   
   applyBoost(onDropFood?: (food: Food) => void) {
+    // Simple boost - just speed increase, no food dropping or mass loss
     if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST) {
       this.speed = this.baseSpeed * this.boostMultiplier;
-      this.boostCooldown++;
-      
-      // Drop food more frequently for continuous trail effect
-      if (this.boostCooldown % 10 === 0 && onDropFood) {
-        // Find the second-to-last segment position for food drop
-        let dropX = this.head.x;
-        let dropY = this.head.y;
-        
-        if (this.visibleSegments.length >= 2) {
-          // Use second-to-last segment position
-          const secondToLast = this.visibleSegments[this.visibleSegments.length - 2];
-          dropX = secondToLast.x;
-          dropY = secondToLast.y;
-        } else {
-          // Fallback to behind the head if not enough segments
-          dropX = this.head.x - Math.cos(this.currentAngle) * 25;
-          dropY = this.head.y - Math.sin(this.currentAngle) * 25;
-        }
-        
-        // Add slight randomness to avoid perfect stacking
-        dropX += (Math.random() - 0.5) * 8;
-        dropY += (Math.random() - 0.5) * 8;
-        
-        onDropFood({
-          x: dropX,
-          y: dropY,
-          size: 3.5,
-          color: '#f55400',
-          mass: 0.25 // Each piece worth 0.25, dropped every 10 frames instead of 20
-        });
-        
-        this.totalMass -= 0.25; // Reduce mass loss per drop to maintain same rate
-        this.updateVisibleSegments();
-      }
     } else {
       this.speed = this.baseSpeed;
       this.isBoosting = false;
@@ -546,55 +513,30 @@ export default function GamePage() {
 
 
 
-  // Initialize food with mass system
+  // Initialize simple small foods
   useEffect(() => {
     const initialFoods: Food[] = [];
+    
+    // Create small food scattered around the map
     for (let i = 0; i < FOOD_COUNT; i++) {
-      // Generate food within circular boundary
+      // Generate food within the circular map boundary
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * (MAP_RADIUS - 100); // Keep food away from edge
-      const x = MAP_CENTER_X + Math.cos(angle) * radius;
-      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+      const distance = Math.random() * (MAP_RADIUS - 100); // Keep food away from edge
       
-      const foodType = Math.random();
-      let food: Food;
+      const x = MAP_CENTER_X + Math.cos(angle) * distance;
+      const y = MAP_CENTER_Y + Math.sin(angle) * distance;
       
-      if (foodType < 0.05) { // 5% orange test food (40 mass)
-        food = {
-          x: x,
-          y: y,
-          size: 15,
-          mass: 40,
-          color: '#ff8800'
-        };
-      } else if (foodType < 0.15) { // 10% big food
-        food = {
-          x: x,
-          y: y,
-          size: 10,
-          mass: 2,
-          color: '#ff4444'
-        };
-      } else if (foodType < 0.45) { // 30% medium food
-        food = {
-          x: x,
-          y: y,
-          size: 6,
-          mass: 1,
-          color: '#44ff44'
-        };
-      } else { // 55% small food
-        food = {
-          x: x,
-          y: y,
-          size: 4,
-          mass: 0.5,
-          color: '#4444ff'
-        };
-      }
+      const colors = ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57", "#ff9ff3", "#54a0ff"];
       
-      initialFoods.push(food);
+      initialFoods.push({
+        x,
+        y,
+        size: 3, // Small consistent size
+        color: colors[Math.floor(Math.random() * colors.length)],
+        mass: 1 // Simple consistent mass of 1
+      });
     }
+    
     setFoods(initialFoods);
     
     // Initialize bot snakes
@@ -749,23 +691,20 @@ export default function GamePage() {
                 // Remove eaten food and add new one
                 newFoods.splice(i, 1);
                 
-                const foodType = Math.random();
-                let newFood: Food;
-                
+                // Generate new small food
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.random() * (MAP_RADIUS - 100);
                 const newX = MAP_CENTER_X + Math.cos(angle) * radius;
                 const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
                 
-                if (foodType < 0.05) {
-                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800' };
-                } else if (foodType < 0.15) {
-                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444' };
-                } else if (foodType < 0.45) {
-                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44' };
-                } else {
-                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff' };
-                }
+                const colors = ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57", "#ff9ff3", "#54a0ff"];
+                const newFood: Food = {
+                  x: newX,
+                  y: newY,
+                  size: 3,
+                  mass: 1,
+                  color: colors[Math.floor(Math.random() * colors.length)]
+                };
                 
                 newFoods.push(newFood);
                 break;
@@ -816,48 +755,20 @@ export default function GamePage() {
             // Remove eaten food and add new one with mass system
             newFoods.splice(i, 1);
             
-            const foodType = Math.random();
-            let newFood: Food;
-            
             // Generate new food within circular boundary
             const angle = Math.random() * Math.PI * 2;
             const radius = Math.random() * (MAP_RADIUS - 100);
             const newX = MAP_CENTER_X + Math.cos(angle) * radius;
             const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
             
-            if (foodType < 0.05) { // 5% orange test food (40 mass)
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 15,
-                mass: 40,
-                color: '#ff8800'
-              };
-            } else if (foodType < 0.15) { // 10% big food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 10,
-                mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
-                color: '#ff4444'
-              };
-            } else if (foodType < 0.45) { // 30% medium food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 6,
-                mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
-                color: '#44ff44'
-              };
-            } else { // 55% small food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 4,
-                mass: 0.2, // Reduced from 0.5 to 0.2 (2.5x less)
-                color: '#4444ff'
-              };
-            }
+            const colors = ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57", "#ff9ff3", "#54a0ff"];
+            const newFood: Food = {
+              x: newX,
+              y: newY,
+              size: 3,
+              mass: 1,
+              color: colors[Math.floor(Math.random() * colors.length)]
+            };
             
             newFoods.push(newFood);
             break; // Only eat one food per frame
