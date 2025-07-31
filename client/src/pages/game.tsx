@@ -296,14 +296,16 @@ class SmoothSnake {
   }
   
   getSegmentRadius() {
-    // Dynamic scaling based on mass (baseline at mass=10, caps at 2x width)
-    const scaleFactor = 1 + Math.min((this.totalMass - 10) / 200, 1);
+    // Dynamic scaling based on mass (baseline at mass=10, caps at 5x width)
+    const maxScale = 5;
+    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
     return this.SEGMENT_RADIUS * scaleFactor;
   }
 
   // Get scale factor for all visual elements
   getScaleFactor() {
-    return 1 + Math.min((this.totalMass - 10) / 200, 1);
+    const maxScale = 5;
+    return Math.min(1 + (this.totalMass - 10) / 100, maxScale);
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -438,8 +440,21 @@ export default function GamePage() {
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
-  // Dynamic zoom level based on snake mass (zooms out as snake grows)
-  const zoom = Math.max(0.3, 1 - (snake.totalMass - 10) / 500);
+  // Dynamic zoom level with slower, smoother zoom-out
+  const calculateZoom = (mass: number) => {
+    const maxZoomOut = 0.3;
+    const minZoomOutTriggerMass = 200;
+    const maxZoomTriggerMass = 1000;
+    
+    if (mass <= minZoomOutTriggerMass) {
+      return 1; // No zoom-out for small snakes
+    }
+    
+    const factor = Math.min((mass - minZoomOutTriggerMass) / (maxZoomTriggerMass - minZoomOutTriggerMass), 1);
+    return 1 - factor * (1 - maxZoomOut); // Smoothly goes from 1 → 0.3
+  };
+  
+  const zoom = calculateZoom(snake.totalMass);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -727,9 +742,10 @@ export default function GamePage() {
 
       // Check collision between player snake and bot snakes
       for (const bot of botSnakes) {
-        // Calculate bot's current radius based on mass
+        // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
-        const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
         const botRadius = botBaseRadius * botScaleFactor;
         
         for (const segment of bot.visibleSegments) {
@@ -751,9 +767,10 @@ export default function GamePage() {
               const food = newFoods[i];
               const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
               
-              // Calculate bot's current radius for food collision
+              // Calculate bot's current radius for food collision (caps at 5x width)
               const botBaseRadius = 8;
-              const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+              const maxScale = 5;
+              const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
               const botRadius = botBaseRadius * botScaleFactor;
               
               if (dist < botRadius + food.size) {
@@ -975,9 +992,10 @@ export default function GamePage() {
 
       // Draw bot snakes first (behind player)
       botSnakes.forEach(bot => {
-        // Bot dynamic scaling based on mass
+        // Bot dynamic scaling based on mass (caps at 5x width)
         const botBaseRadius = 8;
-        const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
         const botRadius = botBaseRadius * botScaleFactor;
         const botOutlineThickness = 2 * botScaleFactor;
         
