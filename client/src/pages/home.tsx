@@ -115,13 +115,52 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-
+  // State variables
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
+  const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
+
+  // Handle sound toggle
+  const toggleSound = () => {
+    const newSoundState = !soundEnabled;
+    setSoundEnabled(newSoundState);
+    if (backgroundMusic) {
+      if (newSoundState) {
+        backgroundMusic.play().catch(console.error);
+      } else {
+        backgroundMusic.pause();
+      }
+    }
+  };
+
+  // Background music setup
+  useEffect(() => {
+    // Create background music audio element
+    const audio = new Audio();
+    audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt6H1MBjSFutu9YAU3';
+    audio.loop = true;
+    audio.volume = 0.3;
+    setBackgroundMusic(audio);
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, []);
+
+  // Auto-play background music when sound is enabled
+  useEffect(() => {
+    if (backgroundMusic && soundEnabled) {
+      backgroundMusic.play().catch(console.error);
+    } else if (backgroundMusic && !soundEnabled) {
+      backgroundMusic.pause();
+    }
+  }, [backgroundMusic, soundEnabled]);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -192,11 +231,20 @@ export default function Home() {
           <span className="text-white text-lg">Welcome, </span>
           <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
         </div>
-        <button 
-          className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={toggleSound}
+            className="bg-gray-700 text-white px-3 py-1 text-sm hover:bg-gray-600 border-2 border-gray-600 font-retro flex items-center gap-2"
+          >
+            <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
+            {soundEnabled ? 'ON' : 'OFF'}
+          </button>
+          <button 
+            className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Main Content Container */}
