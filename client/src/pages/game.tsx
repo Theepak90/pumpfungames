@@ -714,14 +714,32 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw each segment from tail to head with natural z-ordering
+      // Two-layer drawing for proper outline overlap behavior
+      const highlightCount = 6; // Number of head segments that appear "on top"
+      
+      // Layer 1: Draw full snake body only (no outlines)
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
         ctx.globalAlpha = segment.opacity;
         
-        // Draw white outline behind segment
+        // Draw only segment body
+        ctx.fillStyle = "#d55400";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Layer 2: Draw head + recent segments with outline (appears on top)
+      const startIndex = Math.max(0, snake.visibleSegments.length - highlightCount);
+      for (let i = snake.visibleSegments.length - 1; i >= startIndex; i--) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
+        
+        ctx.globalAlpha = segment.opacity;
+        
+        // Draw white outline
         ctx.fillStyle = "white";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
