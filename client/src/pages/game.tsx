@@ -752,6 +752,42 @@ export default function GamePage() {
         ctx.fill();
       }
       
+      // Draw eyes on the head (always last)
+      if (snake.visibleSegments.length > 0) {
+        const head = snake.visibleSegments[0];
+        const segmentRadius = snake.getSegmentRadius();
+        
+        ctx.globalAlpha = head.opacity;
+        
+        // Calculate eye positions based on movement direction
+        const eyeOffset = segmentRadius * 0.4;
+        const eyeRadius = segmentRadius * 0.15;
+        
+        // Get movement direction from current angle
+        const eyeX1 = head.x + Math.cos(snake.currentAngle - 0.5) * eyeOffset;
+        const eyeY1 = head.y + Math.sin(snake.currentAngle - 0.5) * eyeOffset;
+        const eyeX2 = head.x + Math.cos(snake.currentAngle + 0.5) * eyeOffset;
+        const eyeY2 = head.y + Math.sin(snake.currentAngle + 0.5) * eyeOffset;
+        
+        // Draw white eye background
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(eyeX1, eyeY1, eyeRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeX2, eyeY2, eyeRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw black pupils
+        ctx.fillStyle = "black";
+        ctx.beginPath();
+        ctx.arc(eyeX1, eyeY1, eyeRadius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eyeX2, eyeY2, eyeRadius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
       // Reset global alpha
       ctx.globalAlpha = 1.0;
 
