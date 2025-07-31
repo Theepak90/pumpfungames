@@ -248,14 +248,16 @@ export default function GamePage() {
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     newSnake.segmentSpacing = 24; // Connected segments like a worm
-    // Recreate segments with proper spacing
+    // Recreate segments with proper spacing - start with 60 segments for 300 mass
     newSnake.segments = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 60; i++) {
       newSnake.segments.push({ 
         x: MAP_CENTER_X - i * newSnake.segmentSpacing, 
         y: MAP_CENTER_Y 
       });
     }
+    newSnake.growthRemaining = 300; // Start with 300 mass
+    newSnake.minimumMass = 300; // Cannot go below starting mass
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
@@ -561,7 +563,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 10,
-                mass: 2,
+                mass: 10, // 2 * 5 = 10
                 color: '#ff4444'
               };
             } else if (foodType < 0.4) { // 30% medium food
@@ -569,7 +571,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 6,
-                mass: 1,
+                mass: 5, // 1 * 5 = 5
                 color: '#44ff44'
               };
             } else { // 60% small food
@@ -577,7 +579,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 4,
-                mass: 0.5,
+                mass: 2.5, // 0.5 * 5 = 2.5
                 color: '#4444ff'
               };
             }
@@ -784,10 +786,10 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (5 segments, 25 mass) with new spacing
+    // Reset snake to initial state (60 segments, 300 mass) with new spacing
     snake.segments = [];
-    const START_MASS = 25;
-    const START_SEGMENTS = 5;
+    const START_MASS = 300;
+    const START_SEGMENTS = 60;
     snake.segmentSpacing = 24; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
