@@ -275,9 +275,10 @@ class SmoothSnake {
   applyGrowth() {
     // Gradually increase mass from growthRemaining
     // Don't add segments manually - let updateVisibleSegments reveal them from trail
-    if (this.growthRemaining > 0.05) {
-      this.totalMass += 0.05;
-      this.growthRemaining -= 0.05;
+    if (this.growthRemaining > 0.01) {
+      const growthRate = Math.min(0.02, this.growthRemaining); // Slower growth rate and consume all remaining
+      this.totalMass += growthRate;
+      this.growthRemaining -= growthRate;
       // As totalMass increases, more trail segments become visible (smooth tail growth)
       this.updateVisibleSegments();
     }
@@ -916,20 +917,24 @@ export default function GamePage() {
         const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
         const playerRadius = playerBaseRadius * playerScaleFactor;
         
-        const dist = Math.sqrt((snake.head.x - player.x) ** 2 + (snake.head.y - player.y) ** 2);
-        if (dist < snake.getSegmentRadius() + playerRadius) {
-          // Award money for kill
-          const killReward = Math.max(1.00, player.totalMass * 0.1);
-          snake.money += killReward;
-          
-          // The server will handle dropping food and removing the killed player
-          if (ws) {
-            ws.send(JSON.stringify({
-              type: 'snake_player_death',
-              payload: {
-                killerId: playerId
-              }
-            }));
+        // Check collision with player's head (first segment)
+        if (player.segments.length > 0) {
+          const playerHead = player.segments[0];
+          const dist = Math.sqrt((snake.head.x - playerHead.x) ** 2 + (snake.head.y - playerHead.y) ** 2);
+          if (dist < snake.getSegmentRadius() + playerRadius) {
+            // Award money for kill
+            const killReward = Math.max(1.00, player.totalMass * 0.1);
+            snake.money += killReward;
+            
+            // The server will handle dropping food and removing the killed player
+            if (ws) {
+              ws.send(JSON.stringify({
+                type: 'snake_player_death',
+                payload: {
+                  killerId: playerId
+                }
+              }));
+            }
           }
         }
       }
@@ -1113,7 +1118,7 @@ export default function GamePage() {
           const eyeSize = playerRadius * 0.15;
           
           // Calculate eye positions based on player angle (if available)
-          const angle = player.angle || 0;
+          const angle = (player as any).angle || 0;
           const leftEyeX = playerHead.x + Math.cos(angle - 0.5) * eyeDistance;
           const leftEyeY = playerHead.y + Math.sin(angle - 0.5) * eyeDistance;
           const rightEyeX = playerHead.x + Math.cos(angle + 0.5) * eyeDistance;
