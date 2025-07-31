@@ -39,6 +39,7 @@ class SmoothSnake {
   growthRemaining: number;
   distanceBuffer: number;
   currentSegmentCount: number; // Smoothly animated segment count
+  fadingSegments: Array<{ x: number; y: number; opacity: number }>; // Segments fading out from tail
   
   // Constants
   START_MASS: number;
@@ -72,6 +73,7 @@ class SmoothSnake {
     this.growthRemaining = 0;
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    this.fadingSegments = []; // Initialize fading segments array
     
     this.updateVisibleSegments();
   }
@@ -79,6 +81,7 @@ class SmoothSnake {
   updateVisibleSegments() {
     // Calculate target segment count based on mass
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    const previousRenderCount = Math.round(this.currentSegmentCount);
     
     // Smoothly animate currentSegmentCount toward target
     const transitionSpeed = 0.2; // Slightly faster for smoother transitions
@@ -91,6 +94,14 @@ class SmoothSnake {
     
     // Round once per frame to prevent flickering
     const renderCount = Math.round(this.currentSegmentCount);
+    
+    // If segment count decreased, add last segment to fading array
+    if (renderCount < previousRenderCount && this.visibleSegments.length > renderCount) {
+      const lastSegment = this.visibleSegments[this.visibleSegments.length - 1];
+      if (lastSegment) {
+        this.fadingSegments.push({ ...lastSegment, opacity: 1.0 });
+      }
+    }
     
     this.visibleSegments = [];
     let distanceSoFar = 0;
@@ -203,6 +214,14 @@ class SmoothSnake {
     } else {
       this.speed = this.baseSpeed;
       this.isBoosting = false;
+    }
+    
+    // Update fading segments
+    for (let i = this.fadingSegments.length - 1; i >= 0; i--) {
+      this.fadingSegments[i].opacity -= 0.05; // Adjust fade speed
+      if (this.fadingSegments[i].opacity <= 0) {
+        this.fadingSegments.splice(i, 1); // Remove when fully transparent
+      }
     }
   }
   
@@ -713,6 +732,25 @@ export default function GamePage() {
         ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
         ctx.fill();
       }
+      
+      // Fourth pass: Draw fading segments
+      for (const seg of snake.fadingSegments) {
+        ctx.globalAlpha = seg.opacity;
+        
+        // Draw white outline behind
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(seg.x, seg.y, snake.getSegmentRadius() + 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw orange segment on top
+        ctx.fillStyle = "#d55400";
+        ctx.beginPath();
+        ctx.arc(seg.x, seg.y, snake.getSegmentRadius(), 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1.0; // Reset alpha
+      }
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
       if (snake.visibleSegments.length > 0) {
@@ -789,6 +827,7 @@ export default function GamePage() {
     snake.growthRemaining = 0;
     snake.distanceBuffer = 0;
     snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
+    snake.fadingSegments = []; // Clear fading segments
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;
