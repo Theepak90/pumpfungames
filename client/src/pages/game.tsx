@@ -756,10 +756,11 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (5 segments, 25 mass)
+    // Reset snake to initial state (5 segments, 25 mass) with new spacing
     snake.segments = [];
     const START_MASS = 25;
     const START_SEGMENTS = 5;
+    snake.segmentSpacing = 45; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
     }
