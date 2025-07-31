@@ -212,7 +212,7 @@ export default function Home() {
           </div>
 
           {/* Main Game Area - Three Column Layout */}
-          <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
             
             {/* Left Panel - Leaderboard */}
             <div className="bg-gray-800 p-3 border-2 border-gray-600 flex flex-col self-start">
@@ -239,19 +239,19 @@ export default function Home() {
             </div>
 
             {/* Center Panel - Game Controls */}
-            <div className="bg-gray-800 p-4 border-2 border-gray-600">
+            <div className="bg-gray-800 p-3 border-2 border-gray-600">
               
               {/* Username with edit icon */}
-              <div className="flex items-center justify-between mb-4 bg-gray-700 px-4 py-3 border-2 border-gray-600">
-                <span className="text-gray-300 font-retro text-sm">〈Username〉</span>
-                <Edit3 className="w-4 h-4 text-gray-400 hover:text-white cursor-pointer" />
+              <div className="flex items-center justify-between mb-3 bg-gray-700 px-3 py-2 border-2 border-gray-600">
+                <span className="text-gray-300 font-retro text-xs">〈Username〉</span>
+                <Edit3 className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer" />
               </div>
               
               {/* Bet Amount Selection */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-3 gap-1 mb-3">
                 <button 
                   onClick={() => setSelectedBetAmount(1)}
-                  className={`py-3 px-4 text-base border-2 font-retro ${
+                  className={`py-2 px-3 text-sm border-2 font-retro ${
                     selectedBetAmount === 1 
                       ? 'text-white border-2' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
@@ -263,7 +263,7 @@ export default function Home() {
                 <div className="relative group">
                   <button 
                     disabled
-                    className="py-3 px-4 text-base border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
                   >
                     $5
                   </button>
@@ -284,7 +284,7 @@ export default function Home() {
                 <div className="relative group">
                   <button 
                     disabled
-                    className="py-3 px-4 text-base border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
+                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
                   >
                     $20
                   </button>
@@ -307,7 +307,7 @@ export default function Home() {
               {/* Play Button */}
               <button 
                 onClick={handleStartGame}
-                className="text-white font-bold text-xl py-4 w-full mb-4 font-retro transition-colors border-2"
+                className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
                 style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
                 onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
                 onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
