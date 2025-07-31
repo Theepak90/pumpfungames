@@ -677,8 +677,8 @@ export default function GamePage() {
         const headSeg = snake.visibleSegments[0];
         const headRadius = snake.getSegmentRadius();
         
-        // Solid brighter orange for head
-        ctx.fillStyle = "#ff6600";
+        // Same solid orange color as body
+        ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -690,7 +690,7 @@ export default function GamePage() {
         const movementAngle = snake.currentAngle;
         const eyeDistance = 5; // Smaller distance from center
         const eyeSize = 3; // Smaller eyes
-        const pupilSize = 2.5; // Bigger pupils
+        const pupilSize = 1.5; // Smaller pupils
         
         // Calculate cursor direction in world coordinates
         const worldMouseX = (canvasSize.width / 2) / zoom + snake.head.x;
@@ -712,8 +712,8 @@ export default function GamePage() {
         ctx.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Black pupils looking at cursor (bigger pupils)
-        const pupilOffset = 1; // How far pupils can move within the eye
+        // Black pupils at front of eyes, looking at cursor
+        const pupilOffset = 1.2; // Position pupils toward front of eye
         ctx.fillStyle = 'black';
         ctx.beginPath();
         ctx.arc(
