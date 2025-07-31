@@ -355,6 +355,23 @@ class SmoothSnake {
       
       // Drop food more frequently for continuous trail effect
       if (this.boostCooldown % 10 === 0 && onDropFood) {
+        // Visual effect: Make the last segment move into the second-to-last segment
+        if (this.visibleSegments.length >= 2) {
+          const lastSegment = this.visibleSegments[this.visibleSegments.length - 1];
+          const secondToLastSegment = this.visibleSegments[this.visibleSegments.length - 2];
+          
+          // Animate the last segment moving into the second-to-last position
+          const dx = secondToLastSegment.x - lastSegment.x;
+          const dy = secondToLastSegment.y - lastSegment.y;
+          const moveSpeed = 0.3; // How fast the segment moves (0-1)
+          
+          lastSegment.x += dx * moveSpeed;
+          lastSegment.y += dy * moveSpeed;
+          
+          // Make the last segment fade out as it moves
+          lastSegment.opacity = Math.max(0.2, lastSegment.opacity - 0.05);
+        }
+        
         // Find the second-to-last segment position for food drop
         let dropX = this.head.x;
         let dropY = this.head.y;
@@ -864,16 +881,18 @@ export default function GamePage() {
       snake.updateVisibleSegments();
     };
     
-    // Track when tab becomes hidden/visible for catch-up movement
+    // Track when tab becomes hidden/visible for catch-up movement (real Slither.io method)
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setHiddenAt(performance.now());
+        console.log('Tab visibility changed:', 'hidden');
       } else {
         if (hiddenAt !== null) {
           const now = performance.now();
           const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
           applySnakeCatchUp(delta);
           setHiddenAt(null);
+          console.log('Tab visibility changed:', 'visible');
         }
       }
       setGameIsVisible(!document.hidden);
