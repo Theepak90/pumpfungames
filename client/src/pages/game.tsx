@@ -505,34 +505,52 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newFoods]);
   };
 
-  // Function to drop money squares when snake dies (near head only)
-  const dropMoneySquares = (deathX: number, deathY: number, snakeMoney: number) => {
-    const moneyPerSquare = 0.2; // Each green square worth $0.20
-    const dropCount = Math.floor(snakeMoney / moneyPerSquare);
-    const newMoneyFoods: Food[] = [];
+  // Function to drop money crates when snake dies (20 crates worth $0.05 each)
+  const dropMoneyCrates = () => {
+    const moneyCrateCount = 20;
+    const crateValue = 0.05;
+    const segments = snake.visibleSegments;
+    const segmentCount = segments.length;
     
-    // Drop money squares near the snake's head position only
-    for (let i = 0; i < dropCount; i++) {
-      // Spawn in a small area around the head (20px radius)
-      const x = deathX + (Math.random() - 0.5) * 40;
-      const y = deathY + (Math.random() - 0.5) * 40;
+    // Limit spread zone to first 40 segments or fewer
+    const spreadLength = Math.min(segmentCount, 40);
+    const newCrates: Food[] = [];
+    
+    for (let i = 0; i < moneyCrateCount; i++) {
+      let x, y;
       
-      // Make sure money stays within map bounds
+      if (segments.length > 0) {
+        // Spread over the first 40 segments (or all if fewer)
+        const segIndex = Math.floor((i / moneyCrateCount) * spreadLength);
+        const segment = segments[segIndex];
+        
+        // Add randomness around segment position
+        x = segment.x + (Math.random() - 0.5) * 10;
+        y = segment.y + (Math.random() - 0.5) * 10;
+      } else {
+        // Fallback to snake head position with spread
+        const angle = (i / moneyCrateCount) * Math.PI * 2;
+        const radius = Math.random() * 40 + 20;
+        x = snake.head.x + Math.cos(angle) * radius;
+        y = snake.head.y + Math.sin(angle) * radius;
+      }
+      
+      // Make sure crates stay within map bounds
       const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
       const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
       
-      newMoneyFoods.push({
+      newCrates.push({
         x: clampedX,
         y: clampedY,
-        size: 20, // Double the previous size (was 16, now 20 for 20x20px)
-        color: '#00ff00', // Bright green
+        size: 20, // 20x20 crate size
+        mass: 0,
+        color: '#00ff00', // Green color for money crates
         type: 'money',
-        value: moneyPerSquare
+        value: crateValue
       });
     }
     
-    // Add money squares to the food array
-    setFoods(prevFoods => [...prevFoods, ...newMoneyFoods]);
+    setFoods(prevFoods => [...prevFoods, ...newCrates]);
   };
 
   // Background music setup
@@ -839,9 +857,10 @@ export default function GamePage() {
         (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
       );
       if (distanceFromCenter > MAP_RADIUS) {
-        // Drop food and money squares when snake dies
+        // Drop food and money crates when snake dies
         dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
-        dropMoneySquares(updatedHead.x, updatedHead.y, snake.money);
+        dropMoneyCrates();
+        snake.money = 0; // Reset snake's money on death
         setGameOver(true);
         return;
       }
@@ -857,9 +876,10 @@ export default function GamePage() {
         for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
-            // Drop food and money squares when snake dies from collision
+            // Drop food and money crates when snake dies from collision
             dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
-            dropMoneySquares(updatedHead.x, updatedHead.y, snake.money);
+            dropMoneyCrates();
+            snake.money = 0; // Reset snake's money on death
             setGameOver(true);
             return;
           }
@@ -880,9 +900,12 @@ export default function GamePage() {
             // Player killed a bot - drop food and money squares
             dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
             
-            // Drop money squares based on bot's money (bots start with $1.00)
-            const botMoney = 1.0; // Bots have a fixed money amount
-            dropMoneySquares(bot.head.x, bot.head.y, botMoney);
+            // Drop money crates when bot dies (20 crates worth $0.05 each = $1.00 total)
+            // Create temporary function call for bot death
+            const originalSegments = snake.visibleSegments;
+            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
+            dropMoneyCrates();
+            snake.visibleSegments = originalSegments; // Restore player segments
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -987,7 +1010,7 @@ export default function GamePage() {
             // Handle different food types
             if (food.type === 'money') {
               // Money pickup - add to snake's money balance
-              snake.money += food.value || 0.2;
+              snake.money += food.value || 0.05; // Default to $0.05 per crate
               newFoods.splice(i, 1);
               continue; // Don't spawn replacement food for money
             } else {
@@ -1126,42 +1149,9 @@ export default function GamePage() {
       // Draw food items
       foods.forEach((food, index) => {
         if (food.type === 'money') {
-          // Draw money squares with dollar sign image, shadow, and wobble
-          const time = Date.now() * 0.003; // Time for animation
-          const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
-          const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
-          
-          const drawX = food.x + wobbleX;
-          const drawY = food.y + wobbleY;
-          
-          // Draw shadow first
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 3;
-          ctx.shadowOffsetY = 3;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-          ctx.fillRect(drawX - food.size/2 + 2, drawY - food.size/2 + 2, food.size, food.size);
-          
-          // Reset shadow for main square
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-          
-          // Draw green background square (20x20px)
-          ctx.fillStyle = food.color;
-          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
-          
-          // Draw dollar sign image if loaded (20x20px)
-          if (dollarSignImage && dollarSignImage.complete) {
-            ctx.drawImage(
-              dollarSignImage,
-              drawX - 10,
-              drawY - 10,
-              20,
-              20
-            );
-          }
+          // Draw money crates as simple green squares (20x20px)
+          ctx.fillStyle = food.color; // Green color
+          ctx.fillRect(food.x - 10, food.y - 10, 20, 20);
         } else {
           // Draw regular food as circles with glow effect
           ctx.shadowColor = food.color;
