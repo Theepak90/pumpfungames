@@ -275,6 +275,7 @@ export default function GamePage() {
     const saved = localStorage.getItem('previousVolume');
     return saved ? parseFloat(saved) : 0.25;
   });
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -298,6 +299,15 @@ export default function GamePage() {
         audio.pause();
         audio.src = '';
       }
+    };
+  }, []);
+
+  // Load background image
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/background.png';
+    img.onload = () => {
+      setBackgroundImage(img);
     };
   }, []);
 
@@ -580,9 +590,24 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Clear canvas with dark background
-      ctx.fillStyle = '#15161b';
-      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      // Clear canvas with background image or dark fallback
+      if (backgroundImage) {
+        // Calculate scale to cover entire canvas while maintaining aspect ratio
+        const scale = Math.max(
+          canvasSize.width / backgroundImage.width,
+          canvasSize.height / backgroundImage.height
+        );
+        const scaledWidth = backgroundImage.width * scale;
+        const scaledHeight = backgroundImage.height * scale;
+        const offsetX = (canvasSize.width - scaledWidth) / 2;
+        const offsetY = (canvasSize.height - scaledHeight) / 2;
+        
+        ctx.drawImage(backgroundImage, offsetX, offsetY, scaledWidth, scaledHeight);
+      } else {
+        // Fallback to solid color if image not loaded
+        ctx.fillStyle = '#15161b';
+        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      }
 
       // Save context for camera transform
       ctx.save();
