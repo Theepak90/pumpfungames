@@ -220,6 +220,7 @@ class SmoothSnake {
         newSegmentPos = { x: lastSegment.x, y: lastSegment.y };
       }
       
+      // Add new segment without any fading - just solid opacity
       this.visibleSegments.push({ x: newSegmentPos.x, y: newSegmentPos.y, opacity: 1.0 });
     }
     
@@ -252,11 +253,8 @@ class SmoothSnake {
           curr.y = prev.y - Math.sin(angle) * this.SEGMENT_SPACING;
         }
         
-        // Optional fading for tail segments
+        // Keep all segments fully opaque (no fading)
         curr.opacity = 1.0;
-        if (i >= this.visibleSegments.length - 3) {
-          curr.opacity = Math.max(0.3, (this.visibleSegments.length - i) / 3);
-        }
       }
     }
   }
@@ -687,6 +685,9 @@ export default function GamePage() {
     let animationId: number;
     
     const gameLoop = () => {
+      // Clear canvas completely every frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
       // Move snake with smooth turning based on mouse direction
       snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
         // Add dropped food from boosting to the food array
