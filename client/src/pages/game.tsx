@@ -441,6 +441,27 @@ class SmoothSnake {
       this.boostCooldown = 0;
     }
   }
+  
+  // Get eye positions for collision detection
+  getEyePositions() {
+    if (this.visibleSegments.length === 0) return [];
+    
+    const snakeHead = this.visibleSegments[0];
+    const scaleFactor = this.getScaleFactor();
+    const eyeDistance = 5 * scaleFactor; // Same as in drawing code
+    const eyeSize = 3 * scaleFactor; // Same as in drawing code
+    
+    // Eye positions perpendicular to movement direction
+    const eye1X = snakeHead.x + Math.cos(this.currentAngle + Math.PI/2) * eyeDistance;
+    const eye1Y = snakeHead.y + Math.sin(this.currentAngle + Math.PI/2) * eyeDistance;
+    const eye2X = snakeHead.x + Math.cos(this.currentAngle - Math.PI/2) * eyeDistance;
+    const eye2Y = snakeHead.y + Math.sin(this.currentAngle - Math.PI/2) * eyeDistance;
+    
+    return [
+      { x: eye1X, y: eye1Y, size: eyeSize },
+      { x: eye2X, y: eye2Y, size: eyeSize }
+    ];
+  }
 }
 
 export default function GamePage() {
@@ -920,21 +941,33 @@ export default function GamePage() {
         return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
       });
 
-      // Check circular map boundaries (death barrier)
-      const updatedHead = snake.head;
-      const distanceFromCenter = Math.sqrt(
-        (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
-      );
-      if (distanceFromCenter > MAP_RADIUS) {
+      // Check circular map boundaries (death barrier) - using eye positions
+      const eyePositions = snake.getEyePositions();
+      let hitBoundary = false;
+      
+      for (const eye of eyePositions) {
+        const distanceFromCenter = Math.sqrt(
+          (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
+        );
+        if (distanceFromCenter > MAP_RADIUS) {
+          hitBoundary = true;
+          break;
+        }
+      }
+      
+      if (hitBoundary) {
         // Drop food and money crates when snake dies
-        dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+        dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
         dropMoneyCrates();
         snake.money = 0; // Reset snake's money on death
         setGameOver(true);
         return;
       }
 
-      // Check collision between player snake and bot snakes
+      // Check collision between player snake eyes and bot snakes
+      const playerEyePositions = snake.getEyePositions();
+      let hitBot = false;
+      
       for (const bot of botSnakes) {
         // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
@@ -943,16 +976,26 @@ export default function GamePage() {
         const botRadius = botBaseRadius * botScaleFactor;
         
         for (const segment of bot.visibleSegments) {
-          const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
-            // Drop food and money crates when snake dies from collision
-            dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
-            dropMoneyCrates();
-            snake.money = 0; // Reset snake's money on death
-            setGameOver(true);
-            return;
+          // Check each eye against bot segments
+          for (const eye of playerEyePositions) {
+            const dist = Math.sqrt((eye.x - segment.x) ** 2 + (eye.y - segment.y) ** 2);
+            if (dist < eye.size + botRadius) {
+              hitBot = true;
+              break;
+            }
           }
+          if (hitBot) break;
         }
+        if (hitBot) break;
+      }
+      
+      if (hitBot) {
+        // Drop food and money crates when snake dies from collision
+        dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+        dropMoneyCrates();
+        snake.money = 0; // Reset snake's money on death
+        setGameOver(true);
+        return;
       }
       
       // Check if player snake kills any bot snakes
@@ -1049,8 +1092,8 @@ export default function GamePage() {
       
       setFoods(prevFoods => {
         return prevFoods.map(food => {
-          const dx = updatedHead.x - food.x;
-          const dy = updatedHead.y - food.y;
+          const dx = snake.head.x - food.x;
+          const dy = snake.head.y - food.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           
           if (dist < suctionRadius && dist > 0) {
@@ -1071,7 +1114,7 @@ export default function GamePage() {
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
-          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
+          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
           
           // Use appropriate collision detection based on food type
           const collisionRadius = food.type === 'money' ? 10 : food.size; // Money squares are 20x20px (10px radius)
