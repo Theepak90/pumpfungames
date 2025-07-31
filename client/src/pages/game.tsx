@@ -60,7 +60,7 @@ class SmoothSnake {
     // Snake system constants
     this.START_MASS = 6; // Start with just 6 segments instead of 30
     this.MASS_PER_SEGMENT = 1;
-    this.SEGMENT_SPACING = 14; // Maximum overlap (radius=10, so 6px overlap for tight Slither.io look)
+    this.SEGMENT_SPACING = 10; // Heavy overlap (radius=10, so 10px overlap for maximum density)
     this.SEGMENT_RADIUS = 10;
     this.MIN_MASS_TO_BOOST = 4;
     
