@@ -936,8 +936,31 @@ export default function GamePage() {
 
       // Food eating is now handled by server in multiplayer mode
 
-      // In multiplayer mode, food collision is handled by the server
-      // Only visual collision detection - server manages actual food eating
+      // Food collision detection - works locally with server sync
+      setFoods(prevFoods => {
+        const newFoods = [...prevFoods];
+        let scoreIncrease = 0;
+        
+        for (let i = newFoods.length - 1; i >= 0; i--) {
+          const food = newFoods[i];
+          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
+          
+          if (dist < snake.getSegmentRadius() + food.size) {
+            // Snake eats the food - growth handled internally
+            scoreIncrease += snake.eatFood(food);
+            
+            // Remove eaten food locally (server will sync)
+            newFoods.splice(i, 1);
+            break; // Only eat one food per frame
+          }
+        }
+        
+        if (scoreIncrease > 0) {
+          setScore(prev => prev + scoreIncrease);
+        }
+        
+        return newFoods;
+      });
 
       // Clear canvas with background image pattern or dark fallback
       if (backgroundImage) {
