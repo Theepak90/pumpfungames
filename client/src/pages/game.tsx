@@ -8,6 +8,7 @@ const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 150;
+const BOT_COUNT = 5;
 
 interface Position {
   x: number;
@@ -20,6 +21,135 @@ interface Food {
   size: number;
   color: string;
   mass?: number; // Mass value for growth
+}
+
+interface BotSnake {
+  id: string;
+  head: Position;
+  visibleSegments: Array<{ x: number; y: number; opacity: number }>;
+  segmentTrail: Position[];
+  totalMass: number;
+  currentAngle: number;
+  speed: number;
+  color: string;
+  targetAngle: number;
+  lastDirectionChange: number;
+  targetFood: Food | null;
+}
+
+// Bot snake utility functions
+function createBotSnake(id: string): BotSnake {
+  // Spawn bot at random location within map
+  const angle = Math.random() * Math.PI * 2;
+  const radius = Math.random() * (MAP_RADIUS - 200);
+  const x = MAP_CENTER_X + Math.cos(angle) * radius;
+  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+  
+  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+  
+  return {
+    id,
+    head: { x, y },
+    visibleSegments: [{ x, y, opacity: 1.0 }],
+    segmentTrail: [{ x, y }],
+    totalMass: 8 + Math.random() * 12, // Start with 8-20 mass
+    currentAngle: Math.random() * Math.PI * 2,
+    speed: 1.8 + Math.random() * 0.8, // Slightly slower than player
+    color: colors[Math.floor(Math.random() * colors.length)],
+    targetAngle: Math.random() * Math.PI * 2,
+    lastDirectionChange: 0,
+    targetFood: null
+  };
+}
+
+function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): BotSnake {
+  // AI Decision making
+  const SEGMENT_SPACING = 10;
+  const SEGMENT_RADIUS = 10;
+  
+  // Find nearest food if no target or target is too far
+  if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 300) {
+    let nearestFood: Food | null = null;
+    let nearestDist = Infinity;
+    
+    foods.forEach(food => {
+      const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestFood = food;
+      }
+    });
+    
+    bot.targetFood = nearestFood;
+  }
+  
+  // Calculate target angle based on AI behavior
+  if (bot.targetFood) {
+    bot.targetAngle = Math.atan2(bot.targetFood.y - bot.head.y, bot.targetFood.x - bot.head.x);
+  } else {
+    // Wander randomly if no food target
+    bot.lastDirectionChange++;
+    if (bot.lastDirectionChange > 60) {
+      bot.targetAngle = Math.random() * Math.PI * 2;
+      bot.lastDirectionChange = 0;
+    }
+  }
+  
+  // Avoid going too close to map edge
+  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
+  if (distFromCenter > MAP_RADIUS - 300) {
+    bot.targetAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+  }
+  
+  // Smooth angle interpolation
+  let angleDiff = bot.targetAngle - bot.currentAngle;
+  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+  bot.currentAngle += angleDiff * 0.03; // Slower turning than player
+  
+  // Move bot head
+  const dx = Math.cos(bot.currentAngle) * bot.speed;
+  const dy = Math.sin(bot.currentAngle) * bot.speed;
+  bot.head.x += dx;
+  bot.head.y += dy;
+  
+  // Update trail
+  bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
+  const maxTrailLength = Math.floor((bot.totalMass / 1) * SEGMENT_SPACING * 2);
+  if (bot.segmentTrail.length > maxTrailLength) {
+    bot.segmentTrail.length = maxTrailLength;
+  }
+  
+  // Update visible segments
+  bot.visibleSegments = [];
+  let distanceSoFar = 0;
+  let segmentIndex = 0;
+  const targetSegmentCount = Math.floor(bot.totalMass / 1);
+  
+  for (let i = 1; i < bot.segmentTrail.length && bot.visibleSegments.length < targetSegmentCount; i++) {
+    const a = bot.segmentTrail[i - 1];
+    const b = bot.segmentTrail[i];
+    
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segmentDist = Math.sqrt(dx * dx + dy * dy);
+    
+    while (distanceSoFar + segmentDist >= segmentIndex * SEGMENT_SPACING && bot.visibleSegments.length < targetSegmentCount) {
+      const targetDistance = segmentIndex * SEGMENT_SPACING;
+      const overshoot = targetDistance - distanceSoFar;
+      const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+      
+      const x = a.x + dx * t;
+      const y = a.y + dy * t;
+      
+      bot.visibleSegments.push({ x, y, opacity: 1.0 });
+      segmentIndex++;
+    }
+    
+    distanceSoFar += segmentDist;
+  }
+  
+  return bot;
 }
 
 class SmoothSnake {
@@ -284,6 +414,7 @@ export default function GamePage() {
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
+  const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
@@ -479,6 +610,13 @@ export default function GamePage() {
       initialFoods.push(food);
     }
     setFoods(initialFoods);
+    
+    // Initialize bot snakes
+    const initialBots: BotSnake[] = [];
+    for (let i = 0; i < BOT_COUNT; i++) {
+      initialBots.push(createBotSnake(`bot_${i}`));
+    }
+    setBotSnakes(initialBots);
   }, []);
 
   // Mouse tracking
@@ -567,6 +705,11 @@ export default function GamePage() {
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
 
+      // Update bot snakes
+      setBotSnakes(prevBots => {
+        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
+      });
+
       // Check circular map boundaries (death barrier)
       const updatedHead = snake.head;
       const distanceFromCenter = Math.sqrt(
@@ -576,6 +719,64 @@ export default function GamePage() {
         setGameOver(true);
         return;
       }
+
+      // Check collision between player snake and bot snakes
+      for (const bot of botSnakes) {
+        for (const segment of bot.visibleSegments) {
+          const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
+          if (dist < snake.getSegmentRadius() + 10) { // Bot segment radius is 10
+            setGameOver(true);
+            return;
+          }
+        }
+      }
+
+      // Let bot snakes eat food
+      setBotSnakes(prevBots => {
+        return prevBots.map(bot => {
+          setFoods(prevFoods => {
+            const newFoods = [...prevFoods];
+            
+            for (let i = newFoods.length - 1; i >= 0; i--) {
+              const food = newFoods[i];
+              const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+              
+              if (dist < 10 + food.size) { // Bot radius is 10
+                // Bot eats food
+                bot.totalMass += food.mass || 1;
+                
+                // Remove eaten food and add new one
+                newFoods.splice(i, 1);
+                
+                const foodType = Math.random();
+                let newFood: Food;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * (MAP_RADIUS - 100);
+                const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+                const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+                
+                if (foodType < 0.05) {
+                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800' };
+                } else if (foodType < 0.15) {
+                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444' };
+                } else if (foodType < 0.45) {
+                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44' };
+                } else {
+                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff' };
+                }
+                
+                newFoods.push(newFood);
+                break;
+              }
+            }
+            
+            return newFoods;
+          });
+          
+          return bot;
+        });
+      });
 
       // Food gravitation toward snake head (50px radius, 2x faster)
       const suctionRadius = 50;
@@ -756,6 +957,31 @@ export default function GamePage() {
         );
         ctx.shadowBlur = 0;
       });
+
+      // Draw bot snakes first (behind player)
+      botSnakes.forEach(bot => {
+        // Bot outline
+        ctx.fillStyle = "white";
+        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = bot.visibleSegments[i];
+          ctx.globalAlpha = segment.opacity;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, 12, 0, Math.PI * 2); // 10 + 2 outline
+          ctx.fill();
+        }
+        
+        // Bot body
+        ctx.fillStyle = bot.color;
+        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = bot.visibleSegments[i];
+          ctx.globalAlpha = segment.opacity;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+      
+      ctx.globalAlpha = 1.0;
 
       // First pass: Draw white outline behind ALL segments including head
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
