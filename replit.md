@@ -22,6 +22,12 @@ Preferred communication style: Simple, everyday language.
 - Food distribution spreads across entire snake path for realistic death mechanics
 - Removed special medical cross items per user request
 
+### Visual Effects System
+- Food renders as solid colored circles with clean glow effects
+- Snake has subtle drop shadow when not boosting for floating effect
+- Clean white glow outline around entire snake when boosting (no overlapping segments)
+- Boost effects scale properly with snake size
+
 ## System Architecture
 
 ### Frontend Architecture

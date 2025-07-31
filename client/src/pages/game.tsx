@@ -1103,7 +1103,17 @@ export default function GamePage() {
         ctx.restore();
       }
       
-      // Draw snake segments (no individual strokes)
+      // Draw snake segments with appropriate shadow effects
+      ctx.save();
+      
+      if (!snake.isBoosting) {
+        // Add subtle drop shadow when not boosting
+        ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+      }
+      
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -1116,6 +1126,8 @@ export default function GamePage() {
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
       }
+      
+      ctx.restore();
       
       // Reset global alpha
       ctx.globalAlpha = 1.0;
