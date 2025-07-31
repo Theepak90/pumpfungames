@@ -19,8 +19,357 @@ interface AuthenticatedWebSocket extends WebSocket {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
-  // WebSocket server for real-time game communication
+  // WebSocket server for real-time multiplayer game
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Multiplayer game state management
+  interface MultiplayerPlayerState {
+    id: string;
+    x: number;
+    y: number;
+    angle: number;
+    segments: Array<{ x: number; y: number; opacity: number }>;
+    totalMass: number;
+    money: number;
+    isBoosting: boolean;
+    isAlive: boolean;
+    color: string;
+    name?: string;
+  }
+
+  interface MultiplayerGameFood {
+    id: string;
+    x: number;
+    y: number;
+    size: number;
+    mass: number;
+    color: string;
+    type: 'normal' | 'money';
+    value?: number;
+  }
+
+  // Game world state
+  const multiplayerPlayers = new Map<string, MultiplayerPlayerState>();
+  const multiplayerFoods = new Map<string, MultiplayerGameFood>();
+  const multiplayerConnections = new Map<string, WebSocket>();
+
+  // Game constants
+  const MULTIPLAYER_MAP_CENTER_X = 2500;
+  const MULTIPLAYER_MAP_CENTER_Y = 2500;
+  const MULTIPLAYER_MAP_RADIUS = 2000;
+
+  // Initialize multiplayer foods
+  function initializeMultiplayerFoods() {
+    for (let i = 0; i < 500; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MULTIPLAYER_MAP_RADIUS - 100);
+      const x = MULTIPLAYER_MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MULTIPLAYER_MAP_CENTER_Y + Math.sin(angle) * radius;
+      
+      const foodType = Math.random();
+      let food: MultiplayerGameFood;
+      
+      if (foodType < 0.05) {
+        food = {
+          id: `food_${Date.now()}_${i}`,
+          x, y, size: 15, mass: 40, color: '#ff8800', type: 'normal'
+        };
+      } else if (foodType < 0.15) {
+        food = {
+          id: `food_${Date.now()}_${i}`,
+          x, y, size: 10, mass: 1.2, color: '#ff4444', type: 'normal'
+        };
+      } else if (foodType < 0.45) {
+        food = {
+          id: `food_${Date.now()}_${i}`,
+          x, y, size: 6, mass: 0.4, color: '#44ff44', type: 'normal'
+        };
+      } else {
+        food = {
+          id: `food_${Date.now()}_${i}`,
+          x, y, size: 4, mass: 0.2, color: '#4444ff', type: 'normal'
+        };
+      }
+      
+      multiplayerFoods.set(food.id, food);
+    }
+    
+    // Add money crates
+    for (let i = 0; i < 50; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MULTIPLAYER_MAP_RADIUS - 100);
+      const x = MULTIPLAYER_MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MULTIPLAYER_MAP_CENTER_Y + Math.sin(angle) * radius;
+      
+      const moneyCrate: MultiplayerGameFood = {
+        id: `money_${Date.now()}_${i}`,
+        x, y, size: 10, mass: 0, color: '#00ff00', type: 'money', value: 0.05
+      };
+      
+      multiplayerFoods.set(moneyCrate.id, moneyCrate);
+    }
+  }
+
+  // Handle multiplayer WebSocket connections
+  wss.on('connection', (ws: WebSocket) => {
+    const playerId = `player_${Date.now()}_${Math.random()}`;
+    console.log(`Multiplayer player ${playerId} connected`);
+    
+    // Initialize new player
+    const newPlayer: MultiplayerPlayerState = {
+      id: playerId,
+      x: MULTIPLAYER_MAP_CENTER_X + (Math.random() - 0.5) * 200,
+      y: MULTIPLAYER_MAP_CENTER_Y + (Math.random() - 0.5) * 200,
+      angle: Math.random() * Math.PI * 2,
+      segments: [],
+      totalMass: 30,
+      money: 1.00,
+      isBoosting: false,
+      isAlive: true,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`
+    };
+    
+    // Initialize player segments
+    for (let i = 0; i < 6; i++) {
+      newPlayer.segments.push({
+        x: newPlayer.x - i * 10,
+        y: newPlayer.y,
+        opacity: 1.0
+      });
+    }
+    
+    multiplayerPlayers.set(playerId, newPlayer);
+    multiplayerConnections.set(playerId, ws);
+    
+    // Send initial game state to new player
+    ws.send(JSON.stringify({
+      type: 'init',
+      playerId,
+      player: newPlayer,
+      players: Array.from(multiplayerPlayers.values()).filter(p => p.id !== playerId),
+      foods: Array.from(multiplayerFoods.values())
+    }));
+    
+    // Broadcast new player to others
+    broadcastToMultiplayerClients({
+      type: 'playerJoined',
+      player: newPlayer
+    }, playerId);
+    
+    // Handle messages from client
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        handleMultiplayerPlayerMessage(playerId, message);
+      } catch (error) {
+        console.error('Error parsing multiplayer message:', error);
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      console.log(`Multiplayer player ${playerId} disconnected`);
+      multiplayerPlayers.delete(playerId);
+      multiplayerConnections.delete(playerId);
+      
+      // Notify other players
+      broadcastToMultiplayerClients({
+        type: 'playerLeft',
+        playerId
+      });
+    });
+  });
+
+  // Handle multiplayer player messages
+  function handleMultiplayerPlayerMessage(playerId: string, message: any) {
+    const player = multiplayerPlayers.get(playerId);
+    if (!player) return;
+    
+    switch (message.type) {
+      case 'move':
+        player.x = message.x;
+        player.y = message.y;
+        player.angle = message.angle;
+        player.segments = message.segments;
+        player.isBoosting = message.isBoosting;
+        player.totalMass = message.totalMass;
+        player.money = message.money;
+        break;
+        
+      case 'eatFood':
+        const food = multiplayerFoods.get(message.foodId);
+        if (food) {
+          if (food.type === 'money') {
+            player.money += food.value || 0.05;
+          } else {
+            player.totalMass += food.mass * 0.5;
+          }
+          
+          multiplayerFoods.delete(message.foodId);
+          spawnNewMultiplayerFood();
+          
+          // Broadcast food eaten
+          broadcastToMultiplayerClients({
+            type: 'foodEaten',
+            foodId: message.foodId,
+            playerId
+          });
+        }
+        break;
+        
+      case 'death':
+        player.isAlive = false;
+        // Create death food
+        createMultiplayerDeathFood(player);
+        // Reset player
+        respawnMultiplayerPlayer(playerId);
+        break;
+    }
+  }
+
+  // Broadcast message to all multiplayer clients
+  function broadcastToMultiplayerClients(message: any, excludePlayerId?: string) {
+    const messageStr = JSON.stringify(message);
+    multiplayerConnections.forEach((ws, playerId) => {
+      if (playerId !== excludePlayerId && ws.readyState === WebSocket.OPEN) {
+        ws.send(messageStr);
+      }
+    });
+  }
+
+  // Spawn new multiplayer food
+  function spawnNewMultiplayerFood() {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * (MULTIPLAYER_MAP_RADIUS - 100);
+    const x = MULTIPLAYER_MAP_CENTER_X + Math.cos(angle) * radius;
+    const y = MULTIPLAYER_MAP_CENTER_Y + Math.sin(angle) * radius;
+    
+    const foodType = Math.random();
+    let food: MultiplayerGameFood;
+    
+    if (foodType < 0.1) {
+      food = {
+        id: `food_${Date.now()}_${Math.random()}`,
+        x, y, size: 10, mass: 1.2, color: '#ff4444', type: 'normal'
+      };
+    } else if (foodType < 0.4) {
+      food = {
+        id: `food_${Date.now()}_${Math.random()}`,
+        x, y, size: 6, mass: 0.4, color: '#44ff44', type: 'normal'
+      };
+    } else {
+      food = {
+        id: `food_${Date.now()}_${Math.random()}`,
+        x, y, size: 4, mass: 0.2, color: '#4444ff', type: 'normal'
+      };
+    }
+    
+    multiplayerFoods.set(food.id, food);
+    
+    broadcastToMultiplayerClients({
+      type: 'newFood',
+      food
+    });
+  }
+
+  // Create death food for multiplayer
+  function createMultiplayerDeathFood(player: MultiplayerPlayerState) {
+    const deathFoods: MultiplayerGameFood[] = [];
+    const foodCount = Math.floor(player.totalMass);
+    
+    for (let i = 0; i < foodCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * 50;
+      const x = player.x + Math.cos(angle) * radius;
+      const y = player.y + Math.sin(angle) * radius;
+      
+      const deathFood: MultiplayerGameFood = {
+        id: `death_${Date.now()}_${i}`,
+        x, y, size: 7, mass: 1, color: player.color, type: 'normal'
+      };
+      
+      multiplayerFoods.set(deathFood.id, deathFood);
+      deathFoods.push(deathFood);
+    }
+    
+    // Create money crates from player's money
+    const moneyValue = player.money - 1.00;
+    if (moneyValue > 0.05) {
+      const crateCount = Math.floor(moneyValue / 0.05);
+      for (let i = 0; i < crateCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 30;
+        const x = player.x + Math.cos(angle) * radius;
+        const y = player.y + Math.sin(angle) * radius;
+        
+        const moneyCrate: MultiplayerGameFood = {
+          id: `money_death_${Date.now()}_${i}`,
+          x, y, size: 10, mass: 0, color: '#00ff00', type: 'money', value: 0.05
+        };
+        
+        multiplayerFoods.set(moneyCrate.id, moneyCrate);
+        deathFoods.push(moneyCrate);
+      }
+    }
+    
+    broadcastToMultiplayerClients({
+      type: 'deathFoodCreated',
+      foods: deathFoods
+    });
+  }
+
+  // Respawn multiplayer player
+  function respawnMultiplayerPlayer(playerId: string) {
+    const player = multiplayerPlayers.get(playerId);
+    if (!player) return;
+    
+    // Reset player state
+    player.x = MULTIPLAYER_MAP_CENTER_X + (Math.random() - 0.5) * 200;
+    player.y = MULTIPLAYER_MAP_CENTER_Y + (Math.random() - 0.5) * 200;
+    player.angle = Math.random() * Math.PI * 2;
+    player.totalMass = 30;
+    player.money = 1.00;
+    player.isAlive = true;
+    player.segments = [];
+    
+    // Reset segments
+    for (let i = 0; i < 6; i++) {
+      player.segments.push({
+        x: player.x - i * 10,
+        y: player.y,
+        opacity: 1.0
+      });
+    }
+    
+    // Notify player of respawn
+    const ws = multiplayerConnections.get(playerId);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'respawn',
+        player
+      }));
+    }
+    
+    broadcastToMultiplayerClients({
+      type: 'playerRespawned',
+      player
+    }, playerId);
+  }
+
+  // Multiplayer game loop - broadcast player states
+  function multiplayerGameLoop() {
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(multiplayerPlayers.values()),
+      timestamp: Date.now()
+    };
+    
+    broadcastToMultiplayerClients(gameState);
+  }
+
+  // Initialize multiplayer foods and start game loop
+  initializeMultiplayerFoods();
+  setInterval(multiplayerGameLoop, 50); // 20 FPS server updates
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {

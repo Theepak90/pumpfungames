@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
+import { useMultiplayer } from '../hooks/useMultiplayer';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 
@@ -430,6 +431,18 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
+  
+  // Multiplayer integration
+  const {
+    isConnected,
+    currentPlayer,
+    otherPlayers,
+    foods: multiplayerFoods,
+    sendPlayerUpdate,
+    sendFoodEaten,
+    sendDeath
+  } = useMultiplayer();
+  
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     // Snake constructor now creates 6 segments with 30 mass and proper spacing
@@ -439,6 +452,7 @@ export default function GamePage() {
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
+  const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -1111,9 +1125,34 @@ export default function GamePage() {
       });
 
       // Check for food collision and handle eating
-      setFoods(prevFoods => {
-        const newFoods = [...prevFoods];
-        let scoreIncrease = 0;
+      const currentFoods = isMultiplayer ? multiplayerFoods : foods;
+      const activeFoods = isMultiplayer ? multiplayerFoods : foods;
+      
+      if (isMultiplayer) {
+        // Multiplayer food collision
+        for (const food of activeFoods) {
+          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
+          const collisionRadius = food.type === 'money' ? 10 : food.size;
+          
+          if (dist < snake.getSegmentRadius() + collisionRadius) {
+            // Handle different food types
+            if (food.type === 'money') {
+              snake.money += food.value || 0.05;
+            } else {
+              const scoreIncrease = snake.eatFood(food);
+              setScore(prev => prev + scoreIncrease);
+            }
+            
+            // Send to server
+            sendFoodEaten(food.id);
+            break;
+          }
+        }
+      } else {
+        // Single player food collision
+        setFoods(prevFoods => {
+          const newFoods = [...prevFoods];
+          let scoreIncrease = 0;
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
@@ -1192,8 +1231,9 @@ export default function GamePage() {
           setScore(prev => prev + scoreIncrease);
         }
         
-        return newFoods;
-      });
+          return newFoods;
+        });
+      }
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
@@ -1261,8 +1301,9 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food items
-      foods.forEach((food, index) => {
+      // Draw food items - use multiplayer foods if connected
+      const foodsToDraw = isMultiplayer ? multiplayerFoods : foods;
+      foodsToDraw.forEach((food, index) => {
         if (food.type === 'money') {
           // Draw money crates with dollar sign image, shadow, and wobble
           const time = Date.now() * 0.003; // Time for animation
@@ -1318,8 +1359,58 @@ export default function GamePage() {
         }
       });
 
-      // Draw bot snakes first (behind player)
-      botSnakes.forEach(bot => {
+      // Draw other players in multiplayer or bots in single player
+      if (isMultiplayer) {
+        // Draw other multiplayer players
+        otherPlayers.forEach(player => {
+          if (!player.isAlive) return;
+          
+          // Player dynamic scaling based on mass
+          const playerBaseRadius = 8;
+          const maxScale = 5;
+          const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
+          const playerRadius = playerBaseRadius * playerScaleFactor;
+          const playerOutlineThickness = 2 * playerScaleFactor;
+          
+          // Player outline
+          ctx.fillStyle = "white";
+          for (let i = player.segments.length - 1; i >= 0; i--) {
+            const segment = player.segments[i];
+            ctx.globalAlpha = segment.opacity;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, playerRadius + playerOutlineThickness, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          // Player body
+          ctx.fillStyle = player.color;
+          for (let i = player.segments.length - 1; i >= 0; i--) {
+            const segment = player.segments[i];
+            ctx.globalAlpha = segment.opacity;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, playerRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          // Player money display
+          if (player.segments.length > 0) {
+            const playerHead = player.segments[0];
+            ctx.font = `${14 * playerScaleFactor}px Arial, sans-serif`;
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 2 * playerScaleFactor;
+            ctx.textAlign = "center";
+            
+            const moneyText = `$${player.money.toFixed(2)}`;
+            const offsetY = 35 * playerScaleFactor;
+            
+            ctx.strokeText(moneyText, playerHead.x, playerHead.y - offsetY);
+            ctx.fillText(moneyText, playerHead.x, playerHead.y - offsetY);
+          }
+        });
+      } else {
+        // Draw bot snakes (single player mode)
+        botSnakes.forEach(bot => {
         // Bot dynamic scaling based on mass (caps at 5x width)
         const botBaseRadius = 8;
         const maxScale = 5;
@@ -1346,7 +1437,8 @@ export default function GamePage() {
           ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
         }
-      });
+        });
+      }
       
       ctx.globalAlpha = 1.0;
 
@@ -1537,8 +1629,8 @@ export default function GamePage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-      {/* Exit Button */}
-      <div className="absolute top-4 left-4 z-10">
+      {/* Multiplayer Controls */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-4">
         <Button
           onClick={exitGame}
           className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
@@ -1546,6 +1638,19 @@ export default function GamePage() {
           <X className="w-4 h-4" />
           Exit Game
         </Button>
+        
+        <Button
+          onClick={() => setIsMultiplayer(!isMultiplayer)}
+          className={`px-4 py-2 rounded text-sm ${isMultiplayer ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+        >
+          {isMultiplayer ? 'Multiplayer' : 'Single Player'}
+        </Button>
+        
+        {isMultiplayer && (
+          <div className={`px-3 py-1 rounded text-sm ${isConnected ? 'bg-green-600' : 'bg-red-600'}`}>
+            {isConnected ? `Connected • ${otherPlayers.length} players` : 'Connecting...'}
+          </div>
+        )}
       </div>
 
       {/* Volume Controls */}
