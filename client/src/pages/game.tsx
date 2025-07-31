@@ -307,7 +307,11 @@ export default function GamePage() {
     const img = new Image();
     img.src = '/background.png';
     img.onload = () => {
+      console.log('Background image loaded successfully');
       setBackgroundImage(img);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load background image:', e);
     };
   }, []);
 
