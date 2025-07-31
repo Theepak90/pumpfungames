@@ -665,17 +665,8 @@ export default function GamePage() {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
-        // Create radial gradient for 3D effect
-        const gradient = ctx.createRadialGradient(
-          segment.x, segment.y, 0,
-          segment.x, segment.y, segmentRadius
-        );
-        
-        // Orange gradient from bright center to dark edges
-        gradient.addColorStop(0, "#ffbaba");    // Light center
-        gradient.addColorStop(1, "#d55400");    // Dark orange edge
-        
-        ctx.fillStyle = gradient;
+        // Solid orange color for body segments
+        ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -685,28 +676,26 @@ export default function GamePage() {
       if (snake.visibleSegments.length > 0) {
         const headSeg = snake.visibleSegments[0];
         const headRadius = snake.getSegmentRadius();
-        const headGradient = ctx.createRadialGradient(
-          headSeg.x, headSeg.y, 0,
-          headSeg.x, headSeg.y, headRadius
-        );
         
-        // Head has a brighter, more distinctive gradient
-        headGradient.addColorStop(0, "#ffffff");     // White center
-        headGradient.addColorStop(1, "#d55400");     // Dark orange edge
-        
-        ctx.fillStyle = headGradient;
+        // Solid brighter orange for head
+        ctx.fillStyle = "#ff6600";
         ctx.beginPath();
         ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Draw eyes that follow snake's movement direction (after head is drawn)
+      // Draw eyes that track the cursor smoothly (after head is drawn)
       if (snake.visibleSegments.length > 0) {
         const snakeHead = snake.visibleSegments[0];
         const movementAngle = snake.currentAngle;
-        const eyeDistance = 8;
-        const eyeSize = 4;
-        const pupilSize = 2;
+        const eyeDistance = 5; // Smaller distance from center
+        const eyeSize = 3; // Smaller eyes
+        const pupilSize = 2.5; // Bigger pupils
+        
+        // Calculate cursor direction in world coordinates
+        const worldMouseX = (canvasSize.width / 2) / zoom + snake.head.x;
+        const worldMouseY = (canvasSize.height / 2) / zoom + snake.head.y;
+        const cursorAngle = Math.atan2(worldMouseY - snakeHead.y, worldMouseX - snakeHead.x);
         
         // Eye positions perpendicular to movement direction
         const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -714,9 +703,7 @@ export default function GamePage() {
         const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
         const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
         
-        // White eyes with slight glow
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 4;
+        // White eyes (smaller)
         ctx.fillStyle = 'white';
         ctx.beginPath();
         ctx.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
@@ -724,22 +711,21 @@ export default function GamePage() {
         ctx.beginPath();
         ctx.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.shadowBlur = 0;
         
-        // Black pupils following movement direction
-        const pupilOffset = 2;
+        // Black pupils looking at cursor (bigger pupils)
+        const pupilOffset = 1; // How far pupils can move within the eye
         ctx.fillStyle = 'black';
         ctx.beginPath();
         ctx.arc(
-          eye1X + Math.cos(movementAngle) * pupilOffset, 
-          eye1Y + Math.sin(movementAngle) * pupilOffset, 
+          eye1X + Math.cos(cursorAngle) * pupilOffset, 
+          eye1Y + Math.sin(cursorAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
         ctx.beginPath();
         ctx.arc(
-          eye2X + Math.cos(movementAngle) * pupilOffset, 
-          eye2Y + Math.sin(movementAngle) * pupilOffset, 
+          eye2X + Math.cos(cursorAngle) * pupilOffset, 
+          eye2Y + Math.sin(cursorAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
