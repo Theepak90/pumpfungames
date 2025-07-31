@@ -1108,10 +1108,16 @@ export default function GamePage() {
       
       if (!snake.isBoosting) {
         // Add subtle drop shadow when not boosting
-        ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
         ctx.shadowBlur = 6;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
+      } else {
+        // Ensure no shadow when boosting (glow effect is already applied)
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
       }
       
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
