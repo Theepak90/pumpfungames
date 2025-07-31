@@ -210,76 +210,53 @@ class SmoothSnake {
     // Calculate target segment count based on mass
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
-    // Smoothly animate currentSegmentCount toward target
-    const transitionSpeed = 0.1; // Smooth transition speed
-    if (this.currentSegmentCount < targetSegmentCount) {
-      this.currentSegmentCount += transitionSpeed;
-    } else if (this.currentSegmentCount > targetSegmentCount) {
-      this.currentSegmentCount -= transitionSpeed;
-    }
-    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
-    
-    // Use floor for solid segments, check if we need a fading segment
-    const solidSegmentCount = Math.floor(this.currentSegmentCount);
-    const fadeAmount = this.currentSegmentCount - solidSegmentCount;
-    const shouldHaveFadingSegment = fadeAmount > 0;
-    
-    this.visibleSegments = [];
-    let distanceSoFar = 0;
-    let segmentIndex = 0;
-    
-    // First, add all solid segments
-    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < solidSegmentCount; i++) {
-      const a = this.segmentTrail[i - 1];
-      const b = this.segmentTrail[i];
+    // Grow snake by adding segments to tail when needed
+    while (this.visibleSegments.length < targetSegmentCount) {
+      let newSegmentPos = { x: this.head.x, y: this.head.y };
       
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const segmentDist = Math.sqrt(dx * dx + dy * dy);
-      
-      // Check if we need to place a segment in this trail section
-      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < solidSegmentCount) {
-        const targetDistance = segmentIndex * this.SEGMENT_SPACING;
-        const overshoot = targetDistance - distanceSoFar;
-        const t = segmentDist > 0 ? overshoot / segmentDist : 0;
-        
-        // Linear interpolation between trail points
-        const x = a.x + dx * t;
-        const y = a.y + dy * t;
-        
-        this.visibleSegments.push({ x, y, opacity: 1.0 });
-        segmentIndex++;
+      // If we have segments, place new one behind the last segment
+      if (this.visibleSegments.length > 0) {
+        const lastSegment = this.visibleSegments[this.visibleSegments.length - 1];
+        newSegmentPos = { x: lastSegment.x, y: lastSegment.y };
       }
       
-      distanceSoFar += segmentDist;
+      this.visibleSegments.push({ x: newSegmentPos.x, y: newSegmentPos.y, opacity: 1.0 });
     }
     
-    // Add fading segment if needed (only if opacity > 0.2 to avoid ghosting)
-    if (shouldHaveFadingSegment && fadeAmount > 0.2) {
-      // Continue searching for the position of the fading segment
-      for (let i = 1; i < this.segmentTrail.length; i++) {
-        const a = this.segmentTrail[i - 1];
-        const b = this.segmentTrail[i];
+    // Shrink snake by removing tail segments when needed (rare)
+    while (this.visibleSegments.length > targetSegmentCount) {
+      this.visibleSegments.pop();
+    }
+    
+    // Update segment positions using smooth following mechanics
+    if (this.visibleSegments.length > 0) {
+      // Head follows the actual head position
+      this.visibleSegments[0] = { 
+        x: this.head.x, 
+        y: this.head.y, 
+        opacity: 1.0 
+      };
+      
+      // Each segment follows the one in front with fixed spacing
+      for (let i = 1; i < this.visibleSegments.length; i++) {
+        const prev = this.visibleSegments[i - 1];
+        const curr = this.visibleSegments[i];
         
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const segmentDist = Math.sqrt(dx * dx + dy * dy);
+        const dx = prev.x - curr.x;
+        const dy = prev.y - curr.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         
-        // Check if this is where the fading segment should be
-        if (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING) {
-          const targetDistance = segmentIndex * this.SEGMENT_SPACING;
-          const overshoot = targetDistance - distanceSoFar;
-          const t = segmentDist > 0 ? overshoot / segmentDist : 0;
-          
-          // Linear interpolation for fading segment position
-          const x = a.x + dx * t;
-          const y = a.y + dy * t;
-          
-          this.visibleSegments.push({ x, y, opacity: fadeAmount });
-          break;
+        if (dist > this.SEGMENT_SPACING) {
+          const angle = Math.atan2(dy, dx);
+          curr.x = prev.x - Math.cos(angle) * this.SEGMENT_SPACING;
+          curr.y = prev.y - Math.sin(angle) * this.SEGMENT_SPACING;
         }
         
-        distanceSoFar += segmentDist;
+        // Optional fading for tail segments
+        curr.opacity = 1.0;
+        if (i >= this.visibleSegments.length - 3) {
+          curr.opacity = Math.max(0.3, (this.visibleSegments.length - i) / 3);
+        }
       }
     }
   }
@@ -333,16 +310,7 @@ class SmoothSnake {
     this.head.x += dx;
     this.head.y += dy;
     
-    // Add head position to trail every frame for smooth following
-    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
-
-    // Remove excess trail length (keep enough to render full snake)
-    const maxTrailLength = Math.floor((this.totalMass / this.MASS_PER_SEGMENT) * this.SEGMENT_SPACING * 2);
-    if (this.segmentTrail.length > maxTrailLength) {
-      this.segmentTrail.length = maxTrailLength;
-    }
-
-    // Sample segments at fixed spacing from the trail
+    // Update segments with smooth following system
     this.updateVisibleSegments();
     
     // Apply gradual growth
