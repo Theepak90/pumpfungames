@@ -224,11 +224,9 @@ export default function GamePage() {
     return saved ? parseFloat(saved) : 0.25;
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
-  const [zoom, setZoom] = useState(1.0);
   
-  // Zoom constants
-  const ZOOM_MIN = 0.3;
-  const ZOOM_MAX = 1.5;
+  // Fixed zoom level
+  const zoom = 0.3;
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -323,26 +321,7 @@ export default function GamePage() {
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, []);
 
-  // Handle zoom with mouse wheel
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) return; // Prevent browser zoom
 
-      const zoomFactor = 0.1;
-      setZoom(prevZoom => {
-        if (e.deltaY > 0) {
-          return Math.max(ZOOM_MIN, prevZoom - zoomFactor);
-        } else {
-          return Math.min(ZOOM_MAX, prevZoom + zoomFactor);
-        }
-      });
-
-      e.preventDefault(); // Block page zoom/scroll
-    };
-
-    window.addEventListener("wheel", handleWheel, { passive: false });
-    return () => window.removeEventListener("wheel", handleWheel);
-  }, [ZOOM_MIN, ZOOM_MAX]);
 
   // Initialize food with mass system
   useEffect(() => {
@@ -744,7 +723,7 @@ export default function GamePage() {
 
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, zoom]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
   const resetGame = () => {
     setGameOver(false);
