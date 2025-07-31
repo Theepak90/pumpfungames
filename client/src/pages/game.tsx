@@ -709,45 +709,23 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // First pass: Draw white outline behind ALL segments including head
+      // Draw each segment (outline + body) together for proper z-order
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
         ctx.globalAlpha = segment.opacity;
         
-        // White outline circle (slightly bigger)
+        // 1. Draw white outline first
         ctx.fillStyle = "white";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
         ctx.fill();
-      }
-      
-      // Second pass: Draw actual segments on top (body segments only, excluding head)
-      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
         
-        ctx.globalAlpha = segment.opacity;
-        
-        // Solid orange color for body segments
+        // 2. Draw segment body on top
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Third pass: Draw head on top
-      if (snake.visibleSegments.length > 0) {
-        const headSeg = snake.visibleSegments[0];
-        const headRadius = snake.getSegmentRadius();
-        
-        ctx.globalAlpha = headSeg.opacity;
-        
-        // Same solid orange color as body
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
         ctx.fill();
       }
       
