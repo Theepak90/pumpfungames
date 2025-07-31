@@ -731,9 +731,9 @@ export default function GamePage() {
         ctx.fill();
       }
       
-      // Layer 2: Draw recent segments with outline (tail to head order for proper stacking)
-      const startIndex = Math.max(0, snake.visibleSegments.length - highlightCount);
-      for (let i = startIndex; i < snake.visibleSegments.length; i++) {
+      // Layer 2: Draw head + recent segments with outline (tail to head order)
+      // Note: visibleSegments[0] is head, so we draw from tail towards head
+      for (let i = Math.min(highlightCount - 1, snake.visibleSegments.length - 1); i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
