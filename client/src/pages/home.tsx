@@ -118,9 +118,18 @@ export default function Home() {
   // State variables
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [volume, setVolume] = useState(0.25);
-  const [previousVolume, setPreviousVolume] = useState(0.25);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('soundEnabled');
+    return saved ? JSON.parse(saved) : true;
+  });
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('volume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
+  const [previousVolume, setPreviousVolume] = useState(() => {
+    const saved = localStorage.getItem('previousVolume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
@@ -129,14 +138,28 @@ export default function Home() {
   const toggleSound = () => {
     const newSoundState = !soundEnabled;
     setSoundEnabled(newSoundState);
+    localStorage.setItem('soundEnabled', JSON.stringify(newSoundState));
     
     if (newSoundState) {
       // Turning sound ON - restore previous volume
       setVolume(previousVolume);
+      localStorage.setItem('volume', previousVolume.toString());
     } else {
       // Turning sound OFF - save current volume and set to 0
       setPreviousVolume(volume);
+      localStorage.setItem('previousVolume', volume.toString());
       setVolume(0);
+      localStorage.setItem('volume', '0');
+    }
+  };
+
+  // Handle volume change
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    localStorage.setItem('volume', newVolume.toString());
+    if (soundEnabled && newVolume > 0) {
+      setPreviousVolume(newVolume);
+      localStorage.setItem('previousVolume', newVolume.toString());
     }
   };
 
@@ -254,7 +277,7 @@ export default function Home() {
               max="1"
               step="0.1"
               value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
               className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
               style={{
                 background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
