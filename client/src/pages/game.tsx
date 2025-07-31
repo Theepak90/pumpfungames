@@ -946,85 +946,64 @@ export default function GamePage() {
         }
       }
 
-      // Food collision detection - Active food eating
-      setFoods(prevFoods => {
-        const newFoods = [...prevFoods];
-        let scoreIncrease = 0;
-        let hasEatenFood = false;
+      // Food collision detection - Process ONE food per frame maximum
+      let hasEatenThisFrame = false;
+      let scoreIncrease = 0;
+      
+      setFoods(currentFoods => {
+        let newFoods = [...currentFoods];
         
-        for (let i = newFoods.length - 1; i >= 0 && !hasEatenFood; i--) {
-          const food = newFoods[i];
-          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
-          
-          // Check collision with reasonable collision detection
-          if (dist < snake.getSegmentRadius() + food.size) {
-            // Snake eats the food - growth handled internally
-            const massGained = snake.eatFood(food);
+        // Only check for food if we haven't eaten this frame
+        if (!hasEatenThisFrame) {
+          for (let i = 0; i < newFoods.length; i++) {
+            const food = newFoods[i];
+            const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
             
-            if (massGained > 0) {
-              scoreIncrease += massGained;
+            // Check collision
+            if (dist < snake.getSegmentRadius() + food.size) {
+              // Snake eats the food
+              const massGained = snake.eatFood(food);
               
-              // Remove eaten food - this should make it disappear
-              newFoods.splice(i, 1);
-              hasEatenFood = true;
-              
-              console.log(`Ate food! Mass gained: ${food.mass}, Total mass: ${snake.totalMass}, Foods left: ${newFoods.length}`);
-              
-              // Spawn new food to replace eaten one
-              const foodType = Math.random();
-              let newFood: Food;
-              
-              // Generate new food within circular boundary
-              const angle = Math.random() * Math.PI * 2;
-              const radius = Math.random() * (MAP_RADIUS - 100);
-              const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-              const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-              
-              if (foodType < 0.05) { // 5% orange test food (40 mass)
-                newFood = {
-                  x: newX,
-                  y: newY,
-                  size: 15,
-                  mass: 40,
-                  color: '#ff8800'
-                };
-              } else if (foodType < 0.15) { // 10% big food
-                newFood = {
-                  x: newX,
-                  y: newY,
-                  size: 10,
-                  mass: 2,
-                  color: '#ff4444'
-                };
-              } else if (foodType < 0.45) { // 30% medium food
-                newFood = {
-                  x: newX,
-                  y: newY,
-                  size: 6,
-                  mass: 1,
-                  color: '#44ff44'
-                };
-              } else { // 55% small food
-                newFood = {
-                  x: newX,
-                  y: newY,
-                  size: 4,
-                  mass: 0.5,
-                  color: '#4444ff'
-                };
+              if (massGained > 0) {
+                scoreIncrease += massGained;
+                hasEatenThisFrame = true;
+                
+                // Remove the eaten food
+                newFoods.splice(i, 1);
+                
+                console.log(`Ate food! Mass gained: ${food.mass}, Total foods: ${newFoods.length}`);
+                
+                // Spawn replacement food
+                const foodType = Math.random();
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * (MAP_RADIUS - 100);
+                const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+                const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+                
+                let newFood: Food;
+                if (foodType < 0.05) {
+                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800' };
+                } else if (foodType < 0.15) {
+                  newFood = { x: newX, y: newY, size: 10, mass: 2, color: '#ff4444' };
+                } else if (foodType < 0.45) {
+                  newFood = { x: newX, y: newY, size: 6, mass: 1, color: '#44ff44' };
+                } else {
+                  newFood = { x: newX, y: newY, size: 4, mass: 0.5, color: '#4444ff' };
+                }
+                
+                newFoods.push(newFood);
+                break; // Only eat one food per frame
               }
-              
-              newFoods.push(newFood);
             }
           }
         }
         
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
-        }
-        
         return newFoods;
       });
+      
+      if (scoreIncrease > 0) {
+        setScore(prev => prev + scoreIncrease);
+      }
 
       // Clear canvas with background image pattern or dark fallback
       if (backgroundImage) {
