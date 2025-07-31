@@ -215,25 +215,36 @@ class SmoothSnake {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Drop mass every 20 frames (same frequency as before)
-      if (this.boostCooldown % 20 === 0 && onDropFood) {
-        // Drop 2 smaller food pieces instead of 1
-        for (let i = 0; i < 2; i++) {
-          const angle = this.currentAngle + Math.PI + (Math.random() - 0.5) * 0.4; // Behind snake with slight spread
-          const distance = 18 + i * 10; // Stagger the drops
-          const dropX = this.head.x + Math.cos(angle) * distance;
-          const dropY = this.head.y + Math.sin(angle) * distance;
-          
-          onDropFood({
-            x: dropX,
-            y: dropY,
-            size: 3.5, // Slightly smaller than original
-            color: '#f55400',
-            mass: 0.25 // 2x less mass (0.5 / 2 = 0.25)
-          });
+      // Drop food more frequently for continuous trail effect
+      if (this.boostCooldown % 10 === 0 && onDropFood) {
+        // Find the second-to-last segment position for food drop
+        let dropX = this.head.x;
+        let dropY = this.head.y;
+        
+        if (this.visibleSegments.length >= 2) {
+          // Use second-to-last segment position
+          const secondToLast = this.visibleSegments[this.visibleSegments.length - 2];
+          dropX = secondToLast.x;
+          dropY = secondToLast.y;
+        } else {
+          // Fallback to behind the head if not enough segments
+          dropX = this.head.x - Math.cos(this.currentAngle) * 25;
+          dropY = this.head.y - Math.sin(this.currentAngle) * 25;
         }
         
-        this.totalMass -= 0.5; // Same total mass loss rate
+        // Add slight randomness to avoid perfect stacking
+        dropX += (Math.random() - 0.5) * 8;
+        dropY += (Math.random() - 0.5) * 8;
+        
+        onDropFood({
+          x: dropX,
+          y: dropY,
+          size: 3.5,
+          color: '#f55400',
+          mass: 0.25 // Each piece worth 0.25, dropped every 10 frames instead of 20
+        });
+        
+        this.totalMass -= 0.25; // Reduce mass loss per drop to maintain same rate
         this.updateVisibleSegments();
       }
     } else {
