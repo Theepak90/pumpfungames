@@ -250,9 +250,30 @@ export default function GamePage() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  // Background music setup
+  useEffect(() => {
+    const audio = new Audio();
+    audio.src = '/audio/background-music.mp3';
+    audio.preload = 'auto';
+    audio.loop = true;
+    audio.volume = 0.3;
+    setBackgroundMusic(audio);
+    
+    // Start playing music when game loads
+    audio.play().catch(console.error);
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, []);
 
   // Handle canvas resize for fullscreen
   useEffect(() => {
