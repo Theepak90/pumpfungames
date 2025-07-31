@@ -16,6 +16,18 @@ Preferred communication style: Simple, everyday language.
 - Money resets to $1.00 when game restarts
 - Display scales with snake size and has outline for visibility
 
+### Tab Switching System (Latest)
+- Implemented time-based catch-up movement for when browser tab is inactive
+- Tracks exact time while tab is hidden using performance.now()
+- When tab becomes active again, snake moves forward based on elapsed time
+- Prevents JavaScript throttling issues that break background movement
+- Snake appears exactly where it would have been if tab never switched
+
+### Enhanced Turning System
+- Snake turns 2x faster when boosting to maintain consistent turn radius
+- Compensates for increased speed to prevent wide turns during boost
+- Smooth angle interpolation with dynamic turn speed multiplier
+
 ### Enhanced Death Food System
 - Death food drops along snake body segments (not just at death location)
 - Regular death food is half size (7.5) and matches snake's color

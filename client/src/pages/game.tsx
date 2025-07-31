@@ -465,7 +465,7 @@ export default function GamePage() {
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [gameIsVisible, setGameIsVisible] = useState(!document.hidden);
-  const [lastTick, setLastTick] = useState(performance.now());
+  const [hiddenAt, setHiddenAt] = useState<number | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -839,27 +839,47 @@ export default function GamePage() {
     if (!ctx) return;
 
     let animationId: number;
-    let realTimeMovementInterval: number;
     
-    // Background movement timer - lightweight position updates when tab is inactive
-    realTimeMovementInterval = window.setInterval(() => {
-      if (document.hidden && !gameOver) {
-        // Simple background movement - just update head position
-        const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
-        const delta = 1 / 60; // Fixed deltaTime for consistent movement
-        
-        snake.head.x += Math.cos(snake.currentAngle) * speed * delta;
-        snake.head.y += Math.sin(snake.currentAngle) * speed * delta;
-        
-        // Add to trail for continuity when tab becomes active again
-        snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
-        
-        // Keep trail manageable
-        if (snake.segmentTrail.length > 1000) {
-          snake.segmentTrail.length = 500;
+    // Apply snake catch-up movement when tab becomes visible again
+    const applySnakeCatchUp = (deltaSeconds: number) => {
+      if (gameOver) return;
+      
+      const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
+      const distance = speed * deltaSeconds;
+      
+      // Move snake forward based on time that passed while tab was hidden
+      snake.head.x += Math.cos(snake.currentAngle) * distance;
+      snake.head.y += Math.sin(snake.currentAngle) * distance;
+      
+      // Add trail points for the movement that happened while away
+      const numTrailPoints = Math.floor(deltaSeconds * 60); // Approximate trail points
+      for (let i = 0; i < numTrailPoints; i++) {
+        const progress = i / numTrailPoints;
+        const x = snake.head.x - Math.cos(snake.currentAngle) * distance * (1 - progress);
+        const y = snake.head.y - Math.sin(snake.currentAngle) * distance * (1 - progress);
+        snake.segmentTrail.unshift({ x, y });
+      }
+      
+      // Update visible segments after catch-up movement
+      snake.updateVisibleSegments();
+    };
+    
+    // Track when tab becomes hidden/visible for catch-up movement
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setHiddenAt(performance.now());
+      } else {
+        if (hiddenAt !== null) {
+          const now = performance.now();
+          const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
+          applySnakeCatchUp(delta);
+          setHiddenAt(null);
         }
       }
-    }, 1000 / 60); // 60fps background movement
+      setGameIsVisible(!document.hidden);
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -1420,9 +1440,9 @@ export default function GamePage() {
     animationId = requestAnimationFrame(gameLoop);
     return () => {
       cancelAnimationFrame(animationId);
-      clearInterval(realTimeMovementInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt]);
 
   const resetGame = () => {
     setGameOver(false);
