@@ -105,7 +105,7 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-  bot.currentAngle += angleDiff * 0.03; // Slower turning than player
+  bot.currentAngle += angleDiff * 0.024; // 20% slower turning (0.03 * 0.8), maintaining slower than player
   
   // Move bot head
   const dx = Math.cos(bot.currentAngle) * bot.speed;
@@ -181,7 +181,7 @@ class SmoothSnake {
     // Movement properties
     this.head = { x, y };
     this.currentAngle = 0;
-    this.turnSpeed = 0.04;
+    this.turnSpeed = 0.032; // Reduced by 20% (0.04 * 0.8) for smoother turning
     this.baseSpeed = 2.4;
     this.boostMultiplier = 2.0;
     this.speed = this.baseSpeed;
