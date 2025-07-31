@@ -54,10 +54,10 @@ class SmoothSnake {
     this.baseSegmentRadius = 14; // Fixed segment radius
     this.maxSegmentRadius = 14; // Keep consistent size
     
-    // Start with 5 balls (25 mass total)
+    // Start with 5 balls (25 mass total, but we'll give them 200 mass to work with)
     this.segments = [];
-    const START_MASS = 25; // 5 balls x 5 mass each
-    this.growthRemaining = START_MASS;
+    const START_MASS = 25; // 5 balls x 5 mass each (visual segments)
+    this.growthRemaining = START_MASS; // Only the visual mass, not the full 200
     
     // Initialize exactly 5 segments for tracking
     const START_SEGMENTS = 5;
@@ -69,7 +69,7 @@ class SmoothSnake {
     }
     
     // Set minimum mass (cannot go below starting size)
-    this.minimumMass = START_MASS;
+    this.minimumMass = 200; // Player effectively has 200 mass to start
   }
   
   get head() {
@@ -248,16 +248,10 @@ export default function GamePage() {
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     newSnake.segmentSpacing = 24; // Connected segments like a worm
-    // Start with fewer visible segments, let growth system handle the rest
-    newSnake.segments = [];
-    for (let i = 0; i < 5; i++) {
-      newSnake.segments.push({ 
-        x: MAP_CENTER_X - i * newSnake.segmentSpacing, 
-        y: MAP_CENTER_Y 
-      });
-    }
-    newSnake.growthRemaining = 300; // Start with 300 mass ready to grow
-    newSnake.minimumMass = 300; // Cannot go below starting mass
+    // Snake constructor already creates 5 segments with 25 mass
+    // Give them 200 total mass but only show 5 segments initially
+    newSnake.growthRemaining = 200; // Start with 200 mass ready to grow
+    newSnake.minimumMass = 200; // Cannot go below starting mass
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
@@ -786,9 +780,9 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (5 segments, 300 mass ready to grow) with new spacing
+    // Reset snake to initial state (5 segments, 200 mass ready to grow) with new spacing
     snake.segments = [];
-    const START_MASS = 300;
+    const START_MASS = 200;
     const START_SEGMENTS = 5;
     snake.segmentSpacing = 24; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
