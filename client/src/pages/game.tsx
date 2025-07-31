@@ -785,26 +785,42 @@ export default function GamePage() {
         const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
         const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
         
-        // White square eyes
-        ctx.fillStyle = 'white';
-        ctx.fillRect(eye1X - eyeSize, eye1Y - eyeSize, eyeSize * 2, eyeSize * 2);
-        ctx.fillRect(eye2X - eyeSize, eye2Y - eyeSize, eyeSize * 2, eyeSize * 2);
+        // Draw rotated square eyes
+        ctx.save();
         
-        // Black square pupils at front of eyes, looking at cursor
-        const pupilOffset = 1.2; // Position pupils toward front of eye
+        // Draw first eye with rotation
+        ctx.translate(eye1X, eye1Y);
+        ctx.rotate(movementAngle);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+        
+        // Draw first pupil (rotated relative to eye)
+        const pupilOffset = 1.2;
         ctx.fillStyle = 'black';
         ctx.fillRect(
-          (eye1X + Math.cos(cursorAngle) * pupilOffset) - pupilSize,
-          (eye1Y + Math.sin(cursorAngle) * pupilOffset) - pupilSize,
+          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
           pupilSize * 2, 
           pupilSize * 2
         );
+        ctx.restore();
+        
+        // Draw second eye with rotation
+        ctx.save();
+        ctx.translate(eye2X, eye2Y);
+        ctx.rotate(movementAngle);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+        
+        // Draw second pupil (rotated relative to eye)
+        ctx.fillStyle = 'black';
         ctx.fillRect(
-          (eye2X + Math.cos(cursorAngle) * pupilOffset) - pupilSize,
-          (eye2Y + Math.sin(cursorAngle) * pupilOffset) - pupilSize,
+          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
           pupilSize * 2, 
           pupilSize * 2
         );
+        ctx.restore();
       }
 
       // Restore context
