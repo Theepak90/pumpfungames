@@ -181,6 +181,9 @@ class SmoothSnake {
   // Money system
   money: number;
   
+  // Food eating cooldown to prevent spam eating
+  lastFoodEaten: number;
+  
   constructor(x: number, y: number) {
     // Movement properties
     this.head = { x, y };
@@ -209,6 +212,9 @@ class SmoothSnake {
     
     // Initialize money
     this.money = 1.00;
+    
+    // Initialize food eating cooldown
+    this.lastFoodEaten = 0;
     
     this.updateVisibleSegments();
   }
@@ -276,7 +282,7 @@ class SmoothSnake {
     // Gradually increase mass from growthRemaining
     // Don't add segments manually - let updateVisibleSegments reveal them from trail
     if (this.growthRemaining > 0.01) {
-      const growthRate = Math.min(0.02, this.growthRemaining); // Slower growth rate and consume all remaining
+      const growthRate = Math.min(0.1, this.growthRemaining); // Faster consumption of growth
       this.totalMass += growthRate;
       this.growthRemaining -= growthRate;
       // As totalMass increases, more trail segments become visible (smooth tail growth)
@@ -383,9 +389,18 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    this.growthRemaining += mass;
-    console.log(`Snake eating food: +${mass} mass, growthRemaining now: ${this.growthRemaining}`);
-    return mass; // Return score increase
+    
+    // Limit total queued growth to prevent excessive accumulation
+    const maxQueuedGrowth = 10; // Maximum 10 mass can be queued
+    if (this.growthRemaining < maxQueuedGrowth) {
+      this.growthRemaining += mass;
+      this.lastFoodEaten = Date.now();
+      console.log(`Snake eating food: +${mass} mass, growthRemaining now: ${this.growthRemaining.toFixed(2)}`);
+      return mass; // Return score increase
+    } else {
+      console.log(`Growth queue full (${this.growthRemaining.toFixed(2)}), ignoring food`);
+      return 0; // Don't add more growth if queue is full
+    }
   }
   
   setBoost(boosting: boolean) {
@@ -950,8 +965,9 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          // Check collision with more generous collision detection
-          if (dist < snake.getSegmentRadius() + food.size + 5) { // Added 5px buffer
+          // Check collision with reasonable collision detection and cooldown
+          const now = Date.now();
+          if (dist < snake.getSegmentRadius() + food.size && (now - snake.lastFoodEaten) > 100) { // 100ms cooldown
             // Snake eats the food - growth handled internally
             scoreIncrease += snake.eatFood(food);
             
