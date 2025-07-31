@@ -714,37 +714,24 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw segments from tail to head with proper outline layering
-      const overlapHighlightCount = 5; // Last 5 segments get outline
-      const totalSegments = snake.visibleSegments.length;
-      const lastIndex = totalSegments - 1;
-      
-      for (let i = lastIndex; i >= 0; i--) {
+      // Draw each segment from tail to head with natural z-ordering
+      for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
-        const isRecent = i <= overlapHighlightCount - 1; // Head and recent segments
         
         ctx.globalAlpha = segment.opacity;
         
-        if (isRecent) {
-          // Draw with outline (recent segments including head)
-          ctx.fillStyle = "white";
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Draw body on top
-          ctx.fillStyle = "#d55400";
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          // Draw body only (older segments)
-          ctx.fillStyle = "#d55400";
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // Draw white outline behind segment
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw segment body on top
+        ctx.fillStyle = "#d55400";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.fill();
       }
       
       // Reset global alpha

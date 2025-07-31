@@ -1,0 +1,81 @@
+🧠 Current Behavior (Issue Recap):
+You're drawing white outlines on top of all segments near the head.
+
+But now they’re overlapping earlier parts of the snake even when they shouldn’t — this makes the outline always “float” above the body, even when not overlapping itself.
+
+✅ GOAL (Like Slither.io):
+🟠 Body segments: always fully overlap older ones.
+
+⚪ White outline:
+
+Stays behind each segment normally
+
+Only appears “on top” when a segment is visually above another (e.g., head overlapping the tail)
+
+So the outline should only be visible on top if that part of the snake is on top — not globally.
+
+✅ Solution — One-Pass Z-Ordered Rendering:
+🎯 Key Trick:
+Render each segment’s white outline just under its own orange body, in a single back-to-front loop (from tail to head).
+
+This way:
+
+All outlines go behind their own segment.
+
+The top-most segments naturally appear above older parts (including outlines).
+
+You don’t need any special highlight logic or dual-pass.
+
+✅ Fix Instructions for Replit AI:
+Replace your two-pass outline/body logic with a single loop that:
+
+Draws each segment’s outline just before drawing the segment body.
+
+Loop through all segments from tail to head.
+
+This ensures outlines only appear under their own segments and never float incorrectly.
+
+✅ Example Code:
+js
+Copy
+Edit
+for (let i = 0; i < visibleSegments.length; i++) {
+  const seg = visibleSegments[i];
+
+  // Draw white outline behind segment
+  ctx.beginPath();
+  ctx.arc(seg.x, seg.y, SEGMENT_RADIUS + 2, 0, Math.PI * 2);
+  ctx.fillStyle = "white";
+  ctx.fill();
+
+  // Draw gradient body
+  const gradient = ctx.createRadialGradient(seg.x, seg.y, 0, seg.x, seg.y, SEGMENT_RADIUS);
+  gradient.addColorStop(0, "#ffbaba");
+  gradient.addColorStop(1, "#d55400");
+
+  ctx.beginPath();
+  ctx.arc(seg.x, seg.y, SEGMENT_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+}
+✅ Note: You can draw the eyes and head details last, so the head always looks clean and sits on top.
+
+🧠 Why This Works:
+This uses natural z-ordering:
+
+Each new segment appears above older ones.
+
+Outlines only ever show behind the segment they belong to.
+
+When snake overlaps itself, the correct segments (and their outlines) appear on top.
+
+✅ Summary for Replit AI:
+Draw each snake segment from tail to head in a single loop.
+
+Within that loop, draw:
+
+The segment’s white outline (radius + 2)
+
+Then the colored segment body
+
+This prevents outlines from floating above other segments, and naturally supports correct overlapping visuals like Slither.io.
