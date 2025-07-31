@@ -445,14 +445,30 @@ export default function GamePage() {
     const foodValue = 5; // Each food piece worth 5 mass
     const foodCount = Math.floor(snakeMass / foodValue); // Calculate how many food pieces to drop
     const newFoods: Food[] = [];
+    const snakeColor = '#d55400'; // Snake's orange color
+    
+    // Get snake's visible segments to drop food along the body
+    const segments = snake.visibleSegments;
     
     for (let i = 0; i < foodCount; i++) {
-      // Spread food in a circular pattern around death location
-      const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5; // Add slight randomness
-      const radius = 30 + Math.random() * 100; // Random radius between 30-130 pixels
+      let x, y;
       
-      const x = deathX + Math.cos(angle) * radius;
-      const y = deathY + Math.sin(angle) * radius;
+      if (segments.length > 0) {
+        // Drop food along the snake's body segments
+        const segmentIndex = Math.floor((i / foodCount) * segments.length);
+        const segment = segments[Math.min(segmentIndex, segments.length - 1)];
+        
+        // Add some randomness around each segment position
+        const randomOffset = 20;
+        x = segment.x + (Math.random() - 0.5) * randomOffset;
+        y = segment.y + (Math.random() - 0.5) * randomOffset;
+      } else {
+        // Fallback to death location if no segments
+        const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5;
+        const radius = 30 + Math.random() * 50;
+        x = deathX + Math.cos(angle) * radius;
+        y = deathY + Math.sin(angle) * radius;
+      }
       
       // Make sure food stays within map bounds
       const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
@@ -461,9 +477,9 @@ export default function GamePage() {
       newFoods.push({
         x: clampedX,
         y: clampedY,
-        size: 8, // Slightly bigger than normal food
+        size: 15, // Same size as orange test food
         mass: foodValue,
-        color: '#ffaa00' // Orange color for death food
+        color: snakeColor // Same color as the snake
       });
     }
     
