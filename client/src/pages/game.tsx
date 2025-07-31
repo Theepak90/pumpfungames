@@ -767,15 +767,22 @@ export default function GamePage() {
         const botRadius = botBaseRadius * botScaleFactor;
         
         // Only check against bot BODY segments (exclude last 10 to avoid head collision)
-        const botBodySegments = bot.visibleSegments.slice(0, Math.max(0, bot.visibleSegments.length - 10));
+        // Make sure we have enough segments to exclude the head
+        if (bot.visibleSegments.length <= 10) continue; // Skip bots that are too small
+        
+        const botBodySegments = bot.visibleSegments.slice(0, bot.visibleSegments.length - 10);
         
         for (const segment of botBodySegments) {
           const dx = updatedHead.x - segment.x;
           const dy = updatedHead.y - segment.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           
-          if (dist < snake.getSegmentRadius() + botRadius) {
+          // Use tighter collision detection with proper radius calculation
+          const collisionRadius = (snake.getSegmentRadius() + botRadius) * 0.8; // Tighter collision
+          
+          if (dist < collisionRadius) {
             // Player head hit bot body - player dies
+            console.log(`Player collision with bot body at distance: ${dist}, threshold: ${collisionRadius}`);
             const deathFoods = dropDeathFood(snake);
             setFoods(prevFoods => [...prevFoods, ...deathFoods]);
             setGameOver(true);
@@ -784,19 +791,26 @@ export default function GamePage() {
         }
       }
 
-      // Check self-collision: Player head vs Player body (exclude own head - last 10 segments)
-      const playerBodySegments = snake.visibleSegments.slice(0, Math.max(0, snake.visibleSegments.length - 10));
-      for (const segment of playerBodySegments) {
-        const dx = updatedHead.x - segment.x;
-        const dy = updatedHead.y - segment.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+      // Check self-collision: Player head vs Player body (exclude own head - last 15 segments for safety)
+      if (snake.visibleSegments.length > 15) { // Only check self-collision if snake is long enough
+        const playerBodySegments = snake.visibleSegments.slice(0, snake.visibleSegments.length - 15);
         
-        if (dist < snake.getSegmentRadius() * 1.5) {
-          // Player head hit own body - player dies
-          const deathFoods = dropDeathFood(snake);
-          setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-          setGameOver(true);
-          return;
+        for (const segment of playerBodySegments) {
+          const dx = updatedHead.x - segment.x;
+          const dy = updatedHead.y - segment.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // Self-collision needs to be tighter to prevent false positives
+          const selfCollisionRadius = snake.getSegmentRadius() * 1.2;
+          
+          if (dist < selfCollisionRadius) {
+            // Player head hit own body - player dies
+            console.log(`Player self-collision at distance: ${dist}, threshold: ${selfCollisionRadius}`);
+            const deathFoods = dropDeathFood(snake);
+            setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+            setGameOver(true);
+            return;
+          }
         }
       }
 
