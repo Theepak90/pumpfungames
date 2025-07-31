@@ -80,28 +80,32 @@ class SmoothSnake {
     
     this.visibleSegments = [];
     let distanceSoFar = 0;
+    let segmentIndex = 0;
     
-    // Walk through the trail and place segments at proper intervals
-    // This creates smooth tail growth as more segments become visible from existing trail
-    for (let i = 0; i < this.segmentTrail.length && this.visibleSegments.length < targetSegmentCount; i++) {
-      const current = this.segmentTrail[i];
-      const next = this.segmentTrail[i + 1];
+    // Walk through the trail and interpolate segment positions smoothly
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < targetSegmentCount; i++) {
+      const a = this.segmentTrail[i - 1];
+      const b = this.segmentTrail[i];
       
-      if (!next) break;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
-      // Calculate distance to next point
-      const dx = current.x - next.x;
-      const dy = current.y - next.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Add to cumulative distance
-      distanceSoFar += distance;
-      
-      // Place a segment every SEGMENT_SPACING distance
-      // The key: we don't add segments manually - they emerge from existing trail
-      if (distanceSoFar >= this.visibleSegments.length * this.SEGMENT_SPACING) {
-        this.visibleSegments.push(current);
+      // Check if we need to place a segment in this trail section
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < targetSegmentCount) {
+        const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+        const overshoot = targetDistance - distanceSoFar;
+        const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+        
+        // Linear interpolation between trail points
+        const x = a.x + dx * t;
+        const y = a.y + dy * t;
+        
+        this.visibleSegments.push({ x, y });
+        segmentIndex++;
       }
+      
+      distanceSoFar += segmentDist;
     }
   }
   
