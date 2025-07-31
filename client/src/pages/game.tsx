@@ -60,7 +60,7 @@ class SmoothSnake {
     // Snake system constants
     this.START_MASS = 6; // Start with just 6 segments instead of 30
     this.MASS_PER_SEGMENT = 1;
-    this.SEGMENT_SPACING = 20;
+    this.SEGMENT_SPACING = 18; // Slight overlap (radius=10, so 2px overlap)
     this.SEGMENT_RADIUS = 10;
     this.MIN_MASS_TO_BOOST = 15;
     
@@ -614,7 +614,7 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body segments (from back to front, skip head)
+      // Draw snake body segments (from tail to front, excluding head)
       for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -627,8 +627,7 @@ export default function GamePage() {
         
         // Orange gradient from bright center to dark edges
         gradient.addColorStop(0, "#ffbaba");    // Light center
-        gradient.addColorStop(0.7, "#ff6600");  // Medium orange
-        gradient.addColorStop(1, "#c43d00");    // Dark orange edge
+        gradient.addColorStop(1, "#d55400");    // Dark orange edge
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -636,28 +635,28 @@ export default function GamePage() {
         ctx.fill();
       }
 
-      // Draw head at real-time position (index 0 of visible segments or actual head)
-      const headSeg = snake.visibleSegments[0] || snake.head;
-      const headRadius = snake.getSegmentRadius();
-      const headGradient = ctx.createRadialGradient(
-        headSeg.x, headSeg.y, 0,
-        headSeg.x, headSeg.y, headRadius
-      );
-      
-      // Head has a brighter, more distinctive gradient
-      headGradient.addColorStop(0, "#ffffff");     // White center
-      headGradient.addColorStop(0.3, "#ffbaba");   // Light pink
-      headGradient.addColorStop(0.7, "#ff6600");   // Medium orange
-      headGradient.addColorStop(1, "#d55400");     // Dark orange edge
-      
-      ctx.fillStyle = headGradient;
-      ctx.beginPath();
-      ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw eyes that follow snake's movement direction
+      // Draw head on top (always rendered last to appear above body)
       if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.visibleSegments[0] || snake.head;
+        const headSeg = snake.visibleSegments[0];
+        const headRadius = snake.getSegmentRadius();
+        const headGradient = ctx.createRadialGradient(
+          headSeg.x, headSeg.y, 0,
+          headSeg.x, headSeg.y, headRadius
+        );
+        
+        // Head has a brighter, more distinctive gradient
+        headGradient.addColorStop(0, "#ffffff");     // White center
+        headGradient.addColorStop(1, "#d55400");     // Dark orange edge
+        
+        ctx.fillStyle = headGradient;
+        ctx.beginPath();
+        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw eyes that follow snake's movement direction (after head is drawn)
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
         const movementAngle = snake.currentAngle;
         const eyeDistance = 8;
         const eyeSize = 4;
