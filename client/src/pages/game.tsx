@@ -665,6 +665,13 @@ export default function GamePage() {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
+        // Draw outline first (darker color)
+        ctx.strokeStyle = "#8B4513";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        
         // Solid orange color for body segments
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
@@ -676,6 +683,13 @@ export default function GamePage() {
       if (snake.visibleSegments.length > 0) {
         const headSeg = snake.visibleSegments[0];
         const headRadius = snake.getSegmentRadius();
+        
+        // Draw head outline first (darker color)
+        ctx.strokeStyle = "#8B4513";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
+        ctx.stroke();
         
         // Same solid orange color as body
         ctx.fillStyle = "#d55400";
