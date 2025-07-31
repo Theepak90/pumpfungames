@@ -69,8 +69,19 @@
     @apply border-border;
   }
 
-  body {
+  html, body {
     @apply font-sans antialiased bg-dark-bg text-foreground;
+    zoom: 100% !important;
+    overflow: hidden;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  body {
     background-image: 
       linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -117,6 +128,31 @@
 
   .border-dark-border {
     border-color: var(--dark-border);
+  }
+
+  canvas {
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: none;
+    zoom: 100% !important;
+  }
+
+  /* Prevent browser zoom */
+  * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
   }
 
   .glow-hover {

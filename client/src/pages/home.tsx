@@ -115,13 +115,83 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-
+  // State variables
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('soundEnabled');
+    return saved ? JSON.parse(saved) : true;
+  });
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('volume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
+  const [previousVolume, setPreviousVolume] = useState(() => {
+    const saved = localStorage.getItem('previousVolume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
+  const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
+
+  // Handle sound toggle
+  const toggleSound = () => {
+    const newSoundState = !soundEnabled;
+    setSoundEnabled(newSoundState);
+    localStorage.setItem('soundEnabled', JSON.stringify(newSoundState));
+    
+    if (newSoundState) {
+      // Turning sound ON - restore previous volume
+      setVolume(previousVolume);
+      localStorage.setItem('volume', previousVolume.toString());
+    } else {
+      // Turning sound OFF - save current volume and set to 0
+      setPreviousVolume(volume);
+      localStorage.setItem('previousVolume', volume.toString());
+      setVolume(0);
+      localStorage.setItem('volume', '0');
+    }
+  };
+
+  // Handle volume change
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    localStorage.setItem('volume', newVolume.toString());
+    if (soundEnabled && newVolume > 0) {
+      setPreviousVolume(newVolume);
+      localStorage.setItem('previousVolume', newVolume.toString());
+    }
+  };
+
+  // Background music setup
+  useEffect(() => {
+    // Create background music audio element
+    const audio = new Audio();
+    audio.src = '/audio/background-music.mp3';
+    audio.preload = 'auto';
+    audio.loop = true;
+    audio.volume = volume;
+    setBackgroundMusic(audio);
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, []);
+
+  // Auto-play background music when sound is enabled and update volume
+  useEffect(() => {
+    if (backgroundMusic) {
+      backgroundMusic.volume = volume;
+      if (soundEnabled) {
+        backgroundMusic.play().catch(console.error);
+      } else {
+        backgroundMusic.pause();
+      }
+    }
+  }, [backgroundMusic, soundEnabled, volume]);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -192,11 +262,35 @@ export default function Home() {
           <span className="text-white text-lg">Welcome, </span>
           <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
         </div>
-        <button 
-          className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-gray-700 px-3 py-1 border-2 border-gray-600">
+            <button 
+              onClick={toggleSound}
+              className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
+            >
+              <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
+              {soundEnabled ? 'ON' : 'OFF'}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
+              }}
+            />
+            <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
+          </div>
+          <button 
+            className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Main Content Container */}
@@ -208,7 +302,7 @@ export default function Home() {
             <h1 className="text-white text-4xl font-bold mb-2 font-retro tracking-wider">
               PumpGames<span style={{color: '#53d493'}}>.fun</span>
             </h1>
-            <p className="text-gray-300 text-lg font-retro">Skill Based Betting</p>
+            <p className="text-gray-300 text-lg font-retro">Play,Earn,Have Fun!</p>
           </div>
 
           {/* Main Game Area - Three Column Layout */}

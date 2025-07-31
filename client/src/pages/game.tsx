@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Volume2 } from 'lucide-react';
 
 // Game constants
 const MAP_CENTER_X = 2000;
@@ -23,183 +23,228 @@ interface Food {
 }
 
 class SmoothSnake {
-  segments: Position[];
-  speed: number;
-  baseSpeed: number;
-  radius: number;
+  head: Position;
   currentAngle: number;
   turnSpeed: number;
-  segmentSpacing: number;
-  growthRemaining: number;
+  speed: number;
+  baseSpeed: number;
+  boostMultiplier: number;
   isBoosting: boolean;
   boostCooldown: number;
-  segmentMass: number;
-  minimumMass: number;
-  massPerSegment: number;
+  
+  // Trail and segment system
+  segmentTrail: Position[];
+  visibleSegments: Array<{ x: number; y: number; opacity: number }>; // Segments with opacity for fading
+  totalMass: number;
+  growthRemaining: number;
+  distanceBuffer: number;
+  currentSegmentCount: number; // Smoothly animated segment count
+  
+  // Constants
+  START_MASS: number;
+  MASS_PER_SEGMENT: number;
+  SEGMENT_SPACING: number;
+  SEGMENT_RADIUS: number;
+  MIN_MASS_TO_BOOST: number;
   
   constructor(x: number, y: number) {
-    this.baseSpeed = 2.4 * 1.2; // 2.88 px/frame (20% faster than previous)
-    this.speed = this.baseSpeed;
-    this.radius = 12;
+    // Movement properties
+    this.head = { x, y };
     this.currentAngle = 0;
-    this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 8; // Distance between segments for smooth tracking
-    this.growthRemaining = 0; // Growth counter for eating food
+    this.turnSpeed = 0.04;
+    this.baseSpeed = 2.4;
+    this.boostMultiplier = 2.0;
+    this.speed = this.baseSpeed;
     this.isBoosting = false;
     this.boostCooldown = 0;
-    this.segmentMass = 1; // Each segment = 1 mass
-    this.massPerSegment = 3; // 3 mass = 1 visible segment (like Slither.io)
     
-    // Initialize with 45 mass (15 visible segments)
-    this.segments = [];
-    const START_MASS = 45; // 15 balls x 3 mass each
-    this.growthRemaining = START_MASS;
+    // Snake system constants
+    this.START_MASS = 6; // Start with just 6 segments instead of 30
+    this.MASS_PER_SEGMENT = 1;
+    this.SEGMENT_SPACING = 10; // Heavy overlap (radius=10, so 10px overlap for maximum density)
+    this.SEGMENT_RADIUS = 10;
+    this.MIN_MASS_TO_BOOST = 4;
     
-    // Pre-generate 60 segment positions for smooth body tracking
-    const START_SEGMENTS = 60;
-    for (let i = 0; i < START_SEGMENTS; i++) {
-      this.segments.push({ 
-        x: x - i * this.segmentSpacing, // Normal spacing for initialization
-        y: y 
-      });
+    // Initialize trail and segments
+    this.segmentTrail = [{ x, y }];
+    this.visibleSegments = [];
+    this.totalMass = this.START_MASS;
+    this.growthRemaining = 0;
+    this.distanceBuffer = 0;
+    this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    
+    this.updateVisibleSegments();
+  }
+  
+  updateVisibleSegments() {
+    // Calculate target segment count based on mass
+    const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
+    // Smoothly animate currentSegmentCount toward target
+    const transitionSpeed = 0.1; // Smooth transition speed
+    if (this.currentSegmentCount < targetSegmentCount) {
+      this.currentSegmentCount += transitionSpeed;
+    } else if (this.currentSegmentCount > targetSegmentCount) {
+      this.currentSegmentCount -= transitionSpeed;
+    }
+    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    
+    // Use floor for solid segments, check if we need a fading segment
+    const solidSegmentCount = Math.floor(this.currentSegmentCount);
+    const fadeAmount = this.currentSegmentCount - solidSegmentCount;
+    const shouldHaveFadingSegment = fadeAmount > 0;
+    
+    this.visibleSegments = [];
+    let distanceSoFar = 0;
+    let segmentIndex = 0;
+    
+    // First, add all solid segments
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < solidSegmentCount; i++) {
+      const a = this.segmentTrail[i - 1];
+      const b = this.segmentTrail[i];
+      
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentDist = Math.sqrt(dx * dx + dy * dy);
+      
+      // Check if we need to place a segment in this trail section
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < solidSegmentCount) {
+        const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+        const overshoot = targetDistance - distanceSoFar;
+        const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+        
+        // Linear interpolation between trail points
+        const x = a.x + dx * t;
+        const y = a.y + dy * t;
+        
+        this.visibleSegments.push({ x, y, opacity: 1.0 });
+        segmentIndex++;
+      }
+      
+      distanceSoFar += segmentDist;
     }
     
-    // Set minimum mass (50% of spawn mass)
-    this.minimumMass = START_MASS * 0.5;
+    // Add fading segment if needed (only if opacity > 0.2 to avoid ghosting)
+    if (shouldHaveFadingSegment && fadeAmount > 0.2) {
+      // Continue searching for the position of the fading segment
+      for (let i = 1; i < this.segmentTrail.length; i++) {
+        const a = this.segmentTrail[i - 1];
+        const b = this.segmentTrail[i];
+        
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const segmentDist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if this is where the fading segment should be
+        if (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING) {
+          const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+          const overshoot = targetDistance - distanceSoFar;
+          const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+          
+          // Linear interpolation for fading segment position
+          const x = a.x + dx * t;
+          const y = a.y + dy * t;
+          
+          this.visibleSegments.push({ x, y, opacity: fadeAmount });
+          break;
+        }
+        
+        distanceSoFar += segmentDist;
+      }
+    }
   }
   
-  get head() {
-    return this.segments[0];
+  applyGrowth() {
+    // Gradually increase mass from growthRemaining
+    // Don't add segments manually - let updateVisibleSegments reveal them from trail
+    if (this.growthRemaining > 0.05) {
+      this.totalMass += 0.05;
+      this.growthRemaining -= 0.05;
+      // As totalMass increases, more trail segments become visible (smooth tail growth)
+      this.updateVisibleSegments();
+    }
   }
   
-  get length() {
-    return this.segments.length;
-  }
-  
-  get totalMass() {
-    return this.growthRemaining; // Mass is now tracked purely in growthRemaining
-  }
-  
-  get visibleSegments() {
-    return Math.floor(this.totalMass / this.massPerSegment);
+  getSegmentRadius() {
+    return this.SEGMENT_RADIUS;
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
-    // Calculate target angle from mouse direction relative to screen center
+    // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
-    // Robust angle difference calculation to prevent 180° flips
+    // Smooth angle interpolation
     let angleDiff = targetAngle - this.currentAngle;
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
     
-    // Smoothly interpolate toward target angle
     this.currentAngle += angleDiff * this.turnSpeed;
     
-    // Keep currentAngle in proper range to prevent accumulation
+    // Keep angle in range
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
-    // Handle boost mechanic with minimum mass protection
-    const BOOST_MULTIPLIER = 2.0; // Double the normal speed
-    const BOOST_DROP_INTERVAL = 20; // frames (3 drops per second at 60fps)
-    const BOOST_DROP_MASS = 0.5;
+    // Handle boost mechanics
+    this.applyBoost(onDropFood);
     
-    // Prevent boosting if below 50% of spawn mass
-    if (this.totalMass <= this.minimumMass) {
-      this.isBoosting = false;
+    // Move head
+    const dx = Math.cos(this.currentAngle) * this.speed;
+    const dy = Math.sin(this.currentAngle) * this.speed;
+    
+    this.head.x += dx;
+    this.head.y += dy;
+    
+    // Add head position to trail every frame for smooth following
+    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+
+    // Remove excess trail length (keep enough to render full snake)
+    const maxTrailLength = Math.floor((this.totalMass / this.MASS_PER_SEGMENT) * this.SEGMENT_SPACING * 2);
+    if (this.segmentTrail.length > maxTrailLength) {
+      this.segmentTrail.length = maxTrailLength;
     }
+
+    // Sample segments at fixed spacing from the trail
+    this.updateVisibleSegments();
     
-    if (this.isBoosting && this.totalMass > this.minimumMass) {
-      this.speed = this.baseSpeed * BOOST_MULTIPLIER; // 5.76 pixels per frame when boosting (double normal)
+    // Apply gradual growth
+    this.applyGrowth();
+  }
+  
+  applyBoost(onDropFood?: (food: Food) => void) {
+    if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST) {
+      this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Drop orb every 20 frames (3 per second) just behind the head
-      if (this.boostCooldown % BOOST_DROP_INTERVAL === 0 && onDropFood) {
-        const dropDistance = 20; // pixels behind head
-        const dropX = this.head.x - Math.cos(this.currentAngle) * dropDistance;
-        const dropY = this.head.y - Math.sin(this.currentAngle) * dropDistance;
+      // Drop mass every 20 frames
+      if (this.boostCooldown % 20 === 0 && onDropFood) {
+        const dropX = this.head.x - Math.cos(this.currentAngle) * 20;
+        const dropY = this.head.y - Math.sin(this.currentAngle) * 20;
         
         onDropFood({
           x: dropX,
           y: dropY,
           size: 4,
           color: '#f55400',
-          mass: BOOST_DROP_MASS
+          mass: 0.5
         });
-      }
-      
-      // Continuous mass loss while boosting (0.025 per frame = 1.5 per second at 60fps)
-      const boostMassLoss = BOOST_DROP_MASS / BOOST_DROP_INTERVAL;
-      if (this.growthRemaining >= boostMassLoss) {
-        this.growthRemaining -= boostMassLoss;
-      } else {
-        // Cap at minimum mass, don't go below
-        this.growthRemaining = Math.max(0, this.growthRemaining - boostMassLoss);
+        
+        this.totalMass -= 0.5;
+        this.updateVisibleSegments();
       }
     } else {
       this.speed = this.baseSpeed;
-    }
-    
-    // Move head in current direction
-    const newHead = {
-      x: this.head.x + this.speed * Math.cos(this.currentAngle),
-      y: this.head.y + this.speed * Math.sin(this.currentAngle)
-    };
-    
-    // Always update head position for smooth movement
-    this.segments.unshift(newHead);
-    
-    // Remove extra head segment addition to prevent jittering
-    
-    // Adjust segment spacing based on boost state - tighter when boosting for visual effect
-    const currentSpacing = this.isBoosting ? this.segmentSpacing * 0.85 : this.segmentSpacing;
-    
-    // Smooth body following - each segment follows the one before it
-    for (let i = 1; i < this.segments.length; i++) {
-      const current = this.segments[i];
-      const previous = this.segments[i - 1];
-      
-      const dx = previous.x - current.x;
-      const dy = previous.y - current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance > currentSpacing) {
-        // Move segment toward the previous one, maintaining proper spacing
-        const moveRatio = (distance - currentSpacing) / distance;
-        this.segments[i] = {
-          x: current.x + dx * moveRatio,
-          y: current.y + dy * moveRatio
-        };
-      }
-    }
-    
-    // Extend segments array if needed for body tracking
-    while (this.segments.length < 100) { // Ensure we have enough segments for tracking
-      const tail = this.segments[this.segments.length - 1];
-      const secondToLast = this.segments[this.segments.length - 2] || tail;
-      
-      // Calculate direction for new segment placement
-      const dx = tail.x - secondToLast.x;
-      const dy = tail.y - secondToLast.y;
-      const length = Math.sqrt(dx * dx + dy * dy) || this.segmentSpacing;
-      const newX = tail.x + (dx / length) * this.segmentSpacing;
-      const newY = tail.y + (dy / length) * this.segmentSpacing;
-      
-      this.segments.push({ x: newX, y: newY });
+      this.isBoosting = false;
     }
   }
   
   eatFood(food: Food) {
-    // Growth based on food mass - no limits, let it grow indefinitely
-    const mass = food.mass || 1; // Default to 1 if no mass specified
+    const mass = food.mass || 1;
     this.growthRemaining += mass;
-    return mass; // Return score increase based on mass
+    return mass; // Return score increase
   }
   
   setBoost(boosting: boolean) {
-    // Only allow boosting if above 50% of spawn mass
-    if (boosting && this.totalMass <= this.minimumMass) {
+    if (boosting && this.totalMass <= this.MIN_MASS_TO_BOOST) {
       this.isBoosting = false;
       return;
     }
@@ -215,14 +260,111 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
-  const [snake] = useState(new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y));
+  const [snake] = useState(() => {
+    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
+    // Snake constructor now creates 6 segments with 30 mass and proper spacing
+    return newSnake;
+  });
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('soundEnabled');
+    return saved ? JSON.parse(saved) : true;
+  });
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('volume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
+  const [previousVolume, setPreviousVolume] = useState(() => {
+    const saved = localStorage.getItem('previousVolume');
+    return saved ? parseFloat(saved) : 0.25;
+  });
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  
+  // Fixed zoom level
+  const zoom = 1.2;
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  // Background music setup
+  useEffect(() => {
+    const audio = new Audio();
+    audio.src = '/audio/background-music.mp3';
+    audio.preload = 'auto';
+    audio.loop = true;
+    audio.volume = volume;
+    setBackgroundMusic(audio);
+    
+    // Start playing music when game loads if sound is enabled
+    if (soundEnabled) {
+      audio.play().catch(console.error);
+    }
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, []);
+
+  // Load background image
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/background.png';
+    img.onload = () => {
+      console.log('Background image loaded successfully');
+      setBackgroundImage(img);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load background image:', e);
+    };
+  }, []);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (backgroundMusic) {
+      backgroundMusic.volume = volume;
+      if (soundEnabled) {
+        backgroundMusic.play().catch(console.error);
+      } else {
+        backgroundMusic.pause();
+      }
+    }
+  }, [backgroundMusic, volume, soundEnabled]);
+
+  // Toggle sound function
+  const toggleSound = () => {
+    const newSoundState = !soundEnabled;
+    setSoundEnabled(newSoundState);
+    localStorage.setItem('soundEnabled', JSON.stringify(newSoundState));
+    
+    if (newSoundState) {
+      // Turning sound ON - restore previous volume
+      setVolume(previousVolume);
+      localStorage.setItem('volume', previousVolume.toString());
+    } else {
+      // Turning sound OFF - save current volume and set to 0
+      setPreviousVolume(volume);
+      localStorage.setItem('previousVolume', volume.toString());
+      setVolume(0);
+      localStorage.setItem('volume', '0');
+    }
+  };
+
+  // Handle volume change
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    localStorage.setItem('volume', newVolume.toString());
+    if (soundEnabled && newVolume > 0) {
+      setPreviousVolume(newVolume);
+      localStorage.setItem('previousVolume', newVolume.toString());
+    }
+  };
 
   // Handle canvas resize for fullscreen
   useEffect(() => {
@@ -237,6 +379,37 @@ export default function GamePage() {
     window.addEventListener('resize', updateCanvasSize);
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, []);
+
+  // Prevent browser zoom
+  useEffect(() => {
+    const preventZoom = (e: WheelEvent | KeyboardEvent) => {
+      if ('ctrlKey' in e && e.ctrlKey) {
+        e.preventDefault();
+        return false;
+      }
+      if ('metaKey' in e && e.metaKey) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    const preventKeyboardZoom = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    document.addEventListener('wheel', preventZoom, { passive: false });
+    document.addEventListener('keydown', preventKeyboardZoom, { passive: false });
+    
+    return () => {
+      document.removeEventListener('wheel', preventZoom);
+      document.removeEventListener('keydown', preventKeyboardZoom);
+    };
+  }, []);
+
+
 
   // Initialize food with mass system
   useEffect(() => {
@@ -408,7 +581,7 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          if (dist < snake.radius + food.size) {
+          if (dist < snake.getSegmentRadius() + food.size) {
             // Snake eats the food - this handles growth internally
             scoreIncrease += snake.eatFood(food);
             
@@ -429,7 +602,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 10,
-                mass: 2,
+                mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
                 color: '#ff4444'
               };
             } else if (foodType < 0.4) { // 30% medium food
@@ -437,7 +610,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 6,
-                mass: 1,
+                mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
                 color: '#44ff44'
               };
             } else { // 60% small food
@@ -445,7 +618,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 4,
-                mass: 0.5,
+                mass: 0.2, // Reduced from 0.5 to 0.2 (2.5x less)
                 color: '#4444ff'
               };
             }
@@ -462,94 +635,57 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Clear canvas with dark background
-      ctx.fillStyle = '#15161b';
-      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      // Clear canvas with background image pattern or dark fallback
+      if (backgroundImage) {
+        // Create repeating pattern from background image
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+        }
+      } else {
+        // Fallback to solid color if image not loaded
+        ctx.fillStyle = '#15161b';
+        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      }
 
       // Save context for camera transform
       ctx.save();
 
-      // Camera follows snake head
-      ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
+      // Apply zoom and camera following snake head
+      ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-snake.head.x, -snake.head.y);
 
-      // Draw hexagonal cellular pattern like Slither.io
-      const hexSize = 35;
-      const hexHeight = hexSize * Math.sqrt(3);
-      
-      // Function to draw a filled hexagon at given center
-      const drawFilledHexagon = (centerX: number, centerY: number, fillColor: string, strokeColor: string) => {
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const angle = (i * Math.PI) / 3;
-          const x = centerX + hexSize * Math.cos(angle);
-          const y = centerY + hexSize * Math.sin(angle);
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        }
-        ctx.closePath();
-        
-        // Fill the hexagon
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-        
-        // Stroke the border
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      };
-      
-      // Draw hexagonal grid pattern with cellular appearance
-      const mapSize = MAP_RADIUS * 2.5; // Cover area larger than map for red zone
-      for (let row = 0; row * hexHeight * 0.75 < mapSize; row++) {
-        for (let col = 0; col * hexSize * 1.5 < mapSize; col++) {
-          const x = col * hexSize * 1.5;
-          const y = row * hexHeight * 0.75 + (col % 2) * hexHeight * 0.375;
-          
-          // Check distance from map center
-          const distanceFromCenter = Math.sqrt(
-            (x - MAP_CENTER_X) ** 2 + (y - MAP_CENTER_Y) ** 2
-          );
-          
-          let fillColor, strokeColor;
-          
-          if (distanceFromCenter > MAP_RADIUS) {
-            // Outside death barrier - red zone
-            const redIntensity = Math.min(255, 150 + (distanceFromCenter - MAP_RADIUS) * 0.1);
-            fillColor = `rgb(${redIntensity}, 20, 20)`;
-            strokeColor = '#8b0000';
-          } else {
-            // Inside safe zone - normal hexagons
-            const variation = Math.sin(x * 0.01 + y * 0.01) * 0.1;
-            const baseBlue = 0x2a + Math.floor(variation * 20);
-            const baseGreen = 0x2f + Math.floor(variation * 15);
-            const baseBrightness = 0x3a + Math.floor(variation * 25);
-            
-            fillColor = `rgb(${baseBlue}, ${baseGreen}, ${baseBrightness})`;
-            strokeColor = '#1a1d24';
-          }
-          
-          drawFilledHexagon(x, y, fillColor, strokeColor);
+      // Draw background image across the full map area if loaded
+      if (backgroundImage) {
+        const mapSize = MAP_RADIUS * 2.5;
+        // Draw background image tiled across the entire game area
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
         }
       }
-
-      // Draw thick red barrier band
-      const barrierWidth = 60; // Width of the red barrier band
       
-      // Draw outer red circle (barrier)
-      ctx.fillStyle = '#cc2222';
-      ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS + barrierWidth/2, 0, Math.PI * 2);
-      ctx.fill();
+      // Fill area outside death barrier with semi-transparent darker overlay
+      const mapSize = MAP_RADIUS * 2.5;
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.3)'; // Semi-transparent green overlay
+      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
       
-      // Cut out inner circle to create ring
+      // Cut out the safe zone circle
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS - barrierWidth/2, 0, Math.PI * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
+
+      // Draw thin death barrier line
+      ctx.strokeStyle = '#53d392';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
 
       // Draw food with gradient effect
       foods.forEach(food => {
@@ -573,67 +709,61 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body with 3D gradient spheres (connected beads)
-      const segmentRadius = 16; // Larger radius for better overlap
-      const maxVisibleSegments = snake.visibleSegments;
+      // First pass: Draw white outline behind ALL segments including head
+      for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
+        
+        ctx.globalAlpha = segment.opacity;
+        
+        // White outline circle (slightly bigger)
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
       
-      // Adjust spacing based on boost state to maintain connection
-      const drawSpacing = snake.isBoosting ? 1.4 : 1.8; // Closer spacing when boosting
-      
-      // Draw segments with proper overlap to eliminate gaps
-      for (let i = 0; i < maxVisibleSegments && i < snake.segments.length; i++) {
-        const segmentIndex = Math.min(Math.floor(i * drawSpacing), snake.segments.length - 1);
-        const segment = snake.segments[segmentIndex];
-        const isHead = i === 0;
+      // Second pass: Draw actual segments on top (body segments only, excluding head)
+      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
         
-        // Create radial gradient for 3D effect (light top, dark bottom)
-        const gradient = ctx.createRadialGradient(
-          segment.x - 4, segment.y - 4, 0,
-          segment.x, segment.y, segmentRadius
-        );
+        ctx.globalAlpha = segment.opacity;
         
-        if (isHead) {
-          // Head gradient - brighter with consistent highlight
-          gradient.addColorStop(0, "#ffbaba");  // Light center highlight
-          gradient.addColorStop(0.7, "#ff6600"); // Mid tone
-          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
-        } else {
-          // Body gradient - standard with consistent highlight
-          gradient.addColorStop(0, "#ffbaba");  // Light center highlight  
-          gradient.addColorStop(0.7, "#f55400"); // Mid tone
-          gradient.addColorStop(1, "#d66868");   // Dark shadow edge
-        }
-        
-        // Draw segment sphere
-        ctx.fillStyle = gradient;
+        // Solid orange color for body segments
+        ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Add subtle rim lighting for extra 3D effect
-        if (isHead) {
-          const rimGradient = ctx.createRadialGradient(
-            segment.x, segment.y, segmentRadius - 2,
-            segment.x, segment.y, segmentRadius
-          );
-          rimGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
-          rimGradient.addColorStop(1, "rgba(255, 255, 255, 0.3)");
-          
-          ctx.fillStyle = rimGradient;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
 
-      // Draw eyes that follow snake's movement direction
-      if (snake.segments.length > 0) {
-        const snakeHead = snake.head;
-        // Use snake's currentAngle instead of mouse direction
+      // Third pass: Draw head on top
+      if (snake.visibleSegments.length > 0) {
+        const headSeg = snake.visibleSegments[0];
+        const headRadius = snake.getSegmentRadius();
+        
+        ctx.globalAlpha = headSeg.opacity;
+        
+        // Same solid orange color as body
+        ctx.fillStyle = "#d55400";
+        ctx.beginPath();
+        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Reset global alpha
+      ctx.globalAlpha = 1.0;
+
+      // Draw eyes that track the cursor smoothly (after head is drawn)
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
         const movementAngle = snake.currentAngle;
-        const eyeDistance = 8;
-        const eyeSize = 4;
-        const pupilSize = 2;
+        const eyeDistance = 5; // Smaller distance from center
+        const eyeSize = 3; // Smaller eyes
+        const pupilSize = 1.5; // Smaller pupils
+        
+        // Calculate cursor direction using mouse direction vector
+        const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
         
         // Eye positions perpendicular to movement direction
         const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -641,9 +771,7 @@ export default function GamePage() {
         const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
         const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
         
-        // White eyes with slight glow
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 4;
+        // White eyes (smaller)
         ctx.fillStyle = 'white';
         ctx.beginPath();
         ctx.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
@@ -651,22 +779,21 @@ export default function GamePage() {
         ctx.beginPath();
         ctx.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.shadowBlur = 0;
         
-        // Black pupils following movement direction
-        const pupilOffset = 2;
+        // Black pupils at front of eyes, looking at cursor
+        const pupilOffset = 1.2; // Position pupils toward front of eye
         ctx.fillStyle = 'black';
         ctx.beginPath();
         ctx.arc(
-          eye1X + Math.cos(movementAngle) * pupilOffset, 
-          eye1Y + Math.sin(movementAngle) * pupilOffset, 
+          eye1X + Math.cos(cursorAngle) * pupilOffset, 
+          eye1Y + Math.sin(cursorAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
         ctx.beginPath();
         ctx.arc(
-          eye2X + Math.cos(movementAngle) * pupilOffset, 
-          eye2Y + Math.sin(movementAngle) * pupilOffset, 
+          eye2X + Math.cos(cursorAngle) * pupilOffset, 
+          eye2Y + Math.sin(cursorAngle) * pupilOffset, 
           pupilSize, 0, 2 * Math.PI
         );
         ctx.fill();
@@ -679,7 +806,8 @@ export default function GamePage() {
       ctx.fillStyle = 'white';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Length: ${snake.length}`, 20, 70);
+      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
+      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
       
 
 
@@ -693,17 +821,18 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (45 mass = 15 visible segments)
-    snake.segments = [];
-    const START_MASS = 45;
-    const START_SEGMENTS = 60;
-    for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
-    }
+    // Reset snake to initial state using new system
+    snake.head = { x: MAP_CENTER_X, y: MAP_CENTER_Y };
     snake.currentAngle = 0;
-    snake.growthRemaining = START_MASS;
-    snake.minimumMass = START_MASS * 0.5; // Reset minimum mass (50% of spawn)
-    snake.setBoost(false);
+    snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
+    snake.totalMass = snake.START_MASS;
+    snake.growthRemaining = 0;
+    snake.distanceBuffer = 0;
+    snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
+    snake.isBoosting = false;
+    snake.boostCooldown = 0;
+    snake.speed = snake.baseSpeed;
+    snake.updateVisibleSegments();
     setIsBoosting(false);
     setMouseDirection({ x: 1, y: 0 });
   };
@@ -724,18 +853,42 @@ export default function GamePage() {
           Exit Game
         </Button>
       </div>
+
+      {/* Volume Controls */}
+      <div className="absolute top-4 left-40 z-10 flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm px-3 py-2 border border-gray-600 rounded">
+        <button 
+          onClick={toggleSound}
+          className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
+        >
+          <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
+          {soundEnabled ? 'ON' : 'OFF'}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={volume}
+          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+          className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
+          }}
+        />
+        <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
+      </div>
       
       {/* Score Display */}
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Length: {snake.length}</div>
+          <div className="text-white text-sm">Segments: {snake.visibleSegments.length}</div>
           <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
-          <div className="text-gray-400 text-xs">Min Mass: {snake.minimumMass.toFixed(1)} (50% spawn)</div>
+          <div className="text-gray-400 text-xs">Min Mass: {snake.MIN_MASS_TO_BOOST} (boost threshold)</div>
           {isBoosting && (
             <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
           )}
-          {snake.totalMass <= snake.minimumMass && (
+          {snake.totalMass <= snake.MIN_MASS_TO_BOOST && (
             <div className="text-red-400 text-xs">Cannot boost - too small!</div>
           )}
         </div>
@@ -755,7 +908,7 @@ export default function GamePage() {
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
             <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Length: {snake.length}</div>
+            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
             <div className="flex gap-4">
               <Button
                 onClick={resetGame}
