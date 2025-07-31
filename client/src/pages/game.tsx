@@ -384,7 +384,7 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    this.growthRemaining += mass;
+    this.growthRemaining += mass * 0.5; // 1 mass = 0.5 segments
     return mass; // Return score increase
   }
   
@@ -439,10 +439,9 @@ export default function GamePage() {
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
-  // Function to drop food when snake dies
+  // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
-    const foodValue = 5; // Each food piece worth 5 mass
-    const foodCount = Math.floor(snakeMass / foodValue); // Calculate how many food pieces to drop
+    const foodCount = Math.floor(snakeMass); // 1 food per mass
     const newFoods: Food[] = [];
     const snakeColor = '#d55400'; // Snake's orange color
     
@@ -458,13 +457,13 @@ export default function GamePage() {
         const segment = segments[Math.min(segmentIndex, segments.length - 1)];
         
         // Add some randomness around each segment position
-        const randomOffset = 20;
+        const randomOffset = 8;
         x = segment.x + (Math.random() - 0.5) * randomOffset;
         y = segment.y + (Math.random() - 0.5) * randomOffset;
       } else {
         // Fallback to death location if no segments
         const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5;
-        const radius = 30 + Math.random() * 50;
+        const radius = 20 + Math.random() * 30;
         x = deathX + Math.cos(angle) * radius;
         y = deathY + Math.sin(angle) * radius;
       }
@@ -476,44 +475,28 @@ export default function GamePage() {
       newFoods.push({
         x: clampedX,
         y: clampedY,
-        size: 7.5, // Half the size of orange test food
-        mass: foodValue,
+        size: 7, // Size for death food
+        mass: 1, // Each death food worth 1 mass
         color: snakeColor, // Same color as the snake
         type: 'normal'
       });
     }
     
-    // Add only the regular death food to the existing food array
+    // Add the death food to the existing food array
     setFoods(prevFoods => [...prevFoods, ...newFoods]);
   };
 
-  // Function to drop money squares when snake dies
+  // Function to drop money squares when snake dies (near head only)
   const dropMoneySquares = (deathX: number, deathY: number, snakeMoney: number) => {
     const moneyPerSquare = 0.2; // Each green square worth $0.20
     const dropCount = Math.floor(snakeMoney / moneyPerSquare);
     const newMoneyFoods: Food[] = [];
     
-    // Get snake's visible segments to drop money along the body
-    const segments = snake.visibleSegments;
-    
+    // Drop money squares near the snake's head position only
     for (let i = 0; i < dropCount; i++) {
-      let x, y;
-      
-      if (segments.length > 0) {
-        // Drop money along the snake's body segments
-        const segmentIndex = Math.floor((i / dropCount) * segments.length);
-        const segment = segments[Math.min(segmentIndex, segments.length - 1)];
-        
-        // Add some randomness around each segment position
-        x = segment.x + (Math.random() - 0.5) * 10;
-        y = segment.y + (Math.random() - 0.5) * 10;
-      } else {
-        // Fallback to death location if no segments
-        const angle = (i / dropCount) * 2 * Math.PI + Math.random() * 0.5;
-        const radius = 20 + Math.random() * 30;
-        x = deathX + Math.cos(angle) * radius;
-        y = deathY + Math.sin(angle) * radius;
-      }
+      // Spawn in a small area around the head (20px radius)
+      const x = deathX + (Math.random() - 0.5) * 40;
+      const y = deathY + (Math.random() - 0.5) * 40;
       
       // Make sure money stays within map bounds
       const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
@@ -522,7 +505,7 @@ export default function GamePage() {
       newMoneyFoods.push({
         x: clampedX,
         y: clampedY,
-        size: 16, // Double the size (was 8, now 16)
+        size: 20, // Double the previous size (was 16, now 20 for 20x20px)
         color: '#00ff00', // Bright green
         type: 'money',
         value: moneyPerSquare
@@ -904,8 +887,9 @@ export default function GamePage() {
               const botRadius = botBaseRadius * botScaleFactor;
               
               if (dist < botRadius + food.size) {
-                // Bot eats food
-                bot.totalMass += food.mass || 1;
+                // Bot eats food (with new growth system: 1 mass = 0.5 segments)
+                const mass = food.mass || 1;
+                bot.totalMass += mass * 0.5;
                 
                 // Remove eaten food and add new one
                 newFoods.splice(i, 1);
@@ -970,7 +954,9 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          if (dist < snake.getSegmentRadius() + food.size) {
+          // Use appropriate collision detection based on food type
+          const collisionRadius = food.type === 'money' ? 10 : food.size; // Money squares are 20x20px (10px radius)
+          if (dist < snake.getSegmentRadius() + collisionRadius) {
             // Handle different food types
             if (food.type === 'money') {
               // Money pickup - add to snake's money balance
@@ -1135,18 +1121,18 @@ export default function GamePage() {
           ctx.shadowOffsetX = 0;
           ctx.shadowOffsetY = 0;
           
-          // Draw green background square
+          // Draw green background square (20x20px)
           ctx.fillStyle = food.color;
-          ctx.fillRect(drawX - food.size/2, drawY - food.size/2, food.size, food.size);
+          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
           
-          // Draw dollar sign image if loaded
+          // Draw dollar sign image if loaded (20x20px)
           if (dollarSignImage && dollarSignImage.complete) {
             ctx.drawImage(
               dollarSignImage,
-              drawX - food.size/2,
-              drawY - food.size/2,
-              food.size,
-              food.size
+              drawX - 10,
+              drawY - 10,
+              20,
+              20
             );
           }
         } else {
