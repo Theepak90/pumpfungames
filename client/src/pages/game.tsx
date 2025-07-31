@@ -1149,9 +1149,42 @@ export default function GamePage() {
       // Draw food items
       foods.forEach((food, index) => {
         if (food.type === 'money') {
-          // Draw money crates as simple green squares (20x20px)
-          ctx.fillStyle = food.color; // Green color
-          ctx.fillRect(food.x - 10, food.y - 10, 20, 20);
+          // Draw money crates with dollar sign image, shadow, and wobble
+          const time = Date.now() * 0.003; // Time for animation
+          const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
+          const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
+          
+          const drawX = food.x + wobbleX;
+          const drawY = food.y + wobbleY;
+          
+          // Draw shadow first
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
+          
+          // Reset shadow for main square
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw green background square (20x20px)
+          ctx.fillStyle = food.color;
+          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+          
+          // Draw dollar sign image if loaded (20x20px)
+          if (dollarSignImage && dollarSignImage.complete) {
+            ctx.drawImage(
+              dollarSignImage,
+              drawX - 10,
+              drawY - 10,
+              20,
+              20
+            );
+          }
         } else {
           // Draw regular food as circles with glow effect
           ctx.shadowColor = food.color;
