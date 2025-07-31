@@ -45,15 +45,7 @@ function createBotSnake(id: string): BotSnake {
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
-  // Use same gradient colors as player
-  const colors = [
-    '#e74c3c', // Red
-    '#e67e22', // Orange
-    '#f1c40f', // Yellow
-    '#27ae60', // Green
-    '#3498db', // Blue
-    '#9b59b6'  // Purple
-  ];
+  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
   
   return {
     id,
@@ -188,10 +180,6 @@ class SmoothSnake {
   // Money system
   money: number;
   
-  // Skin system
-  skinColor: string;
-  gradientPattern: CanvasPattern | null;
-  
   constructor(x: number, y: number) {
     // Movement properties
     this.head = { x, y };
@@ -220,18 +208,6 @@ class SmoothSnake {
     
     // Initialize money
     this.money = 1.00;
-    
-    // Initialize random skin
-    const skinColors = [
-      '#e74c3c', // Red
-      '#e67e22', // Orange
-      '#f1c40f', // Yellow
-      '#27ae60', // Green
-      '#3498db', // Blue
-      '#9b59b6'  // Purple
-    ];
-    this.skinColor = skinColors[Math.floor(Math.random() * skinColors.length)];
-    this.gradientPattern = null;
     
     this.updateVisibleSegments();
   }
@@ -450,29 +426,6 @@ export default function GamePage() {
     return saved ? parseFloat(saved) : 0.25;
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
-  
-  // Create gradient pattern for snake skin
-  const createSnakeGradientPattern = (ctx: CanvasRenderingContext2D, color: string): CanvasPattern | null => {
-    // Create a small canvas for the gradient pattern
-    const patternCanvas = document.createElement('canvas');
-    patternCanvas.width = 32;
-    patternCanvas.height = 32;
-    const patternCtx = patternCanvas.getContext('2d');
-    
-    if (!patternCtx) return null;
-    
-    // Create radial gradient
-    const gradient = patternCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    gradient.addColorStop(0, '#ffffff'); // White center
-    gradient.addColorStop(0.3, color); // Main color
-    gradient.addColorStop(0.7, color); // Main color
-    gradient.addColorStop(1, '#000000'); // Black edge
-    
-    patternCtx.fillStyle = gradient;
-    patternCtx.fillRect(0, 0, 32, 32);
-    
-    return ctx.createPattern(patternCanvas, 'repeat');
-  };
   
   // Dynamic zoom level with more aggressive zoom-out
   const calculateZoom = (mass: number) => {
@@ -1161,24 +1114,14 @@ export default function GamePage() {
         ctx.shadowOffsetY = 2;
       }
       
-      // Create gradient pattern if not exists
-      if (!snake.gradientPattern) {
-        snake.gradientPattern = createSnakeGradientPattern(ctx, snake.skinColor);
-      }
-      
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
         ctx.globalAlpha = segment.opacity;
         
-        // Draw segment with gradient pattern or fallback to solid color
-        if (snake.gradientPattern) {
-          ctx.fillStyle = snake.gradientPattern;
-        } else {
-          ctx.fillStyle = snake.skinColor;
-        }
-        
+        // Draw solid segment
+        ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -1296,18 +1239,6 @@ export default function GamePage() {
     snake.distanceBuffer = 0;
     snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
     snake.money = 1.00; // Reset money to starting amount
-    
-    // Reset skin with new random color
-    const skinColors = [
-      '#e74c3c', // Red
-      '#e67e22', // Orange
-      '#f1c40f', // Yellow
-      '#27ae60', // Green
-      '#3498db', // Blue
-      '#9b59b6'  // Purple
-    ];
-    snake.skinColor = skinColors[Math.floor(Math.random() * skinColors.length)];
-    snake.gradientPattern = null; // Reset pattern to regenerate with new color
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;
