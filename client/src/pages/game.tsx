@@ -251,8 +251,9 @@ export default function GamePage() {
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
-  const [volume, setVolume] = useState(0.5);
+  const [volume, setVolume] = useState(0.25);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [previousVolume, setPreviousVolume] = useState(0.25);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -293,7 +294,17 @@ export default function GamePage() {
 
   // Toggle sound function
   const toggleSound = () => {
-    setSoundEnabled(!soundEnabled);
+    const newSoundState = !soundEnabled;
+    setSoundEnabled(newSoundState);
+    
+    if (newSoundState) {
+      // Turning sound ON - restore previous volume
+      setVolume(previousVolume);
+    } else {
+      // Turning sound OFF - save current volume and set to 0
+      setPreviousVolume(volume);
+      setVolume(0);
+    }
   };
 
   // Handle canvas resize for fullscreen
@@ -775,7 +786,7 @@ export default function GamePage() {
             background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
           }}
         />
-        <span className="text-white text-xs font-retro">{Math.round(volume * 100)}%</span>
+        <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
       </div>
       
       {/* Score Display */}

@@ -119,7 +119,8 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [volume, setVolume] = useState(0.5);
+  const [volume, setVolume] = useState(0.25);
+  const [previousVolume, setPreviousVolume] = useState(0.25);
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
@@ -128,12 +129,14 @@ export default function Home() {
   const toggleSound = () => {
     const newSoundState = !soundEnabled;
     setSoundEnabled(newSoundState);
-    if (backgroundMusic) {
-      if (newSoundState) {
-        backgroundMusic.play().catch(console.error);
-      } else {
-        backgroundMusic.pause();
-      }
+    
+    if (newSoundState) {
+      // Turning sound ON - restore previous volume
+      setVolume(previousVolume);
+    } else {
+      // Turning sound OFF - save current volume and set to 0
+      setPreviousVolume(volume);
+      setVolume(0);
     }
   };
 
@@ -257,7 +260,7 @@ export default function Home() {
                 background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
               }}
             />
-            <span className="text-white text-xs font-retro">{Math.round(volume * 100)}%</span>
+            <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
           </div>
           <button 
             className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
