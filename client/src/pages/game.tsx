@@ -937,31 +937,7 @@ export default function GamePage() {
       // Food eating is now handled by server in multiplayer mode
 
       // In multiplayer mode, food collision is handled by the server
-      // Client-side food eating for local feedback
-      setFoods(prevFoods => {
-        const newFoods = [...prevFoods];
-        let scoreIncrease = 0;
-        
-        for (let i = newFoods.length - 1; i >= 0; i--) {
-          const food = newFoods[i];
-          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
-          
-          if (dist < snake.getSegmentRadius() + food.size) {
-            // Snake eats the food - growth handled internally
-            scoreIncrease += snake.eatFood(food);
-            
-            // Remove eaten food (server will sync the food state)
-            newFoods.splice(i, 1);
-            break; // Only eat one food per frame
-          }
-        }
-        
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
-        }
-        
-        return newFoods;
-      });
+      // Only visual collision detection - server manages actual food eating
 
       // Clear canvas with background image pattern or dark fallback
       if (backgroundImage) {
@@ -1105,9 +1081,41 @@ export default function GamePage() {
           ctx.fill();
         }
         
-        // Draw player's money balance
+        // Draw player's eyes on head segment
         if (player.segments.length > 0) {
           const playerHead = player.segments[0];
+          
+          // Draw eyes similar to local player
+          const eyeDistance = playerRadius * 0.4;
+          const eyeSize = playerRadius * 0.15;
+          
+          // Calculate eye positions based on player angle (if available)
+          const angle = player.angle || 0;
+          const leftEyeX = playerHead.x + Math.cos(angle - 0.5) * eyeDistance;
+          const leftEyeY = playerHead.y + Math.sin(angle - 0.5) * eyeDistance;
+          const rightEyeX = playerHead.x + Math.cos(angle + 0.5) * eyeDistance;
+          const rightEyeY = playerHead.y + Math.sin(angle + 0.5) * eyeDistance;
+          
+          // White part of eyes
+          ctx.fillStyle = "#ffffff";
+          ctx.globalAlpha = 1.0;
+          ctx.beginPath();
+          ctx.arc(leftEyeX, leftEyeY, eyeSize, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(rightEyeX, rightEyeY, eyeSize, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Black pupils
+          ctx.fillStyle = "#000000";
+          ctx.beginPath();
+          ctx.arc(leftEyeX, leftEyeY, eyeSize * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(rightEyeX, rightEyeY, eyeSize * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw player's money balance
           ctx.font = `${14 * playerScaleFactor}px Arial, sans-serif`;
           ctx.fillStyle = "#ffffff";
           ctx.strokeStyle = "#000000";
