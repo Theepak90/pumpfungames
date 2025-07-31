@@ -170,6 +170,9 @@ class SmoothSnake {
   distanceBuffer: number;
   currentSegmentCount: number; // Smoothly animated segment count
   
+  // Traveling food system
+  travelingFood: Array<{ progress: number; speed: number; mass: number; color: string }>;
+  
   // Constants
   START_MASS: number;
   MASS_PER_SEGMENT: number;
@@ -203,84 +206,97 @@ class SmoothSnake {
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
     
+    // Initialize traveling food system
+    this.travelingFood = [];
+    
     this.updateVisibleSegments();
   }
   
   updateVisibleSegments() {
-    // Ensure we have minimum segments for the snake
+    // Calculate target segment count based on mass
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
-    // Initialize segments if none exist
-    if (this.visibleSegments.length === 0 && targetSegmentCount > 0) {
-      for (let i = 0; i < Math.min(targetSegmentCount, 6); i++) {
-        this.visibleSegments.push({ 
-          x: this.head.x - i * this.SEGMENT_SPACING, 
-          y: this.head.y, 
-          opacity: 1.0 
-        });
-      }
+    // Smoothly animate currentSegmentCount toward target
+    const transitionSpeed = 0.1;
+    if (this.currentSegmentCount < targetSegmentCount) {
+      this.currentSegmentCount += transitionSpeed;
+    } else if (this.currentSegmentCount > targetSegmentCount) {
+      this.currentSegmentCount -= transitionSpeed;
+    }
+    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    
+    const solidSegmentCount = Math.floor(this.currentSegmentCount);
+    const fadeAmount = this.currentSegmentCount - solidSegmentCount;
+    
+    // Stable segment pool - never recreate, only update positions
+    const neededSegments = solidSegmentCount + (fadeAmount > 0.2 ? 1 : 0);
+    
+    // Expand segment pool if needed (add new segments)
+    while (this.visibleSegments.length < neededSegments) {
+      this.visibleSegments.push({ x: this.head.x, y: this.head.y, opacity: 1.0 });
     }
     
-    // Update positions using stable following logic
-    // Head segment (index 0) follows the actual head
-    if (this.visibleSegments.length > 0) {
-      const headSeg = this.visibleSegments[0];
-      const lerpSpeed = 0.2;
-      headSeg.x += (this.head.x - headSeg.x) * lerpSpeed;
-      headSeg.y += (this.head.y - headSeg.y) * lerpSpeed;
-      headSeg.opacity = 1.0;
-    }
-    
-    // Body segments follow the segment ahead of them
-    for (let i = 1; i < this.visibleSegments.length; i++) {
-      const currentSeg = this.visibleSegments[i];
-      const prevSeg = this.visibleSegments[i - 1];
-      
-      // Calculate distance to previous segment
-      const dx = prevSeg.x - currentSeg.x;
-      const dy = prevSeg.y - currentSeg.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Only move if distance exceeds segment spacing
-      if (distance > this.SEGMENT_SPACING) {
-        const moveRatio = (distance - this.SEGMENT_SPACING) / distance;
-        const lerpSpeed = 0.25; // Smooth following
-        currentSeg.x += dx * moveRatio * lerpSpeed;
-        currentSeg.y += dy * moveRatio * lerpSpeed;
-      }
-      
-      currentSeg.opacity = 1.0;
-    }
-    
-    // Remove excess segments from the tail if snake is shrinking
-    if (this.visibleSegments.length > targetSegmentCount) {
-      // Fade out excess tail segments
-      for (let i = targetSegmentCount; i < this.visibleSegments.length; i++) {
+    // Contract segment pool if needed (mark excess segments for fading)
+    if (this.visibleSegments.length > neededSegments) {
+      // Fade out excess segments instead of removing them immediately
+      for (let i = neededSegments; i < this.visibleSegments.length; i++) {
         this.visibleSegments[i].opacity = Math.max(0, this.visibleSegments[i].opacity - 0.05);
       }
-      // Remove fully faded segments
+      // Remove segments only when fully faded
       this.visibleSegments = this.visibleSegments.filter(seg => seg.opacity > 0.01);
+    }
+    
+    // Update positions of existing segments using stable interpolation
+    let distanceSoFar = 0;
+    let segmentIndex = 0;
+    let currentSegmentIdx = 0;
+    
+    for (let i = 1; i < this.segmentTrail.length && currentSegmentIdx < this.visibleSegments.length; i++) {
+      const a = this.segmentTrail[i - 1];
+      const b = this.segmentTrail[i];
+      
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentDist = Math.sqrt(dx * dx + dy * dy);
+      
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && currentSegmentIdx < this.visibleSegments.length) {
+        const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+        const overshoot = targetDistance - distanceSoFar;
+        const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+        
+        // Calculate target position
+        const targetX = a.x + dx * t;
+        const targetY = a.y + dy * t;
+        
+        // Smooth interpolation to target position (prevents popping)
+        const segment = this.visibleSegments[currentSegmentIdx];
+        const lerpSpeed = 0.3; // Smooth following
+        segment.x += (targetX - segment.x) * lerpSpeed;
+        segment.y += (targetY - segment.y) * lerpSpeed;
+        
+        // Set opacity based on segment type
+        if (currentSegmentIdx < solidSegmentCount) {
+          segment.opacity = 1.0;
+        } else {
+          segment.opacity = fadeAmount;
+        }
+        
+        segmentIndex++;
+        currentSegmentIdx++;
+      }
+      
+      distanceSoFar += segmentDist;
     }
   }
   
   applyGrowth() {
-    // Gradually increase mass from growthRemaining with tail-based growth
-    if (this.growthRemaining > 1.0) {
-      this.totalMass += 1.0;
-      this.growthRemaining -= 1.0;
-      
-      // Add new segment at tail (end of visible segments)
-      if (this.visibleSegments.length > 0) {
-        const tail = this.visibleSegments[this.visibleSegments.length - 1];
-        // New segment starts at exact tail position (no floating or popping)
-        const newSegment = {
-          x: tail.x,
-          y: tail.y,
-          opacity: 1.0
-        };
-        // Add at the end (tail)
-        this.visibleSegments.push(newSegment);
-      }
+    // Gradually increase mass from growthRemaining
+    // Don't add segments manually - let updateVisibleSegments reveal them from trail
+    if (this.growthRemaining > 0.05) {
+      this.totalMass += 0.05;
+      this.growthRemaining -= 0.05;
+      // As totalMass increases, more trail segments become visible (smooth tail growth)
+      this.updateVisibleSegments();
     }
   }
   
@@ -334,6 +350,9 @@ class SmoothSnake {
     // Sample segments at fixed spacing from the trail
     this.updateVisibleSegments();
     
+    // Update traveling food packets
+    this.updateTravelingFood();
+    
     // Apply gradual growth
     this.applyGrowth();
   }
@@ -383,8 +402,52 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    this.growthRemaining += mass;
+    
+    // Spawn traveling food that follows snake body
+    this.travelingFood.push({
+      progress: 0, // Start at head (segment 0)
+      speed: 0.08, // Travel speed along segments
+      mass: mass,
+      color: food.color
+    });
+    
     return mass; // Return score increase
+  }
+  
+  updateTravelingFood() {
+    // Update all traveling food packets
+    this.travelingFood = this.travelingFood.filter(packet => {
+      packet.progress += packet.speed;
+      
+      // If reached the tail, convert to growth
+      if (packet.progress >= this.visibleSegments.length - 1) {
+        this.growthRemaining += packet.mass;
+        return false; // Remove this packet
+      }
+      
+      return true; // Keep this packet
+    });
+  }
+  
+  getTravelingFoodPositions() {
+    return this.travelingFood.map(packet => {
+      if (this.visibleSegments.length < 2) {
+        return { x: this.head.x, y: this.head.y, color: packet.color, mass: packet.mass };
+      }
+      
+      // Calculate position between segments
+      const index = Math.floor(packet.progress);
+      const t = packet.progress % 1;
+      
+      // Ensure we don't go out of bounds
+      const segA = this.visibleSegments[Math.min(index, this.visibleSegments.length - 1)];
+      const segB = this.visibleSegments[Math.min(index + 1, this.visibleSegments.length - 1)];
+      
+      const x = segA.x + (segB.x - segA.x) * t;
+      const y = segA.y + (segB.y - segA.y) * t;
+      
+      return { x, y, color: packet.color, mass: packet.mass };
+    });
   }
   
   setBoost(boosting: boolean) {
@@ -1055,6 +1118,35 @@ export default function GamePage() {
       }
       
       // Reset global alpha
+      ctx.globalAlpha = 1.0;
+
+      // Draw traveling food effects along snake body
+      const travelingFoodPositions = snake.getTravelingFoodPositions();
+      travelingFoodPositions.forEach(foodPacket => {
+        // Create pulsing glow effect
+        const time = Date.now() * 0.01;
+        const pulseSize = 3 + Math.sin(time) * 1.5;
+        
+        // Outer glow
+        ctx.shadowColor = foodPacket.color;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = foodPacket.color;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(foodPacket.x, foodPacket.y, pulseSize + 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner bright core
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(foodPacket.x, foodPacket.y, pulseSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.shadowBlur = 0;
+      });
+      
       ctx.globalAlpha = 1.0;
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
