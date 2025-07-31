@@ -714,42 +714,37 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Split rendering for proper outline layering
-      const overlapHighlightCount = 5; // Last 5 segments get outline on top
+      // Draw segments from tail to head with proper outline layering
+      const overlapHighlightCount = 5; // Last 5 segments get outline
       const totalSegments = snake.visibleSegments.length;
+      const lastIndex = totalSegments - 1;
       
-      // First pass: Draw older segments (tail to mid-body) without outlines
-      for (let i = totalSegments - 1; i >= overlapHighlightCount; i--) {
+      for (let i = lastIndex; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
+        const isRecent = i <= overlapHighlightCount - 1; // Head and recent segments
         
         ctx.globalAlpha = segment.opacity;
         
-        // Draw only the body (no outline)
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      // Second pass: Draw newer segments (head area) with outline + body on top
-      for (let i = Math.min(overlapHighlightCount - 1, totalSegments - 1); i >= 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
-        
-        ctx.globalAlpha = segment.opacity;
-        
-        // 1. Draw white outline first
-        ctx.fillStyle = "white";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 2. Draw segment body on top
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fill();
+        if (isRecent) {
+          // Draw with outline (recent segments including head)
+          ctx.fillStyle = "white";
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw body on top
+          ctx.fillStyle = "#d55400";
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Draw body only (older segments)
+          ctx.fillStyle = "#d55400";
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       
       // Reset global alpha
