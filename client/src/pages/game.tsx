@@ -935,8 +935,10 @@ export default function GamePage() {
           
           // Force a render immediately to show new positions
           if (!gameOver) {
-            // Trigger re-render by updating a dummy state
-            setGameIsVisible(true);
+            // Force a re-render by updating state and logging positions
+            console.log('Forcing re-render - snake now at:', snake.head.x, snake.head.y);
+            setGameIsVisible(prev => !prev); // Toggle to force re-render
+            setTimeout(() => setGameIsVisible(prev => !prev), 16); // Toggle back on next frame
           }
         }
       }
@@ -1220,7 +1222,7 @@ export default function GamePage() {
       // Save context for camera transform
       ctx.save();
 
-      // Apply zoom and camera following snake head
+      // Apply zoom and camera following snake head - this should automatically follow
       ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
       ctx.scale(zoom, zoom);
       ctx.translate(-snake.head.x, -snake.head.y);
