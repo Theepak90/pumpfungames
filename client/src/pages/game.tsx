@@ -1029,31 +1029,22 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food as circles with gradient effect
+      // Draw food as solid circles with glow effect
       foods.forEach(food => {
-        // Create radial gradient for circular food
-        const gradient = ctx.createRadialGradient(
-          food.x, food.y, 0,
-          food.x, food.y, food.size
-        );
-        gradient.addColorStop(0, "#ffffff"); // Light center
-        gradient.addColorStop(0.7, food.color); // Main color
-        gradient.addColorStop(1, "#000000"); // Dark edge
-        
-        ctx.fillStyle = gradient;
-        
-        // Draw circular food
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Food glow effect
+        // Draw glow effect first
         ctx.shadowColor = food.color;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = food.color;
         ctx.beginPath();
         ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Draw the solid circle on top (no shadow)
         ctx.shadowBlur = 0;
+        ctx.fillStyle = food.color;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
       });
 
       // Draw bot snakes first (behind player)
