@@ -215,25 +215,25 @@ class SmoothSnake {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Drop mass every 7 frames (3x more frequent)
-      if (this.boostCooldown % 7 === 0 && onDropFood) {
-        // Drop 3 smaller food pieces instead of 1
-        for (let i = 0; i < 3; i++) {
-          const angle = this.currentAngle + Math.PI + (Math.random() - 0.5) * 0.5; // Behind snake with slight spread
-          const distance = 15 + i * 8; // Stagger the drops
+      // Drop mass every 20 frames (same frequency as before)
+      if (this.boostCooldown % 20 === 0 && onDropFood) {
+        // Drop 2 smaller food pieces instead of 1
+        for (let i = 0; i < 2; i++) {
+          const angle = this.currentAngle + Math.PI + (Math.random() - 0.5) * 0.4; // Behind snake with slight spread
+          const distance = 18 + i * 10; // Stagger the drops
           const dropX = this.head.x + Math.cos(angle) * distance;
           const dropY = this.head.y + Math.sin(angle) * distance;
           
           onDropFood({
             x: dropX,
             y: dropY,
-            size: 3, // Smaller size
+            size: 3.5, // Slightly smaller than original
             color: '#f55400',
-            mass: 0.167 // 3x less mass (0.5 / 3 ≈ 0.167)
+            mass: 0.25 // 2x less mass (0.5 / 2 = 0.25)
           });
         }
         
-        this.totalMass -= 0.5; // Same total mass loss
+        this.totalMass -= 0.5; // Same total mass loss rate
         this.updateVisibleSegments();
       }
     } else {
