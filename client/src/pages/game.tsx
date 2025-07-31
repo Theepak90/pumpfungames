@@ -582,6 +582,17 @@ export default function GamePage() {
     audio.src = '/kill-sound.mp3';
     audio.preload = 'auto';
     audio.volume = 0.5; // Always 50% volume
+    
+    audio.oncanplaythrough = () => {
+      console.log('Kill sound loaded and ready to play');
+    };
+    audio.onerror = (e) => {
+      console.error('Failed to load kill sound:', e);
+    };
+    audio.onloadstart = () => {
+      console.log('Started loading kill sound');
+    };
+    
     setKillSound(audio);
 
     return () => {
@@ -925,9 +936,21 @@ export default function GamePage() {
             snake.visibleSegments = originalSegments; // Restore player segments
             
             // Play kill sound effect
+            console.log('Kill attempt - killSound exists:', !!killSound, 'soundEnabled:', soundEnabled);
             if (killSound && soundEnabled) {
+              console.log('Playing kill sound...');
               killSound.currentTime = 0; // Reset to start
-              killSound.play().catch(console.error);
+              killSound.volume = 0.5; // Ensure volume is set
+              const playPromise = killSound.play();
+              if (playPromise !== undefined) {
+                playPromise.then(() => {
+                  console.log('Kill sound played successfully');
+                }).catch((error) => {
+                  console.error('Error playing kill sound:', error);
+                });
+              }
+            } else {
+              console.log('Kill sound not available or sound disabled - killSound:', !!killSound, 'soundEnabled:', soundEnabled);
             }
             
             // Remove the killed bot
