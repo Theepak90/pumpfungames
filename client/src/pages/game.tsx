@@ -45,7 +45,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 400; // Very large spacing for extreme stretch
+    this.segmentSpacing = 24; // Connected segments like a worm
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
@@ -247,8 +247,8 @@ export default function GamePage() {
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
-    newSnake.segmentSpacing = 400; // Force the new spacing immediately
-    // Recreate segments with new spacing
+    newSnake.segmentSpacing = 24; // Connected segments like a worm
+    // Recreate segments with proper spacing
     newSnake.segments = [];
     for (let i = 0; i < 5; i++) {
       newSnake.segments.push({ 
@@ -772,7 +772,7 @@ export default function GamePage() {
     snake.segments = [];
     const START_MASS = 25;
     const START_SEGMENTS = 5;
-    snake.segmentSpacing = 400; // Ensure spacing is updated on reset
+    snake.segmentSpacing = 24; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
     }
