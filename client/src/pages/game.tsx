@@ -76,17 +76,15 @@ class SmoothSnake {
     const totalSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
     // Ensure enough trail points exist
-    while (this.segmentTrail.length < totalSegments) {
-      const lastPoint = this.segmentTrail[this.segmentTrail.length - 1];
+    while (this.segmentTrail.length < totalSegments - 1) { // -1 because head is separate
+      const lastPoint = this.segmentTrail[this.segmentTrail.length - 1] || this.head;
       this.segmentTrail.push({ x: lastPoint.x, y: lastPoint.y });
     }
     
-    // Create visible segments from trail
-    this.visibleSegments = [];
-    for (let i = 0; i < totalSegments; i++) {
-      if (i < this.segmentTrail.length) {
-        this.visibleSegments.push(this.segmentTrail[i]);
-      }
+    // Create visible segments: head + body segments from trail
+    this.visibleSegments = [this.head]; // Head is always first
+    for (let i = 0; i < Math.min(totalSegments - 1, this.segmentTrail.length); i++) {
+      this.visibleSegments.push(this.segmentTrail[i]);
     }
   }
   
@@ -127,12 +125,18 @@ class SmoothSnake {
     this.head.x += dx;
     this.head.y += dy;
     
-    // Record trail based on distance
-    const lastTrailPoint = this.segmentTrail[0];
-    const dist = Math.hypot(this.head.x - lastTrailPoint.x, this.head.y - lastTrailPoint.y);
-    
-    if (dist >= this.SEGMENT_SPACING) {
-      this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+    // Record trail based on distance for body segments only
+    if (this.segmentTrail.length === 0) {
+      // Initialize trail with head position
+      this.segmentTrail.push({ x: this.head.x, y: this.head.y });
+    } else {
+      const lastTrailPoint = this.segmentTrail[0];
+      const dist = Math.hypot(this.head.x - lastTrailPoint.x, this.head.y - lastTrailPoint.y);
+      
+      if (dist >= this.SEGMENT_SPACING) {
+        // Add current head position to trail for body to follow
+        this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+      }
     }
     
     // Apply gradual growth
@@ -602,8 +606,8 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw snake body segments
-      for (let i = 0; i < snake.visibleSegments.length; i++) {
+      // Draw snake body segments (skip head - index 0)
+      for (let i = 1; i < snake.visibleSegments.length; i++) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
@@ -623,6 +627,24 @@ export default function GamePage() {
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // Draw head separately at current head position (not from segments)
+      const headRadius = snake.getSegmentRadius();
+      const headGradient = ctx.createRadialGradient(
+        snake.head.x, snake.head.y, 0,
+        snake.head.x, snake.head.y, headRadius
+      );
+      
+      // Head has a brighter, more distinctive gradient
+      headGradient.addColorStop(0, "#fff");        // White center
+      headGradient.addColorStop(0.3, "#ffbaba");   // Light pink
+      headGradient.addColorStop(0.7, "#ff6600");   // Medium orange
+      headGradient.addColorStop(1, "#d55400");     // Dark orange edge
+      
+      ctx.fillStyle = headGradient;
+      ctx.beginPath();
+      ctx.arc(snake.head.x, snake.head.y, headRadius, 0, Math.PI * 2);
+      ctx.fill();
 
       // Draw eyes that follow snake's movement direction
       if (snake.visibleSegments.length > 0) {
