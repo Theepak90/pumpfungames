@@ -440,6 +440,37 @@ export default function GamePage() {
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
+  // Function to drop food when snake dies
+  const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
+    const foodValue = 5; // Each food piece worth 5 mass
+    const foodCount = Math.floor(snakeMass / foodValue); // Calculate how many food pieces to drop
+    const newFoods: Food[] = [];
+    
+    for (let i = 0; i < foodCount; i++) {
+      // Spread food in a circular pattern around death location
+      const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5; // Add slight randomness
+      const radius = 30 + Math.random() * 100; // Random radius between 30-130 pixels
+      
+      const x = deathX + Math.cos(angle) * radius;
+      const y = deathY + Math.sin(angle) * radius;
+      
+      // Make sure food stays within map bounds
+      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
+      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
+      
+      newFoods.push({
+        x: clampedX,
+        y: clampedY,
+        size: 8, // Slightly bigger than normal food
+        mass: foodValue,
+        color: '#ffaa00' // Orange color for death food
+      });
+    }
+    
+    // Add the new death food to the existing food array
+    setFoods(prevFoods => [...prevFoods, ...newFoods]);
+  };
+
   // Background music setup
   useEffect(() => {
     const audio = new Audio();
@@ -717,6 +748,8 @@ export default function GamePage() {
         (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
       );
       if (distanceFromCenter > MAP_RADIUS) {
+        // Drop food when snake dies
+        dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
         setGameOver(true);
         return;
       }
@@ -732,6 +765,8 @@ export default function GamePage() {
         for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
+            // Drop food when snake dies from collision
+            dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
             setGameOver(true);
             return;
           }
