@@ -785,32 +785,26 @@ export default function GamePage() {
         const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
         const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
         
-        // White eyes (smaller)
+        // White square eyes
         ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, eyeSize, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, eyeSize, 0, 2 * Math.PI);
-        ctx.fill();
+        ctx.fillRect(eye1X - eyeSize, eye1Y - eyeSize, eyeSize * 2, eyeSize * 2);
+        ctx.fillRect(eye2X - eyeSize, eye2Y - eyeSize, eyeSize * 2, eyeSize * 2);
         
-        // Black pupils at front of eyes, looking at cursor
+        // Black square pupils at front of eyes, looking at cursor
         const pupilOffset = 1.2; // Position pupils toward front of eye
         ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(
-          eye1X + Math.cos(cursorAngle) * pupilOffset, 
-          eye1Y + Math.sin(cursorAngle) * pupilOffset, 
-          pupilSize, 0, 2 * Math.PI
+        ctx.fillRect(
+          (eye1X + Math.cos(cursorAngle) * pupilOffset) - pupilSize,
+          (eye1Y + Math.sin(cursorAngle) * pupilOffset) - pupilSize,
+          pupilSize * 2, 
+          pupilSize * 2
         );
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(
-          eye2X + Math.cos(cursorAngle) * pupilOffset, 
-          eye2Y + Math.sin(cursorAngle) * pupilOffset, 
-          pupilSize, 0, 2 * Math.PI
+        ctx.fillRect(
+          (eye2X + Math.cos(cursorAngle) * pupilOffset) - pupilSize,
+          (eye2Y + Math.sin(cursorAngle) * pupilOffset) - pupilSize,
+          pupilSize * 2, 
+          pupilSize * 2
         );
-        ctx.fill();
       }
 
       // Restore context
