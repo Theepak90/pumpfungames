@@ -717,7 +717,7 @@ export default function GamePage() {
       // Two-layer drawing for proper outline overlap behavior
       const highlightCount = 6; // Number of head segments that appear "on top"
       
-      // Layer 1: Draw full snake body only (no outlines)
+      // Layer 1: Draw full snake body only (no outlines) - tail to head
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -731,9 +731,9 @@ export default function GamePage() {
         ctx.fill();
       }
       
-      // Layer 2: Draw head + recent segments with outline (appears on top)
+      // Layer 2: Draw recent segments with outline (tail to head order for proper stacking)
       const startIndex = Math.max(0, snake.visibleSegments.length - highlightCount);
-      for (let i = snake.visibleSegments.length - 1; i >= startIndex; i--) {
+      for (let i = startIndex; i < snake.visibleSegments.length; i++) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
         
