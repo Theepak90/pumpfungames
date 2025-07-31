@@ -839,6 +839,29 @@ export default function GamePage() {
         ctx.restore();
       }
 
+      // Draw floating dollar value above snake head
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
+        const dollarsPerMass = 0.1;
+        const snakeValue = (snake.totalMass * dollarsPerMass).toFixed(2);
+        
+        // Position above the snake head
+        const labelX = snakeHead.x;
+        const labelY = snakeHead.y - 35; // Offset above head
+        
+        // Draw background for better readability
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.font = '14px sans-serif';
+        const textWidth = ctx.measureText(`$${snakeValue}`).width;
+        ctx.fillRect(labelX - textWidth/2 - 4, labelY - 12, textWidth + 8, 16);
+        
+        // Draw the dollar value text in bright green for own snake
+        ctx.fillStyle = '#00ff00';
+        ctx.textAlign = 'center';
+        ctx.fillText(`$${snakeValue}`, labelX, labelY);
+        ctx.textAlign = 'left'; // Reset alignment
+      }
+
       // Restore context
       ctx.restore();
 
