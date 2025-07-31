@@ -21,6 +21,8 @@ interface Food {
   size: number;
   color: string;
   mass?: number; // Mass value for growth
+  type?: 'normal' | 'money'; // Food type
+  value?: number; // Money value for money type
 }
 
 interface BotSnake {
@@ -474,12 +476,59 @@ export default function GamePage() {
         y: clampedY,
         size: 7.5, // Half the size of orange test food
         mass: foodValue,
-        color: snakeColor // Same color as the snake
+        color: snakeColor, // Same color as the snake
+        type: 'normal'
       });
     }
     
     // Add only the regular death food to the existing food array
     setFoods(prevFoods => [...prevFoods, ...newFoods]);
+  };
+
+  // Function to drop money squares when snake dies
+  const dropMoneySquares = (deathX: number, deathY: number, snakeMoney: number) => {
+    const moneyPerSquare = 0.2; // Each green square worth $0.20
+    const dropCount = Math.floor(snakeMoney / moneyPerSquare);
+    const newMoneyFoods: Food[] = [];
+    
+    // Get snake's visible segments to drop money along the body
+    const segments = snake.visibleSegments;
+    
+    for (let i = 0; i < dropCount; i++) {
+      let x, y;
+      
+      if (segments.length > 0) {
+        // Drop money along the snake's body segments
+        const segmentIndex = Math.floor((i / dropCount) * segments.length);
+        const segment = segments[Math.min(segmentIndex, segments.length - 1)];
+        
+        // Add some randomness around each segment position
+        x = segment.x + (Math.random() - 0.5) * 10;
+        y = segment.y + (Math.random() - 0.5) * 10;
+      } else {
+        // Fallback to death location if no segments
+        const angle = (i / dropCount) * 2 * Math.PI + Math.random() * 0.5;
+        const radius = 20 + Math.random() * 30;
+        x = deathX + Math.cos(angle) * radius;
+        y = deathY + Math.sin(angle) * radius;
+      }
+      
+      // Make sure money stays within map bounds
+      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
+      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
+      
+      newMoneyFoods.push({
+        x: clampedX,
+        y: clampedY,
+        size: 8, // Square size
+        color: '#00ff00', // Bright green
+        type: 'money',
+        value: moneyPerSquare
+      });
+    }
+    
+    // Add money squares to the food array
+    setFoods(prevFoods => [...prevFoods, ...newMoneyFoods]);
   };
 
   // Background music setup
@@ -624,7 +673,8 @@ export default function GamePage() {
           y: y,
           size: 15,
           mass: 40,
-          color: '#ff8800'
+          color: '#ff8800',
+          type: 'normal'
         };
       } else if (foodType < 0.15) { // 10% big food
         food = {
@@ -632,7 +682,8 @@ export default function GamePage() {
           y: y,
           size: 10,
           mass: 2,
-          color: '#ff4444'
+          color: '#ff4444',
+          type: 'normal'
         };
       } else if (foodType < 0.45) { // 30% medium food
         food = {
@@ -640,7 +691,8 @@ export default function GamePage() {
           y: y,
           size: 6,
           mass: 1,
-          color: '#44ff44'
+          color: '#44ff44',
+          type: 'normal'
         };
       } else { // 55% small food
         food = {
@@ -648,7 +700,8 @@ export default function GamePage() {
           y: y,
           size: 4,
           mass: 0.5,
-          color: '#4444ff'
+          color: '#4444ff',
+          type: 'normal'
         };
       }
       
@@ -761,8 +814,9 @@ export default function GamePage() {
         (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
       );
       if (distanceFromCenter > MAP_RADIUS) {
-        // Drop food when snake dies
+        // Drop food and money squares when snake dies
         dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+        dropMoneySquares(updatedHead.x, updatedHead.y, snake.money);
         setGameOver(true);
         return;
       }
@@ -778,8 +832,9 @@ export default function GamePage() {
         for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
-            // Drop food when snake dies from collision
+            // Drop food and money squares when snake dies from collision
             dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+            dropMoneySquares(updatedHead.x, updatedHead.y, snake.money);
             setGameOver(true);
             return;
           }
@@ -797,12 +852,12 @@ export default function GamePage() {
         for (const segment of snake.visibleSegments) {
           const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
-            // Player killed a bot - award money
-            const killReward = Math.max(0.50, bot.totalMass * 0.05); // $0.50 minimum, or 5% of bot's mass
-            snake.money += killReward;
-            
-            // Drop food where bot died
+            // Player killed a bot - drop food and money squares
             dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
+            
+            // Drop money squares based on bot's money (bots start with $1.00)
+            const botMoney = 1.0; // Bots have a fixed money amount
+            dropMoneySquares(bot.head.x, bot.head.y, botMoney);
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -849,13 +904,13 @@ export default function GamePage() {
                 const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
                 
                 if (foodType < 0.05) {
-                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800' };
+                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800', type: 'normal' };
                 } else if (foodType < 0.15) {
-                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444' };
+                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444', type: 'normal' };
                 } else if (foodType < 0.45) {
-                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44' };
+                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44', type: 'normal' };
                 } else {
-                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff' };
+                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff', type: 'normal' };
                 }
                 
                 newFoods.push(newFood);
@@ -901,8 +956,16 @@ export default function GamePage() {
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
           if (dist < snake.getSegmentRadius() + food.size) {
-            // Snake eats the food - this handles growth internally
-            scoreIncrease += snake.eatFood(food);
+            // Handle different food types
+            if (food.type === 'money') {
+              // Money pickup - add to snake's money balance
+              snake.money += food.value || 0.2;
+              newFoods.splice(i, 1);
+              continue; // Don't spawn replacement food for money
+            } else {
+              // Regular food - grow snake
+              scoreIncrease += snake.eatFood(food);
+            }
             
             // Remove eaten food and add new one with mass system
             newFoods.splice(i, 1);
@@ -922,7 +985,8 @@ export default function GamePage() {
                 y: newY,
                 size: 15,
                 mass: 40,
-                color: '#ff8800'
+                color: '#ff8800',
+                type: 'normal'
               };
             } else if (foodType < 0.15) { // 10% big food
               newFood = {
@@ -930,7 +994,8 @@ export default function GamePage() {
                 y: newY,
                 size: 10,
                 mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
-                color: '#ff4444'
+                color: '#ff4444',
+                type: 'normal'
               };
             } else if (foodType < 0.45) { // 30% medium food
               newFood = {
@@ -938,7 +1003,8 @@ export default function GamePage() {
                 y: newY,
                 size: 6,
                 mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
-                color: '#44ff44'
+                color: '#44ff44',
+                type: 'normal'
               };
             } else { // 55% small food
               newFood = {
@@ -946,7 +1012,8 @@ export default function GamePage() {
                 y: newY,
                 size: 4,
                 mass: 0.2, // Reduced from 0.5 to 0.2 (2.5x less)
-                color: '#4444ff'
+                color: '#4444ff',
+                type: 'normal'
               };
             }
             
@@ -1028,22 +1095,30 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food as solid circles with glow effect
+      // Draw food items
       foods.forEach(food => {
-        // Draw glow effect first
-        ctx.shadowColor = food.color;
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = food.color;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw the solid circle on top (no shadow)
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = food.color;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (food.type === 'money') {
+          // Draw green money squares
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = food.color;
+          ctx.fillRect(food.x - food.size/2, food.y - food.size/2, food.size, food.size);
+        } else {
+          // Draw regular food as circles with glow effect
+          ctx.shadowColor = food.color;
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw the solid circle on top (no shadow)
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
 
       // Draw bot snakes first (behind player)
