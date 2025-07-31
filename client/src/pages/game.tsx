@@ -170,9 +170,6 @@ class SmoothSnake {
   distanceBuffer: number;
   currentSegmentCount: number; // Smoothly animated segment count
   
-  // Traveling food system
-  travelingFood: Array<{ progress: number; speed: number; mass: number; color: string }>;
-  
   // Constants
   START_MASS: number;
   MASS_PER_SEGMENT: number;
@@ -206,9 +203,6 @@ class SmoothSnake {
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
     
-    // Initialize traveling food system
-    this.travelingFood = [];
-    
     this.updateVisibleSegments();
   }
   
@@ -217,7 +211,7 @@ class SmoothSnake {
     const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
     // Smoothly animate currentSegmentCount toward target
-    const transitionSpeed = 0.1;
+    const transitionSpeed = 0.1; // Smooth transition speed
     if (this.currentSegmentCount < targetSegmentCount) {
       this.currentSegmentCount += transitionSpeed;
     } else if (this.currentSegmentCount > targetSegmentCount) {
@@ -225,33 +219,17 @@ class SmoothSnake {
     }
     this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
     
+    // Use floor for solid segments, check if we need a fading segment
     const solidSegmentCount = Math.floor(this.currentSegmentCount);
     const fadeAmount = this.currentSegmentCount - solidSegmentCount;
+    const shouldHaveFadingSegment = fadeAmount > 0;
     
-    // Stable segment pool - never recreate, only update positions
-    const neededSegments = solidSegmentCount + (fadeAmount > 0.2 ? 1 : 0);
-    
-    // Expand segment pool if needed (add new segments)
-    while (this.visibleSegments.length < neededSegments) {
-      this.visibleSegments.push({ x: this.head.x, y: this.head.y, opacity: 1.0 });
-    }
-    
-    // Contract segment pool if needed (mark excess segments for fading)
-    if (this.visibleSegments.length > neededSegments) {
-      // Fade out excess segments instead of removing them immediately
-      for (let i = neededSegments; i < this.visibleSegments.length; i++) {
-        this.visibleSegments[i].opacity = Math.max(0, this.visibleSegments[i].opacity - 0.05);
-      }
-      // Remove segments only when fully faded
-      this.visibleSegments = this.visibleSegments.filter(seg => seg.opacity > 0.01);
-    }
-    
-    // Update positions of existing segments using stable interpolation
+    this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
-    let currentSegmentIdx = 0;
     
-    for (let i = 1; i < this.segmentTrail.length && currentSegmentIdx < this.visibleSegments.length; i++) {
+    // First, add all solid segments
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < solidSegmentCount; i++) {
       const a = this.segmentTrail[i - 1];
       const b = this.segmentTrail[i];
       
@@ -259,33 +237,50 @@ class SmoothSnake {
       const dy = b.y - a.y;
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
-      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && currentSegmentIdx < this.visibleSegments.length) {
+      // Check if we need to place a segment in this trail section
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < solidSegmentCount) {
         const targetDistance = segmentIndex * this.SEGMENT_SPACING;
         const overshoot = targetDistance - distanceSoFar;
         const t = segmentDist > 0 ? overshoot / segmentDist : 0;
         
-        // Calculate target position
-        const targetX = a.x + dx * t;
-        const targetY = a.y + dy * t;
+        // Linear interpolation between trail points
+        const x = a.x + dx * t;
+        const y = a.y + dy * t;
         
-        // Smooth interpolation to target position (prevents popping)
-        const segment = this.visibleSegments[currentSegmentIdx];
-        const lerpSpeed = 0.3; // Smooth following
-        segment.x += (targetX - segment.x) * lerpSpeed;
-        segment.y += (targetY - segment.y) * lerpSpeed;
-        
-        // Set opacity based on segment type
-        if (currentSegmentIdx < solidSegmentCount) {
-          segment.opacity = 1.0;
-        } else {
-          segment.opacity = fadeAmount;
-        }
-        
+        this.visibleSegments.push({ x, y, opacity: 1.0 });
         segmentIndex++;
-        currentSegmentIdx++;
       }
       
       distanceSoFar += segmentDist;
+    }
+    
+    // Add fading segment if needed (only if opacity > 0.2 to avoid ghosting)
+    if (shouldHaveFadingSegment && fadeAmount > 0.2) {
+      // Continue searching for the position of the fading segment
+      for (let i = 1; i < this.segmentTrail.length; i++) {
+        const a = this.segmentTrail[i - 1];
+        const b = this.segmentTrail[i];
+        
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const segmentDist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if this is where the fading segment should be
+        if (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING) {
+          const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+          const overshoot = targetDistance - distanceSoFar;
+          const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+          
+          // Linear interpolation for fading segment position
+          const x = a.x + dx * t;
+          const y = a.y + dy * t;
+          
+          this.visibleSegments.push({ x, y, opacity: fadeAmount });
+          break;
+        }
+        
+        distanceSoFar += segmentDist;
+      }
     }
   }
   
@@ -350,9 +345,6 @@ class SmoothSnake {
     // Sample segments at fixed spacing from the trail
     this.updateVisibleSegments();
     
-    // Update traveling food packets
-    this.updateTravelingFood();
-    
     // Apply gradual growth
     this.applyGrowth();
   }
@@ -402,52 +394,8 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    
-    // Spawn traveling food that follows snake body
-    this.travelingFood.push({
-      progress: 0, // Start at head (segment 0)
-      speed: 0.08, // Travel speed along segments
-      mass: mass,
-      color: food.color
-    });
-    
+    this.growthRemaining += mass;
     return mass; // Return score increase
-  }
-  
-  updateTravelingFood() {
-    // Update all traveling food packets
-    this.travelingFood = this.travelingFood.filter(packet => {
-      packet.progress += packet.speed;
-      
-      // If reached the tail, convert to growth
-      if (packet.progress >= this.visibleSegments.length - 1) {
-        this.growthRemaining += packet.mass;
-        return false; // Remove this packet
-      }
-      
-      return true; // Keep this packet
-    });
-  }
-  
-  getTravelingFoodPositions() {
-    return this.travelingFood.map(packet => {
-      if (this.visibleSegments.length < 2) {
-        return { x: this.head.x, y: this.head.y, color: packet.color, mass: packet.mass };
-      }
-      
-      // Calculate position between segments
-      const index = Math.floor(packet.progress);
-      const t = packet.progress % 1;
-      
-      // Ensure we don't go out of bounds
-      const segA = this.visibleSegments[Math.min(index, this.visibleSegments.length - 1)];
-      const segB = this.visibleSegments[Math.min(index + 1, this.visibleSegments.length - 1)];
-      
-      const x = segA.x + (segB.x - segA.x) * t;
-      const y = segA.y + (segB.y - segA.y) * t;
-      
-      return { x, y, color: packet.color, mass: packet.mass };
-    });
   }
   
   setBoost(boosting: boolean) {
@@ -1118,35 +1066,6 @@ export default function GamePage() {
       }
       
       // Reset global alpha
-      ctx.globalAlpha = 1.0;
-
-      // Draw traveling food effects along snake body
-      const travelingFoodPositions = snake.getTravelingFoodPositions();
-      travelingFoodPositions.forEach(foodPacket => {
-        // Create pulsing glow effect
-        const time = Date.now() * 0.01;
-        const pulseSize = 3 + Math.sin(time) * 1.5;
-        
-        // Outer glow
-        ctx.shadowColor = foodPacket.color;
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = foodPacket.color;
-        ctx.globalAlpha = 0.6;
-        ctx.beginPath();
-        ctx.arc(foodPacket.x, foodPacket.y, pulseSize + 3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Inner bright core
-        ctx.shadowBlur = 8;
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(foodPacket.x, foodPacket.y, pulseSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.shadowBlur = 0;
-      });
-      
       ctx.globalAlpha = 1.0;
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
