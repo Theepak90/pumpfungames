@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
+import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 
 // Game constants
 const MAP_CENTER_X = 2000;
@@ -428,6 +429,7 @@ export default function GamePage() {
     return saved ? parseFloat(saved) : 0.25;
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
   
   // Zoom parameters
@@ -520,7 +522,7 @@ export default function GamePage() {
       newMoneyFoods.push({
         x: clampedX,
         y: clampedY,
-        size: 8, // Square size
+        size: 16, // Double the size (was 8, now 16)
         color: '#00ff00', // Bright green
         type: 'money',
         value: moneyPerSquare
@@ -563,6 +565,19 @@ export default function GamePage() {
     };
     img.onerror = (e) => {
       console.error('Failed to load background image:', e);
+    };
+  }, []);
+
+  // Load dollar sign image for money squares
+  useEffect(() => {
+    const img = new Image();
+    img.src = dollarSignImageSrc;
+    img.onload = () => {
+      console.log('Dollar sign image loaded successfully');
+      setDollarSignImage(img);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load dollar sign image:', e);
     };
   }, []);
 
@@ -1096,13 +1111,44 @@ export default function GamePage() {
       ctx.stroke();
 
       // Draw food items
-      foods.forEach(food => {
+      foods.forEach((food, index) => {
         if (food.type === 'money') {
-          // Draw green money squares
+          // Draw money squares with dollar sign image, shadow, and wobble
+          const time = Date.now() * 0.003; // Time for animation
+          const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
+          const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
+          
+          const drawX = food.x + wobbleX;
+          const drawY = food.y + wobbleY;
+          
+          // Draw shadow first
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillRect(drawX - food.size/2 + 2, drawY - food.size/2 + 2, food.size, food.size);
+          
+          // Reset shadow for main square
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw green background square
           ctx.fillStyle = food.color;
-          ctx.fillRect(food.x - food.size/2, food.y - food.size/2, food.size, food.size);
+          ctx.fillRect(drawX - food.size/2, drawY - food.size/2, food.size, food.size);
+          
+          // Draw dollar sign image if loaded
+          if (dollarSignImage && dollarSignImage.complete) {
+            ctx.drawImage(
+              dollarSignImage,
+              drawX - food.size/2,
+              drawY - food.size/2,
+              food.size,
+              food.size
+            );
+          }
         } else {
           // Draw regular food as circles with glow effect
           ctx.shadowColor = food.color;
