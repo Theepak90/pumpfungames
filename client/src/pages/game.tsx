@@ -712,60 +712,10 @@ export default function GamePage() {
 
 
 
-  // Initialize food with mass system
+  // Initialize local foods for boost drops (server handles main food)
   useEffect(() => {
-    const initialFoods: Food[] = [];
-    for (let i = 0; i < FOOD_COUNT; i++) {
-      // Generate food within circular boundary
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * (MAP_RADIUS - 100); // Keep food away from edge
-      const x = MAP_CENTER_X + Math.cos(angle) * radius;
-      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
-      
-      const foodType = Math.random();
-      let food: Food;
-      
-      if (foodType < 0.05) { // 5% orange test food (40 mass)
-        food = {
-          x: x,
-          y: y,
-          size: 15,
-          mass: 40,
-          color: '#ff8800',
-          type: 'normal'
-        };
-      } else if (foodType < 0.15) { // 10% big food
-        food = {
-          x: x,
-          y: y,
-          size: 10,
-          mass: 2,
-          color: '#ff4444',
-          type: 'normal'
-        };
-      } else if (foodType < 0.45) { // 30% medium food
-        food = {
-          x: x,
-          y: y,
-          size: 6,
-          mass: 1,
-          color: '#44ff44',
-          type: 'normal'
-        };
-      } else { // 55% small food
-        food = {
-          x: x,
-          y: y,
-          size: 4,
-          mass: 0.5,
-          color: '#4444ff',
-          type: 'normal'
-        };
-      }
-      
-      initialFoods.push(food);
-    }
-    setFoods(initialFoods);
+    // Start with empty local foods - these will be populated by boost drops
+    setFoods([]);
   }, []);
 
   // Mouse tracking
@@ -872,7 +822,7 @@ export default function GamePage() {
         
         snake.updateVisibleSegments();
         
-        // No bots in multiplayer mode
+        // No bots in multiplayer mode - players are handled by WebSocket
         
         console.log('Background frame executed - snake at:', snake.head.x, snake.head.y);
       }
@@ -911,11 +861,26 @@ export default function GamePage() {
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Move snake normally - this ensures visibility and game mechanics work
+      // Move snake with proper boost food dropping
       snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
-        // Add dropped food from boosting to the food array
+        // Add dropped food from boosting to local foods
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
+      snake.processGrowth(deltaTime);
+      snake.updatePosition(deltaTime);
+      
+      // Send player update to multiplayer server
+      if (currentPlayer) {
+        sendPlayerUpdate({
+          x: snake.head.x,
+          y: snake.head.y,
+          angle: snake.currentAngle,
+          segments: snake.visibleSegments,
+          totalMass: snake.totalMass,
+          money: snake.money,
+          isBoosting: snake.isBoosting
+        });
+      }
 
       // Multiplayer-only: Check circular map boundaries (death barrier)
       const updatedHead = snake.head;
@@ -950,35 +915,81 @@ export default function GamePage() {
         }
       }
 
-      // In multiplayer mode, food gravitation is handled by server
-
-      // Check for food collision and handle eating
-      const currentFoods = isMultiplayer ? multiplayerFoods : foods;
-      const activeFoods = isMultiplayer ? multiplayerFoods : foods;
+      // Food gravitation toward snake head (50px radius, 2x faster)
+      const suctionRadius = 50;
+      const suctionStrength = 1.6;
       
-      if (isMultiplayer) {
-        // Multiplayer food collision
-        for (const food of activeFoods) {
-          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
-          const collisionRadius = food.type === 'money' ? 10 : food.size;
+      // Apply to local boost-dropped foods
+      setFoods(prevFoods => {
+        return prevFoods.map(food => {
+          const dx = updatedHead.x - food.x;
+          const dy = updatedHead.y - food.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
           
-          if (dist < snake.getSegmentRadius() + collisionRadius) {
-            // Handle different food types
+          if (dist < suctionRadius && dist > 0) {
+            return {
+              ...food,
+              x: food.x + (dx / dist) * suctionStrength,
+              y: food.y + (dy / dist) * suctionStrength
+            };
+          }
+          return food;
+        });
+      });
+
+      // Check for food collision - both multiplayer foods and local boost foods
+      let scoreIncrease = 0;
+      
+      // Handle multiplayer foods from server
+      for (const food of multiplayerFoods) {
+        const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
+        const collisionRadius = food.type === 'money' ? 10 : food.size;
+        
+        if (dist < snake.getSegmentRadius() + collisionRadius) {
+          // Handle different food types
+          if (food.type === 'money') {
+            snake.money += food.value || 0.05;
+          } else {
+            scoreIncrease += snake.eatFood(food);
+          }
+          
+          // Send to server with ID
+          if (food.id) {
+            sendFoodEaten(food.id);
+          }
+          break;
+        }
+      }
+      
+      // Handle local boost-dropped foods
+      setFoods(prevFoods => {
+        const newFoods = [...prevFoods];
+        
+        for (let i = newFoods.length - 1; i >= 0; i--) {
+          const food = newFoods[i];
+          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
+          
+          if (dist < snake.getSegmentRadius() + food.size) {
             if (food.type === 'money') {
               snake.money += food.value || 0.05;
+              continue; // Don't spawn replacement food for money
             } else {
-              const scoreIncrease = snake.eatFood(food);
-              setScore(prev => prev + scoreIncrease);
+              // Regular food - grow snake
+              scoreIncrease += snake.eatFood(food);
             }
             
-            // Send to server with ID
-            if (food.id) {
-              sendFoodEaten(food.id);
-            }
-            break;
+            // Remove eaten food 
+            newFoods.splice(i, 1);
+            break; // Only eat one food per frame
           }
         }
-      } else {
+        
+        if (scoreIncrease > 0) {
+          setScore(prev => prev + scoreIncrease);
+        }
+        
+        return newFoods;
+      });
         // Single player food collision
         setFoods(prevFoods => {
           const newFoods = [...prevFoods];
@@ -1061,9 +1072,8 @@ export default function GamePage() {
           setScore(prev => prev + scoreIncrease);
         }
         
-          return newFoods;
-        });
-      }
+        return newFoods;
+      });
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
