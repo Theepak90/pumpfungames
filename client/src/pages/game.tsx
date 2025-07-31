@@ -62,7 +62,7 @@ class SmoothSnake {
     this.MASS_PER_SEGMENT = 1;
     this.SEGMENT_SPACING = 16; // Tighter overlap (radius=10, so 4px overlap)
     this.SEGMENT_RADIUS = 10;
-    this.MIN_MASS_TO_BOOST = 15;
+    this.MIN_MASS_TO_BOOST = 4;
     
     // Initialize trail and segments
     this.segmentTrail = [{ x, y }];
@@ -509,7 +509,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 10,
-                mass: 3, // Reduced from 10 to 3
+                mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
                 color: '#ff4444'
               };
             } else if (foodType < 0.4) { // 30% medium food
@@ -517,7 +517,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 6,
-                mass: 1, // Reduced from 5 to 1
+                mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
                 color: '#44ff44'
               };
             } else { // 60% small food
@@ -525,7 +525,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 4,
-                mass: 0.5, // Reduced from 2.5 to 0.5
+                mass: 0.2, // Reduced from 0.5 to 0.2 (2.5x less)
                 color: '#4444ff'
               };
             }
