@@ -840,11 +840,10 @@ export default function GamePage() {
     let animationId: number;
     let backgroundMovementTimer: number;
     
-    // Simple background movement timer - runs every 50ms
+    // Background movement timer - runs every 50ms
     backgroundMovementTimer = window.setInterval(() => {
       if (document.hidden && !gameOver) {
-        console.log('Background movement: moving snake', snake.head.x, snake.head.y);
-        // Only update snake position when tab is inactive
+        // Move snake when tab is inactive
         snake.head.x += Math.cos(snake.currentAngle) * snake.speed * 0.05;
         snake.head.y += Math.sin(snake.currentAngle) * snake.speed * 0.05;
         
@@ -852,15 +851,78 @@ export default function GamePage() {
         snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
         
         // Keep trail manageable
-        if (snake.segmentTrail.length > 1000) {
-          snake.segmentTrail.length = 500;
+        const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
+        if (snake.segmentTrail.length > maxTrailLength) {
+          snake.segmentTrail.length = maxTrailLength;
         }
+        
+        // Update visible segments so they're ready when tab becomes active
+        snake.updateVisibleSegments();
+        
+        // Move bot snakes too
+        setBotSnakes(prevBots => {
+          return prevBots.map(bot => {
+            // Move bot forward in its current direction
+            const dx = Math.cos(bot.currentAngle) * bot.speed * 0.05;
+            const dy = Math.sin(bot.currentAngle) * bot.speed * 0.05;
+            bot.head.x += dx;
+            bot.head.y += dy;
+            
+            // Update bot trail
+            bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
+            const maxBotTrailLength = Math.floor((bot.totalMass / 1) * 10 * 2);
+            if (bot.segmentTrail.length > maxBotTrailLength) {
+              bot.segmentTrail.length = maxBotTrailLength;
+            }
+            
+            // Update bot visible segments
+            bot.visibleSegments = [];
+            let distanceSoFar = 0;
+            let segmentIndex = 0;
+            const targetSegmentCount = Math.floor(bot.totalMass / 1);
+            
+            for (let i = 1; i < bot.segmentTrail.length && bot.visibleSegments.length < targetSegmentCount; i++) {
+              const a = bot.segmentTrail[i - 1];
+              const b = bot.segmentTrail[i];
+              
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const segmentDist = Math.sqrt(dx * dx + dy * dy);
+              
+              while (distanceSoFar + segmentDist >= segmentIndex * 10 && bot.visibleSegments.length < targetSegmentCount) {
+                const targetDistance = segmentIndex * 10;
+                const overshoot = targetDistance - distanceSoFar;
+                const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+                
+                const x = a.x + dx * t;
+                const y = a.y + dy * t;
+                
+                bot.visibleSegments.push({ x, y, opacity: 1.0 });
+                segmentIndex++;
+              }
+              
+              distanceSoFar += segmentDist;
+            }
+            
+            return bot;
+          });
+        });
       }
     }, 50); // Every 50ms
     
     // Add visibility change listener to track tab switching
     const handleVisibilityChange = () => {
       console.log('Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
+      if (!document.hidden) {
+        // When tab becomes visible again, force a render to show updated positions
+        if (!gameOver) {
+          // Update camera position to follow snake
+          const newCameraX = snake.head.x - canvasSize.width / 2;
+          const newCameraY = snake.head.y - canvasSize.height / 2;
+          setCameraX(newCameraX);
+          setCameraY(newCameraY);
+        }
+      }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
