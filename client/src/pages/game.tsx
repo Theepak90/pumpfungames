@@ -714,10 +714,27 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Two-layer drawing for proper outline overlap behavior
-      const highlightCount = 6; // Number of head segments that appear "on top"
+      // Draw unified white outline path behind entire snake
+      if (snake.visibleSegments.length > 0) {
+        ctx.beginPath();
+        for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
+          const seg = snake.visibleSegments[i];
+          if (i === snake.visibleSegments.length - 1) {
+            ctx.moveTo(seg.x, seg.y);
+          } else {
+            ctx.lineTo(seg.x, seg.y);
+          }
+        }
+        
+        // Draw white outline path
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = snake.getSegmentRadius() * 2.1;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
       
-      // Layer 1: Draw full snake body only (no outlines) - tail to head
+      // Draw all snake segments on top (no individual outlines)
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -725,27 +742,6 @@ export default function GamePage() {
         ctx.globalAlpha = segment.opacity;
         
         // Draw only segment body
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      // Layer 2: Draw head + recent segments with outline (tail to head order)
-      // Note: visibleSegments[0] is head, so we draw from tail towards head
-      for (let i = Math.min(highlightCount - 1, snake.visibleSegments.length - 1); i >= 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
-        
-        ctx.globalAlpha = segment.opacity;
-        
-        // Draw white outline
-        ctx.fillStyle = "white";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw segment body on top
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
