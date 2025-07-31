@@ -760,20 +760,22 @@ export default function GamePage() {
         return;
       }
 
-      // Check collision between player snake head and bot snake bodies
+      // Check collision: Player head vs Bot bodies (exclude bot heads - last 10 segments)
       for (const bot of botSnakes) {
-        // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, 5);
         const botRadius = botBaseRadius * botScaleFactor;
         
-        // Skip the head segments to avoid head-to-head collisions (last 3 segments)
-        const bodySegments = bot.visibleSegments.slice(0, -3);
-        for (const segment of bodySegments) {
-          const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < (snake.getSegmentRadius() + botRadius) * 0.9) { // Slightly tighter collision
-            // Player died - drop death food
+        // Only check against bot BODY segments (exclude last 10 to avoid head collision)
+        const botBodySegments = bot.visibleSegments.slice(0, Math.max(0, bot.visibleSegments.length - 10));
+        
+        for (const segment of botBodySegments) {
+          const dx = updatedHead.x - segment.x;
+          const dy = updatedHead.y - segment.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < snake.getSegmentRadius() + botRadius) {
+            // Player head hit bot body - player dies
             const deathFoods = dropDeathFood(snake);
             setFoods(prevFoods => [...prevFoods, ...deathFoods]);
             setGameOver(true);
@@ -782,12 +784,15 @@ export default function GamePage() {
         }
       }
 
-      // Check collision between player snake head and player snake body (self-collision)
-      const playerBodySegments = snake.visibleSegments.slice(0, -10); // Skip head and near-head segments
+      // Check self-collision: Player head vs Player body (exclude own head - last 10 segments)
+      const playerBodySegments = snake.visibleSegments.slice(0, Math.max(0, snake.visibleSegments.length - 10));
       for (const segment of playerBodySegments) {
-        const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-        if (dist < snake.getSegmentRadius() * 1.8) { // Self collision threshold
-          // Player died from self-collision
+        const dx = updatedHead.x - segment.x;
+        const dy = updatedHead.y - segment.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < snake.getSegmentRadius() * 1.5) {
+          // Player head hit own body - player dies
           const deathFoods = dropDeathFood(snake);
           setFoods(prevFoods => [...prevFoods, ...deathFoods]);
           setGameOver(true);
@@ -795,79 +800,90 @@ export default function GamePage() {
         }
       }
 
-      // Check collision between bot snakes (bot vs bot and bot vs player body)
+      // Check bot collisions: Bot heads vs other snake bodies only
       setBotSnakes(prevBots => {
         const newBots = [...prevBots];
-        const botsToRemove: number[] = [];
+        const botsToKill: number[] = [];
         
         for (let i = 0; i < newBots.length; i++) {
-          const bot = newBots[i];
-          if (botsToRemove.includes(i)) continue;
+          if (botsToKill.includes(i)) continue;
           
+          const bot = newBots[i];
           const botRadius = 8 * Math.min(1 + (bot.totalMass - 10) / 100, 5);
           
-          // Check bot head vs player body
-          const playerBodySegments = snake.visibleSegments.slice(0, -3); // Skip player head
+          // Bot head vs Player body (exclude player head - last 10 segments)
+          const playerBodySegments = snake.visibleSegments.slice(0, Math.max(0, snake.visibleSegments.length - 10));
           for (const segment of playerBodySegments) {
-            const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-            if (dist < (botRadius + snake.getSegmentRadius()) * 0.9) {
-              // Bot dies hitting player
-              const deathFoods = dropDeathFood(bot);
-              setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-              botsToRemove.push(i);
+            const dx = bot.head.x - segment.x;
+            const dy = bot.head.y - segment.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < botRadius + snake.getSegmentRadius()) {
+              // Bot head hit player body - bot dies
+              botsToKill.push(i);
               break;
             }
           }
           
-          if (botsToRemove.includes(i)) continue;
+          if (botsToKill.includes(i)) continue;
           
-          // Check bot head vs other bot bodies
+          // Bot head vs Other bot bodies (exclude their heads - last 10 segments)
           for (let j = 0; j < newBots.length; j++) {
-            if (i === j || botsToRemove.includes(j)) continue;
+            if (i === j || botsToKill.includes(j)) continue;
             
             const otherBot = newBots[j];
             const otherBotRadius = 8 * Math.min(1 + (otherBot.totalMass - 10) / 100, 5);
             
-            // Skip head segments to avoid head-to-head (use body only)
-            const otherBotBodySegments = otherBot.visibleSegments.slice(0, -3);
+            // Only check against other bot's BODY segments (exclude last 10)
+            const otherBotBodySegments = otherBot.visibleSegments.slice(0, Math.max(0, otherBot.visibleSegments.length - 10));
+            
             for (const segment of otherBotBodySegments) {
-              const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-              if (dist < (botRadius + otherBotRadius) * 0.9) {
-                // Bot dies hitting other bot's body
-                const deathFoods = dropDeathFood(bot);
-                setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-                botsToRemove.push(i);
+              const dx = bot.head.x - segment.x;
+              const dy = bot.head.y - segment.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              if (dist < botRadius + otherBotRadius) {
+                // Bot head hit other bot body - this bot dies
+                botsToKill.push(i);
                 break;
               }
             }
-            if (botsToRemove.includes(i)) break;
+            if (botsToKill.includes(i)) break;
           }
           
-          // Check bot head vs own body (self-collision)
-          if (!botsToRemove.includes(i)) {
-            const ownBodySegments = bot.visibleSegments.slice(0, -10); // Skip head and near-head
-            for (const segment of ownBodySegments) {
-              const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-              if (dist < botRadius * 1.8) {
-                // Bot self-collision
-                const deathFoods = dropDeathFood(bot);
-                setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-                botsToRemove.push(i);
-                break;
-              }
+          if (botsToKill.includes(i)) continue;
+          
+          // Bot head vs Own body (self-collision, exclude own head - last 10 segments)
+          const ownBodySegments = bot.visibleSegments.slice(0, Math.max(0, bot.visibleSegments.length - 10));
+          for (const segment of ownBodySegments) {
+            const dx = bot.head.x - segment.x;
+            const dy = bot.head.y - segment.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < botRadius * 1.5) {
+              // Bot head hit own body - bot dies
+              botsToKill.push(i);
+              break;
             }
           }
         }
         
+        // Create death food for killed bots
+        botsToKill.forEach(index => {
+          const deadBot = newBots[index];
+          const deathFoods = dropDeathFood(deadBot);
+          setFoods(prevFoods => [...prevFoods, ...deathFoods]);
+        });
+        
         // Remove dead bots and spawn new ones
-        const filteredBots = newBots.filter((_, index) => !botsToRemove.includes(index));
+        const survivingBots = newBots.filter((_, index) => !botsToKill.includes(index));
         
         // Spawn new bots to maintain BOT_COUNT
-        while (filteredBots.length < BOT_COUNT) {
-          filteredBots.push(createBotSnake(`bot_${Date.now()}_${Math.random()}`));
+        while (survivingBots.length < BOT_COUNT) {
+          survivingBots.push(createBotSnake(`bot_${Date.now()}_${Math.random()}`));
         }
         
-        return filteredBots;
+        return survivingBots;
       });
 
       // Let bot snakes eat food
