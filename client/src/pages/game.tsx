@@ -296,9 +296,14 @@ class SmoothSnake {
   }
   
   getSegmentRadius() {
-    // Dynamic scaling based on mass (baseline at mass=10, max 1.5x scale)
-    const scale = 1 + Math.min((this.totalMass - 10) / 200, 0.5);
-    return this.SEGMENT_RADIUS * scale;
+    // Dynamic scaling based on mass (baseline at mass=10, caps at 2x width)
+    const scaleFactor = 1 + Math.min((this.totalMass - 10) / 200, 1);
+    return this.SEGMENT_RADIUS * scaleFactor;
+  }
+
+  // Get scale factor for all visual elements
+  getScaleFactor() {
+    return 1 + Math.min((this.totalMass - 10) / 200, 1);
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -434,7 +439,7 @@ export default function GamePage() {
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
   // Dynamic zoom level based on snake mass (zooms out as snake grows)
-  const zoom = Math.max(0.3, 1.2 - (snake.totalMass - 10) / 500);
+  const zoom = Math.max(0.3, 1 - (snake.totalMass - 10) / 500);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -722,9 +727,14 @@ export default function GamePage() {
 
       // Check collision between player snake and bot snakes
       for (const bot of botSnakes) {
+        // Calculate bot's current radius based on mass
+        const botBaseRadius = 8;
+        const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+        const botRadius = botBaseRadius * botScaleFactor;
+        
         for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + 10) { // Bot segment radius is 10
+          if (dist < snake.getSegmentRadius() + botRadius) {
             setGameOver(true);
             return;
           }
@@ -741,7 +751,12 @@ export default function GamePage() {
               const food = newFoods[i];
               const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
               
-              if (dist < 10 + food.size) { // Bot radius is 10
+              // Calculate bot's current radius for food collision
+              const botBaseRadius = 8;
+              const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+              const botRadius = botBaseRadius * botScaleFactor;
+              
+              if (dist < botRadius + food.size) {
                 // Bot eats food
                 bot.totalMass += food.mass || 1;
                 
@@ -960,13 +975,19 @@ export default function GamePage() {
 
       // Draw bot snakes first (behind player)
       botSnakes.forEach(bot => {
+        // Bot dynamic scaling based on mass
+        const botBaseRadius = 8;
+        const botScaleFactor = 1 + Math.min((bot.totalMass - 10) / 200, 1);
+        const botRadius = botBaseRadius * botScaleFactor;
+        const botOutlineThickness = 2 * botScaleFactor;
+        
         // Bot outline
         ctx.fillStyle = "white";
         for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
           const segment = bot.visibleSegments[i];
           ctx.globalAlpha = segment.opacity;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, 12, 0, Math.PI * 2); // 10 + 2 outline
+          ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
           ctx.fill();
         }
         
@@ -976,7 +997,7 @@ export default function GamePage() {
           const segment = bot.visibleSegments[i];
           ctx.globalAlpha = segment.opacity;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, 10, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
         }
       });
@@ -987,13 +1008,14 @@ export default function GamePage() {
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
+        const scaleFactor = snake.getScaleFactor();
         
         ctx.globalAlpha = segment.opacity;
         
-        // White outline circle (slightly bigger)
+        // White outline circle (thickness scales with snake width)
         ctx.fillStyle = "white";
         ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+        ctx.arc(segment.x, segment.y, segmentRadius + (2 * scaleFactor), 0, Math.PI * 2);
         ctx.fill();
       }
       
@@ -1033,10 +1055,10 @@ export default function GamePage() {
         const snakeHead = snake.visibleSegments[0];
         const movementAngle = snake.currentAngle;
         // Dynamic eye scaling based on mass (same scale as segments)
-        const scale = 1 + Math.min((snake.totalMass - 10) / 200, 0.5);
-        const eyeDistance = 5 * scale; // Scale distance from center
-        const eyeSize = 3 * scale; // Scale eye size
-        const pupilSize = 1.5 * scale; // Scale pupil size
+        const scaleFactor = snake.getScaleFactor();
+        const eyeDistance = 5 * scaleFactor; // Scale distance from center
+        const eyeSize = 3 * scaleFactor; // Scale eye size
+        const pupilSize = 1.5 * scaleFactor; // Scale pupil size
         
         // Calculate cursor direction using mouse direction vector
         const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
