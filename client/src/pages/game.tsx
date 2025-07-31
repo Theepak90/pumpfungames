@@ -75,33 +75,43 @@ class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    // Sample segments at fixed distance intervals from the trail
+    // Calculate how many segments we should have based on mass
+    const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
     this.visibleSegments = [];
     let distanceSoFar = 0;
-    const targetSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
-    for (let i = 0; i < this.segmentTrail.length && this.visibleSegments.length < targetSegments; i++) {
-      const point = this.segmentTrail[i];
+    // Walk through the trail and place segments at proper intervals
+    // This creates smooth tail growth as more segments become visible from existing trail
+    for (let i = 0; i < this.segmentTrail.length && this.visibleSegments.length < targetSegmentCount; i++) {
+      const current = this.segmentTrail[i];
+      const next = this.segmentTrail[i + 1];
       
-      // Add segment if we've covered enough distance
-      if (distanceSoFar >= this.visibleSegments.length * this.SEGMENT_SPACING) {
-        this.visibleSegments.push(point);
-      }
-
+      if (!next) break;
+      
       // Calculate distance to next point
-      if (i < this.segmentTrail.length - 1) {
-        const nextPoint = this.segmentTrail[i + 1];
-        const dx = point.x - nextPoint.x;
-        const dy = point.y - nextPoint.y;
-        distanceSoFar += Math.sqrt(dx * dx + dy * dy);
+      const dx = current.x - next.x;
+      const dy = current.y - next.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Add to cumulative distance
+      distanceSoFar += distance;
+      
+      // Place a segment every SEGMENT_SPACING distance
+      // The key: we don't add segments manually - they emerge from existing trail
+      if (distanceSoFar >= this.visibleSegments.length * this.SEGMENT_SPACING) {
+        this.visibleSegments.push(current);
       }
     }
   }
   
   applyGrowth() {
+    // Gradually increase mass from growthRemaining
+    // Don't add segments manually - let updateVisibleSegments reveal them from trail
     if (this.growthRemaining > 0.05) {
       this.totalMass += 0.05;
       this.growthRemaining -= 0.05;
+      // As totalMass increases, more trail segments become visible (smooth tail growth)
       this.updateVisibleSegments();
     }
   }
