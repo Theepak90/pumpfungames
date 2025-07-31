@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { useMultiplayer } from '../hooks/useMultiplayer';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 
@@ -18,7 +17,6 @@ interface Position {
 }
 
 interface Food {
-  id?: string; // Optional ID for multiplayer foods
   x: number;
   y: number;
   size: number;
@@ -432,27 +430,15 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
-  
-  // Multiplayer integration
-  const {
-    isConnected,
-    currentPlayer,
-    otherPlayers,
-    foods: multiplayerFoods,
-    sendPlayerUpdate,
-    sendFoodEaten,
-    sendDeath
-  } = useMultiplayer();
-  
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     // Snake constructor now creates 6 segments with 30 mass and proper spacing
     return newSnake;
   });
-  const [foods, setFoods] = useState<Food[]>([]); // Only used for dropped boost food in multiplayer
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [isMultiplayer] = useState(true); // Always multiplayer mode
   const [isBoosting, setIsBoosting] = useState(false);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -479,7 +465,7 @@ export default function GamePage() {
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [gameIsVisible, setGameIsVisible] = useState(!document.hidden);
-  const [hiddenStartTime, setHiddenStartTime] = useState<number | null>(null);
+  const [hiddenAt, setHiddenAt] = useState<number | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -712,10 +698,67 @@ export default function GamePage() {
 
 
 
-  // Initialize local foods for boost drops (server handles main food)
+  // Initialize food with mass system
   useEffect(() => {
-    // Start with empty local foods - these will be populated by boost drops
-    setFoods([]);
+    const initialFoods: Food[] = [];
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      // Generate food within circular boundary
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MAP_RADIUS - 100); // Keep food away from edge
+      const x = MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+      
+      const foodType = Math.random();
+      let food: Food;
+      
+      if (foodType < 0.05) { // 5% orange test food (40 mass)
+        food = {
+          x: x,
+          y: y,
+          size: 15,
+          mass: 40,
+          color: '#ff8800',
+          type: 'normal'
+        };
+      } else if (foodType < 0.15) { // 10% big food
+        food = {
+          x: x,
+          y: y,
+          size: 10,
+          mass: 2,
+          color: '#ff4444',
+          type: 'normal'
+        };
+      } else if (foodType < 0.45) { // 30% medium food
+        food = {
+          x: x,
+          y: y,
+          size: 6,
+          mass: 1,
+          color: '#44ff44',
+          type: 'normal'
+        };
+      } else { // 55% small food
+        food = {
+          x: x,
+          y: y,
+          size: 4,
+          mass: 0.5,
+          color: '#4444ff',
+          type: 'normal'
+        };
+      }
+      
+      initialFoods.push(food);
+    }
+    setFoods(initialFoods);
+    
+    // Initialize bot snakes
+    const initialBots: BotSnake[] = [];
+    for (let i = 0; i < BOT_COUNT; i++) {
+      initialBots.push(createBotSnake(`bot_${i}`));
+    }
+    setBotSnakes(initialBots);
   }, []);
 
   // Mouse tracking
@@ -796,58 +839,44 @@ export default function GamePage() {
     if (!ctx) return;
 
     let animationId: number;
-    let backgroundMovementTimer: number;
     
-    // Simple background movement - just run the game loop slower when hidden
-    backgroundMovementTimer = window.setInterval(() => {
-      if (document.hidden && !gameOver) {
-        // Simulate one game frame at 20fps when tab is hidden
-        const deltaTime = 0.05; // 50ms
-        const currentTime = performance.now();
-        
-        // Move snake forward  
-        const currentSpeed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
-        const newX = snake.head.x + Math.cos(snake.currentAngle) * currentSpeed * deltaTime;
-        const newY = snake.head.y + Math.sin(snake.currentAngle) * currentSpeed * deltaTime;
-        
-        // Update snake position
-        snake.head.x = newX;
-        snake.head.y = newY;
-        snake.segmentTrail.unshift({ x: newX, y: newY });
-        
-        // Keep trail reasonable size
-        if (snake.segmentTrail.length > 200) {
-          snake.segmentTrail.length = 100;
-        }
-        
-        snake.updateVisibleSegments();
-        
-        // No bots in multiplayer mode - players are handled by WebSocket
-        
-        console.log('Background frame executed - snake at:', snake.head.x, snake.head.y);
+    // Apply snake catch-up movement when tab becomes visible again
+    const applySnakeCatchUp = (deltaSeconds: number) => {
+      if (gameOver) return;
+      
+      const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
+      const distance = speed * deltaSeconds;
+      
+      // Move snake forward based on time that passed while tab was hidden
+      snake.head.x += Math.cos(snake.currentAngle) * distance;
+      snake.head.y += Math.sin(snake.currentAngle) * distance;
+      
+      // Add trail points for the movement that happened while away
+      const numTrailPoints = Math.floor(deltaSeconds * 60); // Approximate trail points
+      for (let i = 0; i < numTrailPoints; i++) {
+        const progress = i / numTrailPoints;
+        const x = snake.head.x - Math.cos(snake.currentAngle) * distance * (1 - progress);
+        const y = snake.head.y - Math.sin(snake.currentAngle) * distance * (1 - progress);
+        snake.segmentTrail.unshift({ x, y });
       }
-    }, 50);
+      
+      // Update visible segments after catch-up movement
+      snake.updateVisibleSegments();
+    };
     
-    // Track tab visibility changes
+    // Track when tab becomes hidden/visible for catch-up movement
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setHiddenStartTime(performance.now());
-        console.log('Tab HIDDEN - starting background movement');
+        setHiddenAt(performance.now());
       } else {
-        if (hiddenStartTime !== null) {
-          const timeHidden = performance.now() - hiddenStartTime;
-          console.log(`Tab VISIBLE - was hidden for ${timeHidden}ms`);
-          setHiddenStartTime(null);
-          
-          // Force a render immediately to show new positions
-          if (!gameOver) {
-            // Force a re-render by updating state and logging positions
-            console.log('Forcing re-render - snake now at:', snake.head.x, snake.head.y);
-            setGameIsVisible(prev => !prev); // Toggle to force re-render
-            setTimeout(() => setGameIsVisible(prev => !prev), 16); // Toggle back on next frame
-          }
+        if (hiddenAt !== null) {
+          const now = performance.now();
+          const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
+          applySnakeCatchUp(delta);
+          setHiddenAt(null);
         }
       }
+      setGameIsVisible(!document.hidden);
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -861,65 +890,144 @@ export default function GamePage() {
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Move snake with proper boost food dropping
+      // Move snake normally - this ensures visibility and game mechanics work
       snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
-        // Add dropped food from boosting to local foods
+        // Add dropped food from boosting to the food array
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
-      snake.processGrowth(deltaTime);
-      snake.updatePosition(deltaTime);
-      
-      // Send player update to multiplayer server
-      if (currentPlayer) {
-        sendPlayerUpdate({
-          x: snake.head.x,
-          y: snake.head.y,
-          angle: snake.currentAngle,
-          segments: snake.visibleSegments,
-          totalMass: snake.totalMass,
-          money: snake.money,
-          isBoosting: snake.isBoosting
-        });
-      }
 
-      // Multiplayer-only: Check circular map boundaries (death barrier)
+      // Update bot snakes
+      setBotSnakes(prevBots => {
+        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
+      });
+
+      // Check circular map boundaries (death barrier)
       const updatedHead = snake.head;
       const distanceFromCenter = Math.sqrt(
         (updatedHead.x - MAP_CENTER_X) ** 2 + (updatedHead.y - MAP_CENTER_Y) ** 2
       );
       if (distanceFromCenter > MAP_RADIUS) {
-        // Send death to server for multiplayer handling
-        sendDeath();
+        // Drop food and money crates when snake dies
+        dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+        dropMoneyCrates();
+        snake.money = 0; // Reset snake's money on death
         setGameOver(true);
         return;
       }
 
-      // Multiplayer collision detection with other players
-      for (const otherPlayer of otherPlayers) {
-        if (!otherPlayer.isAlive) continue;
-        
-        // Calculate other player's radius based on mass
-        const playerBaseRadius = 8;
+      // Check collision between player snake and bot snakes
+      for (const bot of botSnakes) {
+        // Calculate bot's current radius based on mass (caps at 5x width)
+        const botBaseRadius = 8;
         const maxScale = 5;
-        const playerScaleFactor = Math.min(1 + (otherPlayer.totalMass - 10) / 100, maxScale);
-        const playerRadius = playerBaseRadius * playerScaleFactor;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
         
-        for (const segment of otherPlayer.segments) {
+        for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
-          if (dist < snake.getSegmentRadius() + playerRadius) {
-            // Player died from collision with another player
-            sendDeath();
+          if (dist < snake.getSegmentRadius() + botRadius) {
+            // Drop food and money crates when snake dies from collision
+            dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+            dropMoneyCrates();
+            snake.money = 0; // Reset snake's money on death
             setGameOver(true);
             return;
           }
         }
       }
+      
+      // Check if player snake kills any bot snakes
+      for (let i = botSnakes.length - 1; i >= 0; i--) {
+        const bot = botSnakes[i];
+        const botBaseRadius = 8;
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
+        
+        for (const segment of snake.visibleSegments) {
+          const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
+          if (dist < snake.getSegmentRadius() + botRadius) {
+            // Player killed a bot - drop food and money squares
+            dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
+            
+            // Drop money crates when bot dies (20 crates worth $0.05 each = $1.00 total)
+            // Create temporary function call for bot death
+            const originalSegments = snake.visibleSegments;
+            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
+            dropMoneyCrates();
+            snake.visibleSegments = originalSegments; // Restore player segments
+            
+            // Remove the killed bot
+            setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
+            
+            // Spawn a new bot to replace the killed one
+            setTimeout(() => {
+              setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
+            }, 3000); // 3 second delay before respawn
+            
+            break;
+          }
+        }
+      }
+
+      // Let bot snakes eat food
+      setBotSnakes(prevBots => {
+        return prevBots.map(bot => {
+          setFoods(prevFoods => {
+            const newFoods = [...prevFoods];
+            
+            for (let i = newFoods.length - 1; i >= 0; i--) {
+              const food = newFoods[i];
+              const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+              
+              // Calculate bot's current radius for food collision (caps at 5x width)
+              const botBaseRadius = 8;
+              const maxScale = 5;
+              const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+              const botRadius = botBaseRadius * botScaleFactor;
+              
+              if (dist < botRadius + food.size) {
+                // Bot eats food (with new growth system: 1 mass = 0.5 segments)
+                const mass = food.mass || 1;
+                bot.totalMass += mass * 0.5;
+                
+                // Remove eaten food and add new one
+                newFoods.splice(i, 1);
+                
+                const foodType = Math.random();
+                let newFood: Food;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * (MAP_RADIUS - 100);
+                const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+                const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+                
+                if (foodType < 0.05) {
+                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800', type: 'normal' };
+                } else if (foodType < 0.15) {
+                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444', type: 'normal' };
+                } else if (foodType < 0.45) {
+                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44', type: 'normal' };
+                } else {
+                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff', type: 'normal' };
+                }
+                
+                newFoods.push(newFood);
+                break;
+              }
+            }
+            
+            return newFoods;
+          });
+          
+          return bot;
+        });
+      });
 
       // Food gravitation toward snake head (50px radius, 2x faster)
       const suctionRadius = 50;
       const suctionStrength = 1.6;
       
-      // Apply to local boost-dropped foods
       setFoods(prevFoods => {
         return prevFoods.map(food => {
           const dx = updatedHead.x - food.x;
@@ -937,63 +1045,10 @@ export default function GamePage() {
         });
       });
 
-      // Check for food collision - both multiplayer foods and local boost foods
-      let scoreIncrease = 0;
-      
-      // Handle multiplayer foods from server
-      for (const food of multiplayerFoods) {
-        const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
-        const collisionRadius = food.type === 'money' ? 10 : food.size;
-        
-        if (dist < snake.getSegmentRadius() + collisionRadius) {
-          // Handle different food types
-          if (food.type === 'money') {
-            snake.money += food.value || 0.05;
-          } else {
-            scoreIncrease += snake.eatFood(food);
-          }
-          
-          // Send to server with ID
-          if (food.id) {
-            sendFoodEaten(food.id);
-          }
-          break;
-        }
-      }
-      
-      // Handle local boost-dropped foods
+      // Check for food collision and handle eating
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
-        
-        for (let i = newFoods.length - 1; i >= 0; i--) {
-          const food = newFoods[i];
-          const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
-          
-          if (dist < snake.getSegmentRadius() + food.size) {
-            if (food.type === 'money') {
-              snake.money += food.value || 0.05;
-              continue; // Don't spawn replacement food for money
-            } else {
-              // Regular food - grow snake
-              scoreIncrease += snake.eatFood(food);
-            }
-            
-            // Remove eaten food 
-            newFoods.splice(i, 1);
-            break; // Only eat one food per frame
-          }
-        }
-        
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
-        }
-        
-        return newFoods;
-      });
-        // Single player food collision
-        setFoods(prevFoods => {
-          const newFoods = [...prevFoods];
-          let scoreIncrease = 0;
+        let scoreIncrease = 0;
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
@@ -1102,7 +1157,7 @@ export default function GamePage() {
       // Save context for camera transform
       ctx.save();
 
-      // Apply zoom and camera following snake head - this should automatically follow
+      // Apply zoom and camera following snake head
       ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
       ctx.scale(zoom, zoom);
       ctx.translate(-snake.head.x, -snake.head.y);
@@ -1141,9 +1196,8 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food items - use multiplayer foods if connected
-      const foodsToDraw = isMultiplayer ? multiplayerFoods : foods;
-      foodsToDraw.forEach((food, index) => {
+      // Draw food items
+      foods.forEach((food, index) => {
         if (food.type === 'money') {
           // Draw money crates with dollar sign image, shadow, and wobble
           const time = Date.now() * 0.003; // Time for animation
@@ -1199,56 +1253,35 @@ export default function GamePage() {
         }
       });
 
-      // Draw other players in multiplayer or bots in single player
-      if (isMultiplayer) {
-        // Draw other multiplayer players
-        otherPlayers.forEach(player => {
-          if (!player.isAlive) return;
-          
-          // Player dynamic scaling based on mass
-          const playerBaseRadius = 8;
-          const maxScale = 5;
-          const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
-          const playerRadius = playerBaseRadius * playerScaleFactor;
-          const playerOutlineThickness = 2 * playerScaleFactor;
-          
-          // Player outline
-          ctx.fillStyle = "white";
-          for (let i = player.segments.length - 1; i >= 0; i--) {
-            const segment = player.segments[i];
-            ctx.globalAlpha = segment.opacity;
-            ctx.beginPath();
-            ctx.arc(segment.x, segment.y, playerRadius + playerOutlineThickness, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          
-          // Player body
-          ctx.fillStyle = player.color;
-          for (let i = player.segments.length - 1; i >= 0; i--) {
-            const segment = player.segments[i];
-            ctx.globalAlpha = segment.opacity;
-            ctx.beginPath();
-            ctx.arc(segment.x, segment.y, playerRadius, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          
-          // Player money display
-          if (player.segments.length > 0) {
-            const playerHead = player.segments[0];
-            ctx.font = `${14 * playerScaleFactor}px Arial, sans-serif`;
-            ctx.fillStyle = "#ffffff";
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = 2 * playerScaleFactor;
-            ctx.textAlign = "center";
-            
-            const moneyText = `$${player.money.toFixed(2)}`;
-            const offsetY = 35 * playerScaleFactor;
-            
-            ctx.strokeText(moneyText, playerHead.x, playerHead.y - offsetY);
-            ctx.fillText(moneyText, playerHead.x, playerHead.y - offsetY);
-          }
-        });
-      }
+      // Draw bot snakes first (behind player)
+      botSnakes.forEach(bot => {
+        // Bot dynamic scaling based on mass (caps at 5x width)
+        const botBaseRadius = 8;
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
+        const botOutlineThickness = 2 * botScaleFactor;
+        
+        // Bot outline
+        ctx.fillStyle = "white";
+        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = bot.visibleSegments[i];
+          ctx.globalAlpha = segment.opacity;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        // Bot body
+        ctx.fillStyle = bot.color;
+        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = bot.visibleSegments[i];
+          ctx.globalAlpha = segment.opacity;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
       
       ctx.globalAlpha = 1.0;
 
@@ -1407,10 +1440,9 @@ export default function GamePage() {
     animationId = requestAnimationFrame(gameLoop);
     return () => {
       cancelAnimationFrame(animationId);
-      clearInterval(backgroundMovementTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenStartTime, gameIsVisible]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt]);
 
   const resetGame = () => {
     setGameOver(false);
@@ -1439,8 +1471,8 @@ export default function GamePage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-      {/* Multiplayer Controls */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-4">
+      {/* Exit Button */}
+      <div className="absolute top-4 left-4 z-10">
         <Button
           onClick={exitGame}
           className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
@@ -1448,10 +1480,6 @@ export default function GamePage() {
           <X className="w-4 h-4" />
           Exit Game
         </Button>
-        
-        <div className={`px-3 py-1 rounded text-sm ${isConnected ? 'bg-green-600' : 'bg-red-600'}`}>
-          {isConnected ? `Multiplayer • ${otherPlayers.length} other players online` : 'Connecting to server...'}
-        </div>
       </div>
 
       {/* Volume Controls */}
