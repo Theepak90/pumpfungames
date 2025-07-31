@@ -434,6 +434,7 @@ export default function GamePage() {
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
+  const [killSound, setKillSound] = useState<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const saved = localStorage.getItem('soundEnabled');
     return saved ? JSON.parse(saved) : true;
@@ -566,6 +567,22 @@ export default function GamePage() {
     if (soundEnabled) {
       audio.play().catch(console.error);
     }
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, []);
+
+  // Kill sound setup
+  useEffect(() => {
+    const audio = new Audio();
+    audio.src = '/kill-sound.mp3';
+    audio.preload = 'auto';
+    audio.volume = 0.5; // Always 50% volume
+    setKillSound(audio);
 
     return () => {
       if (audio) {
@@ -906,6 +923,12 @@ export default function GamePage() {
             snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
             dropMoneyCrates();
             snake.visibleSegments = originalSegments; // Restore player segments
+            
+            // Play kill sound effect
+            if (killSound && soundEnabled) {
+              killSound.currentTime = 0; // Reset to start
+              killSound.play().catch(console.error);
+            }
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
