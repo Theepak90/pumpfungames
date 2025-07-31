@@ -119,6 +119,7 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [volume, setVolume] = useState(0.5);
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
@@ -143,7 +144,7 @@ export default function Home() {
     audio.src = '/audio/background-music.mp3';
     audio.preload = 'auto';
     audio.loop = true;
-    audio.volume = 0.3;
+    audio.volume = volume;
     setBackgroundMusic(audio);
 
     return () => {
@@ -154,14 +155,17 @@ export default function Home() {
     };
   }, []);
 
-  // Auto-play background music when sound is enabled
+  // Auto-play background music when sound is enabled and update volume
   useEffect(() => {
-    if (backgroundMusic && soundEnabled) {
-      backgroundMusic.play().catch(console.error);
-    } else if (backgroundMusic && !soundEnabled) {
-      backgroundMusic.pause();
+    if (backgroundMusic) {
+      backgroundMusic.volume = volume;
+      if (soundEnabled) {
+        backgroundMusic.play().catch(console.error);
+      } else {
+        backgroundMusic.pause();
+      }
     }
-  }, [backgroundMusic, soundEnabled]);
+  }, [backgroundMusic, soundEnabled, volume]);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -233,13 +237,28 @@ export default function Home() {
           <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={toggleSound}
-            className="bg-gray-700 text-white px-3 py-1 text-sm hover:bg-gray-600 border-2 border-gray-600 font-retro flex items-center gap-2"
-          >
-            <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
-            {soundEnabled ? 'ON' : 'OFF'}
-          </button>
+          <div className="flex items-center gap-2 bg-gray-700 px-3 py-1 border-2 border-gray-600">
+            <button 
+              onClick={toggleSound}
+              className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
+            >
+              <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
+              {soundEnabled ? 'ON' : 'OFF'}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
+              }}
+            />
+            <span className="text-white text-xs font-retro">{Math.round(volume * 100)}%</span>
+          </div>
           <button 
             className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
           >

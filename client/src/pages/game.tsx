@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Volume2 } from 'lucide-react';
 
 // Game constants
 const MAP_CENTER_X = 2000;
@@ -251,6 +251,8 @@ export default function GamePage() {
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
   const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
+  const [volume, setVolume] = useState(0.5);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -261,11 +263,13 @@ export default function GamePage() {
     audio.src = '/audio/background-music.mp3';
     audio.preload = 'auto';
     audio.loop = true;
-    audio.volume = 0.3;
+    audio.volume = volume;
     setBackgroundMusic(audio);
     
-    // Start playing music when game loads
-    audio.play().catch(console.error);
+    // Start playing music when game loads if sound is enabled
+    if (soundEnabled) {
+      audio.play().catch(console.error);
+    }
 
     return () => {
       if (audio) {
@@ -274,6 +278,23 @@ export default function GamePage() {
       }
     };
   }, []);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (backgroundMusic) {
+      backgroundMusic.volume = volume;
+      if (soundEnabled) {
+        backgroundMusic.play().catch(console.error);
+      } else {
+        backgroundMusic.pause();
+      }
+    }
+  }, [backgroundMusic, volume, soundEnabled]);
+
+  // Toggle sound function
+  const toggleSound = () => {
+    setSoundEnabled(!soundEnabled);
+  };
 
   // Handle canvas resize for fullscreen
   useEffect(() => {
@@ -731,6 +752,30 @@ export default function GamePage() {
           <X className="w-4 h-4" />
           Exit Game
         </Button>
+      </div>
+
+      {/* Volume Controls */}
+      <div className="absolute top-4 left-40 z-10 flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm px-3 py-2 border border-gray-600 rounded">
+        <button 
+          onClick={toggleSound}
+          className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
+        >
+          <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
+          {soundEnabled ? 'ON' : 'OFF'}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={volume}
+          onChange={(e) => setVolume(parseFloat(e.target.value))}
+          className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
+          }}
+        />
+        <span className="text-white text-xs font-retro">{Math.round(volume * 100)}%</span>
       </div>
       
       {/* Score Display */}
