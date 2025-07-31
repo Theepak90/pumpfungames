@@ -384,6 +384,7 @@ class SmoothSnake {
   eatFood(food: Food) {
     const mass = food.mass || 1;
     this.growthRemaining += mass;
+    console.log(`Snake eating food: +${mass} mass, growthRemaining now: ${this.growthRemaining}`);
     return mass; // Return score increase
   }
   
@@ -939,24 +940,72 @@ export default function GamePage() {
         }
       }
 
-      // Food eating is now handled by server in multiplayer mode
-
-      // Food collision detection - works locally with server sync
+      // Food collision detection - Active food eating
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
         let scoreIncrease = 0;
+        let hasEatenFood = false;
         
-        for (let i = newFoods.length - 1; i >= 0; i--) {
+        for (let i = newFoods.length - 1; i >= 0 && !hasEatenFood; i--) {
           const food = newFoods[i];
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
-          if (dist < snake.getSegmentRadius() + food.size) {
+          // Check collision with more generous collision detection
+          if (dist < snake.getSegmentRadius() + food.size + 5) { // Added 5px buffer
             // Snake eats the food - growth handled internally
             scoreIncrease += snake.eatFood(food);
             
-            // Remove eaten food locally (server will sync)
+            // Remove eaten food and spawn new one immediately
             newFoods.splice(i, 1);
-            break; // Only eat one food per frame
+            hasEatenFood = true;
+            
+            // Spawn new food to replace eaten one
+            const foodType = Math.random();
+            let newFood: Food;
+            
+            // Generate new food within circular boundary
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * (MAP_RADIUS - 100);
+            const newX = MAP_CENTER_X + Math.cos(angle) * radius;
+            const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
+            
+            if (foodType < 0.05) { // 5% orange test food (40 mass)
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 15,
+                mass: 40,
+                color: '#ff8800'
+              };
+            } else if (foodType < 0.15) { // 10% big food
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 10,
+                mass: 2,
+                color: '#ff4444'
+              };
+            } else if (foodType < 0.45) { // 30% medium food
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 6,
+                mass: 1,
+                color: '#44ff44'
+              };
+            } else { // 55% small food
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 4,
+                mass: 0.5,
+                color: '#4444ff'
+              };
+            }
+            
+            newFoods.push(newFood);
+            
+            console.log(`Ate food! Mass gained: ${food.mass}, Total mass: ${snake.totalMass}`);
           }
         }
         
