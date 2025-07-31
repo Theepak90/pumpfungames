@@ -45,7 +45,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 16; // Fixed spacing between segments
+    this.segmentSpacing = 12; // Reduced spacing for half-overlap effect
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
@@ -63,7 +63,7 @@ class SmoothSnake {
     const START_SEGMENTS = 5;
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * this.segmentSpacing,
+        x: x - i * this.segmentSpacing, // Each segment overlaps half of the previous
         y: y 
       });
     }
