@@ -1079,7 +1079,7 @@ export default function GamePage() {
       
       ctx.globalAlpha = 1.0;
 
-      // First pass: Draw white outline behind ALL segments including head
+      // Draw snake segments (body and head)
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -1087,40 +1087,32 @@ export default function GamePage() {
         
         ctx.globalAlpha = segment.opacity;
         
-        // White outline circle (thickness scales with snake width)
-        ctx.fillStyle = "white";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + (2 * scaleFactor), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      // Second pass: Draw actual segments on top (body segments only, excluding head)
-      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
+        // Set up glow effect if boosting
+        if (snake.isBoosting) {
+          ctx.shadowColor = "white";
+          ctx.shadowBlur = 10;
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2 * scaleFactor;
+        } else {
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+        }
         
-        ctx.globalAlpha = segment.opacity;
-        
-        // Solid orange color for body segments
+        // Draw segment
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
-      }
-
-      // Third pass: Draw head on top
-      if (snake.visibleSegments.length > 0) {
-        const headSeg = snake.visibleSegments[0];
-        const headRadius = snake.getSegmentRadius();
         
-        ctx.globalAlpha = headSeg.opacity;
-        
-        // Same solid orange color as body
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
-        ctx.fill();
+        // Add stroke outline if boosting
+        if (snake.isBoosting) {
+          ctx.stroke();
+        }
       }
+      
+      // Reset shadow effects to avoid affecting other elements
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
       
       // Reset global alpha
       ctx.globalAlpha = 1.0;
