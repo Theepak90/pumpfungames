@@ -54,10 +54,10 @@ class SmoothSnake {
     this.baseSegmentRadius = 14; // Fixed segment radius
     this.maxSegmentRadius = 14; // Keep consistent size
     
-    // Start with 5 balls (25 mass total, but we'll give them 200 mass to work with)
+    // Start with 5 balls (25 mass total visually)
     this.segments = [];
     const START_MASS = 25; // 5 balls x 5 mass each (visual segments)
-    this.growthRemaining = START_MASS; // Only the visual mass, not the full 200
+    this.growthRemaining = START_MASS; // Start with only what's visually there
     
     // Initialize exactly 5 segments for tracking
     const START_SEGMENTS = 5;
@@ -69,7 +69,7 @@ class SmoothSnake {
     }
     
     // Set minimum mass (cannot go below starting size)
-    this.minimumMass = 200; // Player effectively has 200 mass to start
+    this.minimumMass = START_MASS; // Can only go down to starting size
   }
   
   get head() {
@@ -203,11 +203,8 @@ class SmoothSnake {
       }
     }
     
-    // Trim segments to match actual snake length based on mass
-    const maxSegments = Math.floor(this.totalMass / this.massPerSegment);
-    if (this.segments.length > maxSegments) {
-      this.segments = this.segments.slice(0, maxSegments);
-    }
+    // Don't auto-grow segments, only grow through addSegment() when eating food
+    // This prevents the snake from spawning with all segments at once
   }
   
   eatFood(food: Food) {
@@ -249,9 +246,9 @@ export default function GamePage() {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     newSnake.segmentSpacing = 24; // Connected segments like a worm
     // Snake constructor already creates 5 segments with 25 mass
-    // Give them 200 total mass but only show 5 segments initially
-    newSnake.growthRemaining = 200; // Start with 200 mass ready to grow
-    newSnake.minimumMass = 200; // Cannot go below starting mass
+    // Start with just the basic 25 mass, let food provide growth
+    newSnake.growthRemaining = 25; // Start with 25 mass (5 segments)
+    newSnake.minimumMass = 25; // Cannot go below starting mass
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
@@ -780,9 +777,9 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (5 segments, 200 mass ready to grow) with new spacing
+    // Reset snake to initial state (5 segments, 25 mass to start) with new spacing
     snake.segments = [];
-    const START_MASS = 200;
+    const START_MASS = 25;
     const START_SEGMENTS = 5;
     snake.segmentSpacing = 24; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
