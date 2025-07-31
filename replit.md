@@ -19,9 +19,8 @@ Preferred communication style: Simple, everyday language.
 ### Enhanced Death Food System
 - Death food drops along snake body segments (not just at death location)
 - Regular death food is half size (7.5) and matches snake's color
-- Added 5 special medical cross items when snake dies worth 10 mass each
-- Medical cross image displays with green glow effect
 - Food distribution spreads across entire snake path for realistic death mechanics
+- Removed special medical cross items per user request
 
 ## System Architecture
 

@@ -21,7 +21,6 @@ interface Food {
   size: number;
   color: string;
   mass?: number; // Mass value for growth
-  isMedical?: boolean; // Flag for medical cross food
 }
 
 interface BotSnake {
@@ -427,7 +426,6 @@ export default function GamePage() {
     return saved ? parseFloat(saved) : 0.25;
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
-  const [medicalCrossImage, setMedicalCrossImage] = useState<HTMLImageElement | null>(null);
   
   // Dynamic zoom level with more aggressive zoom-out
   const calculateZoom = (mass: number) => {
@@ -491,30 +489,8 @@ export default function GamePage() {
       });
     }
     
-    // Add 5 special medical cross food items
-    const medicalFoods: Food[] = [];
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * 2 * Math.PI + Math.random() * 0.3;
-      const radius = 40 + Math.random() * 60;
-      
-      const x = deathX + Math.cos(angle) * radius;
-      const y = deathY + Math.sin(angle) * radius;
-      
-      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
-      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
-      
-      medicalFoods.push({
-        x: clampedX,
-        y: clampedY,
-        size: 12, // Slightly smaller than orange test food
-        mass: 10, // High value medical food
-        color: '#00ff44', // Green color for medical food
-        isMedical: true // Special flag for rendering
-      });
-    }
-    
-    // Add both regular death food and medical food to the existing food array
-    setFoods(prevFoods => [...prevFoods, ...newFoods, ...medicalFoods]);
+    // Add only the regular death food to the existing food array
+    setFoods(prevFoods => [...prevFoods, ...newFoods]);
   };
 
   // Background music setup
@@ -552,18 +528,7 @@ export default function GamePage() {
     };
   }, []);
 
-  // Load medical cross image
-  useEffect(() => {
-    const img = new Image();
-    img.src = '/medical-cross.png'; // We'll need to copy the image to public folder
-    img.onload = () => {
-      console.log('Medical cross image loaded successfully');
-      setMedicalCrossImage(img);
-    };
-    img.onerror = (e) => {
-      console.error('Failed to load medical cross image:', e);
-    };
-  }, []);
+
 
   // Handle volume changes
   useEffect(() => {
@@ -1066,57 +1031,34 @@ export default function GamePage() {
 
       // Draw food as squares with gradient effect
       foods.forEach(food => {
-        if (food.isMedical && medicalCrossImage) {
-          // Draw medical cross image
-          ctx.drawImage(
-            medicalCrossImage,
-            food.x - food.size,
-            food.y - food.size,
-            food.size * 2,
-            food.size * 2
-          );
-          
-          // Add glow effect for medical food
-          ctx.shadowColor = '#00ff44';
-          ctx.shadowBlur = 15;
-          ctx.drawImage(
-            medicalCrossImage,
-            food.x - food.size,
-            food.y - food.size,
-            food.size * 2,
-            food.size * 2
-          );
-          ctx.shadowBlur = 0;
-        } else {
-          // Create linear gradient for square food
-          const gradient = ctx.createLinearGradient(
-            food.x - food.size, food.y - food.size,
-            food.x + food.size, food.y + food.size
-          );
-          gradient.addColorStop(0, "#ffbaba"); // Light corner
-          gradient.addColorStop(1, food.color); // Dark corner
-          
-          ctx.fillStyle = gradient;
-          
-          // Draw square food
-          ctx.fillRect(
-            food.x - food.size, 
-            food.y - food.size, 
-            food.size * 2, 
-            food.size * 2
-          );
-          
-          // Food glow effect
-          ctx.shadowColor = food.color;
-          ctx.shadowBlur = 10;
-          ctx.fillRect(
-            food.x - food.size, 
-            food.y - food.size, 
-            food.size * 2, 
-            food.size * 2
-          );
-          ctx.shadowBlur = 0;
-        }
+        // Create linear gradient for square food
+        const gradient = ctx.createLinearGradient(
+          food.x - food.size, food.y - food.size,
+          food.x + food.size, food.y + food.size
+        );
+        gradient.addColorStop(0, "#ffbaba"); // Light corner
+        gradient.addColorStop(1, food.color); // Dark corner
+        
+        ctx.fillStyle = gradient;
+        
+        // Draw square food
+        ctx.fillRect(
+          food.x - food.size, 
+          food.y - food.size, 
+          food.size * 2, 
+          food.size * 2
+        );
+        
+        // Food glow effect
+        ctx.shadowColor = food.color;
+        ctx.shadowBlur = 10;
+        ctx.fillRect(
+          food.x - food.size, 
+          food.y - food.size, 
+          food.size * 2, 
+          food.size * 2
+        );
+        ctx.shadowBlur = 0;
       });
 
       // Draw bot snakes first (behind player)
