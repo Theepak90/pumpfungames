@@ -838,54 +838,67 @@ export default function GamePage() {
     if (!ctx) return;
 
     let animationId: number;
-    let backgroundMovementInterval: number;
+    let movementInterval: number;
+    let lastUpdate = Date.now();
     
-    // Background movement when tab is inactive
-    const handleVisibilityChange = () => {
-      console.log('Tab visibility changed:', document.hidden ? 'hidden' : 'visible');
-      setGameIsVisible(!document.hidden);
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Background movement timer - only moves snake when tab is inactive
-    backgroundMovementInterval = window.setInterval(() => {
-      if (document.hidden && !gameOver) {
-        console.log('Background movement active - snake moving in hidden tab');
-        
-        // Only update snake position, nothing else
-        const dx = Math.cos(snake.currentAngle) * snake.speed;
-        const dy = Math.sin(snake.currentAngle) * snake.speed;
-        
-        snake.head.x += dx;
-        snake.head.y += dy;
-        
-        // Add to trail for smooth movement
-        snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
-        
-        // Keep trail length reasonable
-        const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
-        if (snake.segmentTrail.length > maxTrailLength) {
-          snake.segmentTrail.length = maxTrailLength;
-        }
-        
-        // Update visible segments so snake appears properly when tab becomes active
-        snake.updateVisibleSegments();
+    // Independent movement loop - runs at 60 FPS regardless of tab visibility
+    movementInterval = window.setInterval(() => {
+      if (gameOver) return;
+      
+      const now = Date.now();
+      const deltaTime = Math.min((now - lastUpdate) / 1000, 0.033); // Cap at 33ms
+      lastUpdate = now;
+      
+      // Time-based movement - works even when tab is inactive
+      const dx = Math.cos(snake.currentAngle) * snake.speed * deltaTime * 60; // 60 FPS equivalent
+      const dy = Math.sin(snake.currentAngle) * snake.speed * deltaTime * 60;
+      
+      snake.head.x += dx;
+      snake.head.y += dy;
+      
+      // Add to trail for smooth movement
+      snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
+      
+      // Keep trail length reasonable
+      const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
+      if (snake.segmentTrail.length > maxTrailLength) {
+        snake.segmentTrail.length = maxTrailLength;
       }
-    }, 30); // 30ms interval for smooth background movement
-    
-    const gameLoop = () => {
-      // Calculate delta time for smooth growth processing
-      const currentTime = Date.now();
-      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.033); // Cap at 33ms (30fps minimum)
-      setLastFrameTime(currentTime);
+      
+      // Update visible segments
+      snake.updateVisibleSegments();
       
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Move snake with smooth turning based on mouse direction
-      snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
-        // Add dropped food from boosting to the food array
+    }, 1000 / 60); // 60 FPS movement loop
+    
+    const gameLoop = () => {
+      // Calculate delta time for smooth growth processing
+      const currentTime = Date.now();
+      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.033); // Cap at 33ms (30fps minimum)  
+      setLastFrameTime(currentTime);
+      
+      // Only handle mouse-based turning and boost in the render loop
+      // Smooth angle interpolation with dynamic turn speed
+      const targetAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
+      let angleDiff = targetAngle - snake.currentAngle;
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+      
+      // Dynamic turn speed - faster when boosting to maintain turn radius
+      const baseTurnSpeed = snake.turnSpeed;
+      const boostTurnMultiplier = 1.8; // Increase turning speed when boosting
+      const currentTurnSpeed = snake.isBoosting ? baseTurnSpeed * boostTurnMultiplier : baseTurnSpeed;
+      
+      snake.currentAngle += angleDiff * currentTurnSpeed;
+      
+      // Keep angle in range
+      if (snake.currentAngle > Math.PI) snake.currentAngle -= 2 * Math.PI;
+      if (snake.currentAngle < -Math.PI) snake.currentAngle += 2 * Math.PI;
+      
+      // Handle boost mechanics (dropping food when boosting)
+      snake.applyBoost((droppedFood: Food) => {
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
 
@@ -909,6 +922,93 @@ export default function GamePage() {
       }
 
       // Check collision between player snake and bot snakes
+      for (const bot of botSnakes) {
+        // Calculate bot's current radius based on mass (caps at 5x width)
+        const botBaseRadius = 8;
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
+        
+        for (const segment of bot.visibleSegments) {
+          const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
+          if (dist < snake.getSegmentRadius() + botRadius) {
+            // Drop food and money crates when snake dies from collision
+            dropDeathFood(updatedHead.x, updatedHead.y, snake.totalMass);
+            dropMoneyCrates();
+            snake.money = 0; // Reset snake's money on death
+            setGameOver(true);
+            return;
+          }
+        }
+      }
+
+      // Food collision detection
+      const headRadius = snake.getSegmentRadius();
+      setFoods(prevFoods => {
+        return prevFoods.filter(food => {
+          const foodDistance = Math.sqrt(
+            (snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2
+          );
+          
+          if (foodDistance < headRadius + food.size) {
+            // Food eaten - add mass for gradual growth
+            snake.growthRemaining += food.mass;
+            setScore(prevScore => prevScore + food.mass);
+            return false; // Remove food
+          }
+          return true; // Keep food
+        });
+      });
+
+      // Money crate collision detection
+      setMoneyCrates(prevCrates => {
+        return prevCrates.filter(crate => {
+          const crateDistance = Math.sqrt(
+            (snake.head.x - crate.x) ** 2 + (snake.head.y - crate.y) ** 2
+          );
+          
+          if (crateDistance < headRadius + 10) { // 10 is crate radius
+            // Money collected
+            snake.money += crate.value;
+            return false; // Remove crate
+          }
+          return true; // Keep crate
+        });
+      });
+
+      // Bot collision detection (kill bots on contact)
+      setBotSnakes(prevBots => {
+        return prevBots.filter(bot => {
+          // Check collision with bot head
+          const headDistance = Math.sqrt(
+            (snake.head.x - bot.head.x) ** 2 + (snake.head.y - bot.head.y) ** 2
+          );
+          
+          if (headDistance < headRadius + 8) { // Bot collision
+            // Kill bot and drop its food
+            for (let i = 0; i < bot.visibleSegments.length; i++) {
+              const segment = bot.visibleSegments[i];
+              if (Math.random() < 0.3) { // 30% chance per segment
+                const newFood: Food = {
+                  x: segment.x + (Math.random() - 0.5) * 30,
+                  y: segment.y + (Math.random() - 0.5) * 30,
+                  mass: 1.5,
+                  size: 7.5,
+                  color: bot.color
+                };
+                setFoods(prevFoods => [...prevFoods, newFood]);
+              }
+            }
+            
+            // Award money for killing bot (minimum $0.50 or 5% of bot's mass)
+            const moneyEarned = Math.max(0.50, bot.totalMass * 0.05);
+            snake.money += moneyEarned;
+            
+            return false; // Remove bot
+          }
+          return true; // Keep bot
+        });
+      });
       for (const bot of botSnakes) {
         // Calculate bot's current radius based on mass (caps at 5x width)
         const botBaseRadius = 8;
@@ -1431,8 +1531,7 @@ export default function GamePage() {
     animationId = requestAnimationFrame(gameLoop);
     return () => {
       cancelAnimationFrame(animationId);
-      clearInterval(backgroundMovementInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(movementInterval);
     };
   }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
