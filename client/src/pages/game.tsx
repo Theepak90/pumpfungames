@@ -213,11 +213,12 @@ class SmoothSnake {
     const oldMass = this.growthRemaining;
     this.growthRemaining += mass;
     
-    // Check if we should add a new segment (every 5 mass)
+    // Check if we should add a new segment (every 5 mass), but limit growth rate
     const oldSegments = Math.floor(oldMass / this.massPerSegment);
     const newSegments = Math.floor(this.growthRemaining / this.massPerSegment);
     
-    if (newSegments > oldSegments) {
+    // Only add one segment at a time, even if mass would allow more
+    if (newSegments > oldSegments && this.segments.length < 50) { // Cap at 50 segments
       this.addSegment();
     }
     
@@ -554,7 +555,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 10,
-                mass: 10, // 2 * 5 = 10
+                mass: 3, // Reduced from 10 to 3
                 color: '#ff4444'
               };
             } else if (foodType < 0.4) { // 30% medium food
@@ -562,7 +563,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 6,
-                mass: 5, // 1 * 5 = 5
+                mass: 1, // Reduced from 5 to 1
                 color: '#44ff44'
               };
             } else { // 60% small food
@@ -570,7 +571,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 4,
-                mass: 2.5, // 0.5 * 5 = 2.5
+                mass: 0.5, // Reduced from 2.5 to 0.5
                 color: '#4444ff'
               };
             }
