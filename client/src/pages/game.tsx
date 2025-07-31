@@ -692,10 +692,8 @@ export default function GamePage() {
         const eyeSize = 3; // Smaller eyes
         const pupilSize = 1.5; // Smaller pupils
         
-        // Calculate cursor direction in world coordinates
-        const worldMouseX = (canvasSize.width / 2) / zoom + snake.head.x;
-        const worldMouseY = (canvasSize.height / 2) / zoom + snake.head.y;
-        const cursorAngle = Math.atan2(worldMouseY - snakeHead.y, worldMouseX - snakeHead.x);
+        // Calculate cursor direction using mouse direction vector
+        const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
         
         // Eye positions perpendicular to movement direction
         const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
