@@ -934,81 +934,10 @@ export default function GamePage() {
         }
       }
 
-      // Let bot snakes eat food
-      setBotSnakes(prevBots => {
-        return prevBots.map(bot => {
-          setFoods(prevFoods => {
-            const newFoods = [...prevFoods];
-            
-            for (let i = newFoods.length - 1; i >= 0; i--) {
-              const food = newFoods[i];
-              const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
-              
-              // Calculate bot's current radius for food collision (caps at 5x width)
-              const botBaseRadius = 8;
-              const maxScale = 5;
-              const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-              const botRadius = botBaseRadius * botScaleFactor;
-              
-              if (dist < botRadius + food.size) {
-                // Bot eats food
-                bot.totalMass += food.mass || 1;
-                
-                // Remove eaten food and add new one
-                newFoods.splice(i, 1);
-                
-                const foodType = Math.random();
-                let newFood: Food;
-                
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * (MAP_RADIUS - 100);
-                const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-                const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-                
-                if (foodType < 0.05) {
-                  newFood = { x: newX, y: newY, size: 15, mass: 40, color: '#ff8800' };
-                } else if (foodType < 0.15) {
-                  newFood = { x: newX, y: newY, size: 10, mass: 1.2, color: '#ff4444' };
-                } else if (foodType < 0.45) {
-                  newFood = { x: newX, y: newY, size: 6, mass: 0.4, color: '#44ff44' };
-                } else {
-                  newFood = { x: newX, y: newY, size: 4, mass: 0.2, color: '#4444ff' };
-                }
-                
-                newFoods.push(newFood);
-                break;
-              }
-            }
-            
-            return newFoods;
-          });
-          
-          return bot;
-        });
-      });
+      // Food eating is now handled by server in multiplayer mode
 
-      // Food gravitation toward snake head (50px radius, 2x faster)
-      const suctionRadius = 50;
-      const suctionStrength = 1.6;
-      
-      setFoods(prevFoods => {
-        return prevFoods.map(food => {
-          const dx = updatedHead.x - food.x;
-          const dy = updatedHead.y - food.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < suctionRadius && dist > 0) {
-            return {
-              ...food,
-              x: food.x + (dx / dist) * suctionStrength,
-              y: food.y + (dy / dist) * suctionStrength
-            };
-          }
-          return food;
-        });
-      });
-
-      // Check for food collision and handle eating
+      // In multiplayer mode, food collision is handled by the server
+      // Client-side food eating for local feedback
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
         let scoreIncrease = 0;
@@ -1018,56 +947,11 @@ export default function GamePage() {
           const dist = Math.sqrt((updatedHead.x - food.x) ** 2 + (updatedHead.y - food.y) ** 2);
           
           if (dist < snake.getSegmentRadius() + food.size) {
-            // Snake eats the food - this handles growth internally
+            // Snake eats the food - growth handled internally
             scoreIncrease += snake.eatFood(food);
             
-            // Remove eaten food and add new one with mass system
+            // Remove eaten food (server will sync the food state)
             newFoods.splice(i, 1);
-            
-            const foodType = Math.random();
-            let newFood: Food;
-            
-            // Generate new food within circular boundary
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * (MAP_RADIUS - 100);
-            const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-            const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-            
-            if (foodType < 0.05) { // 5% orange test food (40 mass)
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 15,
-                mass: 40,
-                color: '#ff8800'
-              };
-            } else if (foodType < 0.15) { // 10% big food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 10,
-                mass: 1.2, // Reduced from 3 to 1.2 (2.5x less)
-                color: '#ff4444'
-              };
-            } else if (foodType < 0.45) { // 30% medium food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 6,
-                mass: 0.4, // Reduced from 1 to 0.4 (2.5x less)
-                color: '#44ff44'
-              };
-            } else { // 55% small food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 4,
-                mass: 0.2, // Reduced from 0.5 to 0.2 (2.5x less)
-                color: '#4444ff'
-              };
-            }
-            
-            newFoods.push(newFood);
             break; // Only eat one food per frame
           }
         }
