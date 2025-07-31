@@ -54,22 +54,26 @@ class SmoothSnake {
     this.baseSegmentRadius = 14; // Fixed segment radius
     this.maxSegmentRadius = 14; // Keep consistent size
     
-    // Start with 5 balls (25 mass total visually)
+    // Start with 6 balls (30 mass total)
     this.segments = [];
-    const START_MASS = 25; // 5 balls x 5 mass each (visual segments)
-    this.growthRemaining = START_MASS; // Start with only what's visually there
+    const START_MASS = 30; // 6 balls x 5 mass each
+    this.growthRemaining = START_MASS;
     
-    // Initialize exactly 5 segments for tracking
-    const START_SEGMENTS = 5;
+    // Initialize exactly 6 segments with proper spacing (no touching)
+    const START_SEGMENTS = 6;
+    const BALL_SPACING = 32; // Increased spacing so balls don't touch
     for (let i = 0; i < START_SEGMENTS; i++) {
       this.segments.push({ 
-        x: x - i * this.segmentSpacing, // Each segment overlaps half of the previous
+        x: x - i * BALL_SPACING, 
         y: y 
       });
     }
     
+    // Set segment spacing for movement
+    this.segmentSpacing = BALL_SPACING;
+    
     // Set minimum mass (cannot go below starting size)
-    this.minimumMass = START_MASS; // Can only go down to starting size
+    this.minimumMass = START_MASS;
   }
   
   get head() {
@@ -217,8 +221,8 @@ class SmoothSnake {
     const oldSegments = Math.floor(oldMass / this.massPerSegment);
     const newSegments = Math.floor(this.growthRemaining / this.massPerSegment);
     
-    // Only add one segment at a time, even if mass would allow more
-    if (newSegments > oldSegments && this.segments.length < 50) { // Cap at 50 segments
+    // Only add one segment at a time when threshold is exactly reached
+    if (newSegments > oldSegments && newSegments === oldSegments + 1) {
       this.addSegment();
     }
     
@@ -245,11 +249,7 @@ export default function GamePage() {
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
-    newSnake.segmentSpacing = 24; // Connected segments like a worm
-    // Snake constructor already creates 5 segments with 25 mass
-    // Start with just the basic 25 mass, let food provide growth
-    newSnake.growthRemaining = 25; // Start with 25 mass (5 segments)
-    newSnake.minimumMass = 25; // Cannot go below starting mass
+    // Snake constructor now creates 6 segments with 30 mass and proper spacing
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
@@ -778,13 +778,13 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (5 segments, 25 mass to start) with new spacing
+    // Reset snake to initial state (6 segments, 30 mass to start) with new spacing
     snake.segments = [];
-    const START_MASS = 25;
-    const START_SEGMENTS = 5;
-    snake.segmentSpacing = 24; // Ensure spacing is updated on reset
+    const START_MASS = 30;
+    const START_SEGMENTS = 6;
+    snake.segmentSpacing = 32; // Ensure spacing is updated on reset (no touching balls)
     for (let i = 0; i < START_SEGMENTS; i++) {
-      snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
+      snake.segments.push({ x: MAP_CENTER_X - i * 32, y: MAP_CENTER_Y }); // Use fixed spacing
     }
     snake.currentAngle = 0;
     snake.growthRemaining = START_MASS;
