@@ -65,7 +65,7 @@ function createBotSnake(id: string): BotSnake {
   };
 }
 
-function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): BotSnake {
+function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[], deltaTime: number): BotSnake {
   // AI Decision making
   const SEGMENT_SPACING = 10;
   const SEGMENT_RADIUS = 10;
@@ -110,9 +110,9 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
   bot.currentAngle += angleDiff * 0.024; // 20% slower turning (0.03 * 0.8), maintaining slower than player
   
-  // Move bot head
-  const dx = Math.cos(bot.currentAngle) * bot.speed;
-  const dy = Math.sin(bot.currentAngle) * bot.speed;
+  // Move bot head (time-based movement)
+  const dx = Math.cos(bot.currentAngle) * bot.speed * deltaTime * 60; // Scale by 60 to maintain current speed feel
+  const dy = Math.sin(bot.currentAngle) * bot.speed * deltaTime * 60;
   bot.head.x += dx;
   bot.head.y += dy;
   
@@ -300,7 +300,7 @@ class SmoothSnake {
     return Math.min(1 + (this.totalMass - 10) / 100, maxScale);
   }
   
-  move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
+  move(mouseDirectionX: number, mouseDirectionY: number, deltaTime: number, onDropFood?: (food: Food) => void) {
     // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
@@ -325,9 +325,9 @@ class SmoothSnake {
     // Handle boost mechanics
     this.applyBoost(onDropFood);
     
-    // Move head
-    const dx = Math.cos(this.currentAngle) * this.speed;
-    const dy = Math.sin(this.currentAngle) * this.speed;
+    // Move head (time-based movement for consistent speed regardless of frame rate)
+    const dx = Math.cos(this.currentAngle) * this.speed * deltaTime * 60; // Scale by 60 to maintain current speed feel
+    const dy = Math.sin(this.currentAngle) * this.speed * deltaTime * 60;
     
     this.head.x += dx;
     this.head.y += dy;
@@ -838,24 +838,22 @@ export default function GamePage() {
 
     let animationId: number;
     
-    const gameLoop = () => {
-      // Calculate delta time for smooth growth processing
-      const currentTime = Date.now();
-      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.033); // Cap at 33ms (30fps minimum)
-      setLastFrameTime(currentTime);
-      
+    let lastTimestamp = performance.now();
+    
+    // Separate update and render loops for consistent movement
+    const updateGame = (deltaTime: number) => {
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Move snake with smooth turning based on mouse direction
-      snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
+      // Move snake with smooth turning based on mouse direction (time-based)
+      snake.move(mouseDirection.x, mouseDirection.y, deltaTime, (droppedFood: Food) => {
         // Add dropped food from boosting to the food array
         setFoods(prevFoods => [...prevFoods, droppedFood]);
       });
 
-      // Update bot snakes
+      // Update bot snakes (time-based)
       setBotSnakes(prevBots => {
-        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
+        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots, deltaTime));
       });
 
       // Check circular map boundaries (death barrier)
@@ -1389,11 +1387,237 @@ export default function GamePage() {
       
 
 
-      animationId = requestAnimationFrame(gameLoop);
     };
 
-    animationId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animationId);
+    // Separate render function for drawing the game
+    const drawGame = () => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Fill canvas with background
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Set up camera (follow snake head)
+      ctx.save();
+      const zoom = Math.min(1.0, 130 / Math.max(130, snake.visibleSegments.length));
+      ctx.scale(zoom, zoom);
+      ctx.translate(
+        (canvas.width / zoom) / 2 - snake.head.x,
+        (canvas.height / zoom) / 2 - snake.head.y
+      );
+
+      // Render background pattern
+      if (backgroundImage && backgroundImage.complete) {
+        const patternSize = 512;
+        const startX = Math.floor((snake.head.x - canvas.width / 2) / patternSize) * patternSize;
+        const startY = Math.floor((snake.head.y - canvas.height / 2) / patternSize) * patternSize;
+        
+        for (let x = startX - patternSize; x < startX + canvas.width + patternSize; x += patternSize) {
+          for (let y = startY - patternSize; y < startY + canvas.height + patternSize; y += patternSize) {
+            ctx.drawImage(backgroundImage, x, y, patternSize, patternSize);
+          }
+        }
+      }
+
+      // Draw map boundary and death barrier
+      ctx.save();
+      
+      // Create a clipping path for the area outside the safe zone
+      const mapSize = MAP_RADIUS * 2.5;
+      ctx.beginPath();
+      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true);
+      ctx.clip();
+      
+      // Fill only the clipped area with green overlay
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.4)';
+      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+      
+      ctx.restore();
+
+      // Draw thin death barrier line
+      ctx.strokeStyle = '#53d392';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw food items
+      foods.forEach((food, index) => {
+        if (food.type === 'money') {
+          // Draw money crates with dollar sign image, shadow, and wobble
+          const time = Date.now() * 0.003;
+          const wobbleX = Math.sin(time + index * 0.5) * 2;
+          const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5;
+          
+          const drawX = food.x + wobbleX;
+          const drawY = food.y + wobbleY;
+          
+          // Draw shadow first
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
+          
+          // Reset shadow for main square
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw green background square
+          ctx.fillStyle = food.color;
+          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+          
+          // Draw dollar sign image if loaded
+          if (dollarSignImage && dollarSignImage.complete) {
+            ctx.drawImage(dollarSignImage, drawX - 10, drawY - 10, 20, 20);
+          }
+        } else {
+          // Draw regular food as circles with glow effect
+          ctx.shadowColor = food.color;
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+        }
+      });
+
+      // Draw bot snakes
+      botSnakes.forEach(bot => {
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = bot.visibleSegments[i];
+          const botBaseRadius = 8;
+          const maxScale = 5;
+          const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+          const botRadius = botBaseRadius * botScaleFactor;
+          
+          ctx.globalAlpha = segment.opacity || 1.0;
+          ctx.fillStyle = bot.color;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.globalAlpha = 1.0;
+      });
+
+      // Draw single glowing outline behind the whole snake when boosting
+      if (snake.isBoosting && snake.visibleSegments.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        
+        const segmentRadius = snake.getSegmentRadius();
+        const scaleFactor = snake.getScaleFactor();
+        
+        for (let i = 0; i < snake.visibleSegments.length; i++) {
+          const segment = snake.visibleSegments[i];
+          ctx.moveTo(segment.x + segmentRadius, segment.y);
+          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        }
+        
+        ctx.shadowColor = "white";
+        ctx.shadowBlur = 15;
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 3 * scaleFactor;
+        ctx.stroke();
+        ctx.restore();
+      }
+      
+      // Draw snake segments with appropriate shadow effects
+      ctx.save();
+      
+      if (!snake.isBoosting) {
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+      } else {
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+      
+      for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
+        
+        ctx.globalAlpha = segment.opacity;
+        ctx.fillStyle = "#d55400";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+      ctx.globalAlpha = 1.0;
+
+      // Draw money balance above snake head
+      if (snake.visibleSegments.length > 0) {
+        const snakeHead = snake.visibleSegments[0];
+        const scaleFactor = snake.getScaleFactor();
+        
+        ctx.font = `${14 * scaleFactor}px Arial, sans-serif`;
+        ctx.fillStyle = '#00ff00';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        
+        const moneyText = `$${snake.money.toFixed(2)}`;
+        const textWidth = ctx.measureText(moneyText).width;
+        const textX = snakeHead.x - textWidth / 2;
+        const textY = snakeHead.y - (25 * scaleFactor);
+        
+        ctx.strokeText(moneyText, textX, textY);
+        ctx.fillText(moneyText, textX, textY);
+      }
+
+      ctx.restore();
+
+      // Draw UI (fixed position)
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 24px Arial';
+      ctx.fillText(`Score: ${score}`, 20, 40);
+      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
+      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
+    };
+
+    // Set up consistent update loop (60 FPS) that runs even when tab is inactive
+    const updateInterval = setInterval(() => {
+      const now = performance.now();
+      const deltaTime = (now - lastTimestamp) / 1000; // seconds
+      lastTimestamp = now;
+      updateGame(deltaTime);
+    }, 1000 / 60); // 60 updates per second
+
+    // Set up rendering loop (may slow down when tab is inactive, but that's okay)
+    const renderLoop = () => {
+      drawGame();
+      animationId = requestAnimationFrame(renderLoop);
+    };
+
+    // Start rendering loop
+    renderLoop();
+
+    return () => {
+      clearInterval(updateInterval);
+      cancelAnimationFrame(animationId);
+    };
   }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
   const resetGame = () => {
