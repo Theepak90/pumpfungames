@@ -551,8 +551,8 @@ export default function GamePage() {
         return;
       }
 
-      // Food gravitation toward snake head (30px radius, 2x faster)
-      const suctionRadius = 30;
+      // Food gravitation toward snake head (50px radius, 2x faster)
+      const suctionRadius = 50;
       const suctionStrength = 1.6;
       
       setFoods(prevFoods => {
@@ -691,25 +691,35 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food with gradient effect
+      // Draw food as squares with gradient effect
       foods.forEach(food => {
-        // Create radial gradient for food
-        const gradient = ctx.createRadialGradient(
-          food.x, food.y, 0,
-          food.x, food.y, food.size
+        // Create linear gradient for square food
+        const gradient = ctx.createLinearGradient(
+          food.x - food.size, food.y - food.size,
+          food.x + food.size, food.y + food.size
         );
-        gradient.addColorStop(0, "#ffbaba"); // Light center
-        gradient.addColorStop(1, food.color); // Dark edge
+        gradient.addColorStop(0, "#ffbaba"); // Light corner
+        gradient.addColorStop(1, food.color); // Dark corner
         
         ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, 2 * Math.PI);
-        ctx.fill();
+        
+        // Draw square food
+        ctx.fillRect(
+          food.x - food.size, 
+          food.y - food.size, 
+          food.size * 2, 
+          food.size * 2
+        );
         
         // Food glow effect
         ctx.shadowColor = food.color;
         ctx.shadowBlur = 10;
-        ctx.fill();
+        ctx.fillRect(
+          food.x - food.size, 
+          food.y - food.size, 
+          food.size * 2, 
+          food.size * 2
+        );
         ctx.shadowBlur = 0;
       });
 
