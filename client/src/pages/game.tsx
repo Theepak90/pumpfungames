@@ -594,19 +594,14 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Clear canvas with background image or dark fallback
+      // Clear canvas with background image pattern or dark fallback
       if (backgroundImage) {
-        // Calculate scale to cover entire canvas while maintaining aspect ratio
-        const scale = Math.max(
-          canvasSize.width / backgroundImage.width,
-          canvasSize.height / backgroundImage.height
-        );
-        const scaledWidth = backgroundImage.width * scale;
-        const scaledHeight = backgroundImage.height * scale;
-        const offsetX = (canvasSize.width - scaledWidth) / 2;
-        const offsetY = (canvasSize.height - scaledHeight) / 2;
-        
-        ctx.drawImage(backgroundImage, offsetX, offsetY, scaledWidth, scaledHeight);
+        // Create repeating pattern from background image
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+        }
       } else {
         // Fallback to solid color if image not loaded
         ctx.fillStyle = '#15161b';
@@ -619,9 +614,20 @@ export default function GamePage() {
       // Camera follows snake head
       ctx.translate(canvasSize.width/2 - snake.head.x, canvasSize.height/2 - snake.head.y);
 
-      // Fill area outside death barrier with darker green
+      // Draw background image across the full map area if loaded
+      if (backgroundImage) {
+        const mapSize = MAP_RADIUS * 2.5;
+        // Draw background image tiled across the entire game area
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) {
+          ctx.fillStyle = pattern;
+          ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+        }
+      }
+      
+      // Fill area outside death barrier with semi-transparent darker overlay
       const mapSize = MAP_RADIUS * 2.5;
-      ctx.fillStyle = '#52a47a';
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.3)'; // Semi-transparent green overlay
       ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
       
       // Cut out the safe zone circle
@@ -630,27 +636,6 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
-      
-      // Draw simple black grid overlay
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
-      ctx.lineWidth = 1;
-      const gridSize = 50;
-      
-      // Vertical lines
-      for (let x = -mapSize; x <= mapSize; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, -mapSize);
-        ctx.lineTo(x, mapSize);
-        ctx.stroke();
-      }
-      
-      // Horizontal lines
-      for (let y = -mapSize; y <= mapSize; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(-mapSize, y);
-        ctx.lineTo(mapSize, y);
-        ctx.stroke();
-      }
 
       // Draw thin death barrier line
       ctx.strokeStyle = '#53d392';
