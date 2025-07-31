@@ -45,7 +45,7 @@ class SmoothSnake {
     this.radius = 12;
     this.currentAngle = 0;
     this.turnSpeed = 0.04; // Smoother turning speed to prevent snapping
-    this.segmentSpacing = 45; // Increased spacing for more stretched appearance
+    this.segmentSpacing = 400; // Very large spacing for extreme stretch
     this.growthRemaining = 0; // Growth counter for eating food
     this.isBoosting = false;
     this.boostCooldown = 0;
@@ -760,7 +760,7 @@ export default function GamePage() {
     snake.segments = [];
     const START_MASS = 25;
     const START_SEGMENTS = 5;
-    snake.segmentSpacing = 45; // Ensure spacing is updated on reset
+    snake.segmentSpacing = 400; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
     }
