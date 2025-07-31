@@ -714,34 +714,21 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // Draw unified white outline path behind entire snake
-      if (snake.visibleSegments.length > 0) {
-        ctx.beginPath();
-        for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
-          const seg = snake.visibleSegments[i];
-          if (i === snake.visibleSegments.length - 1) {
-            ctx.moveTo(seg.x, seg.y);
-          } else {
-            ctx.lineTo(seg.x, seg.y);
-          }
-        }
-        
-        // Draw white outline path
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = snake.getSegmentRadius() * 2.1;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-      }
-      
-      // Draw all snake segments on top (no individual outlines)
+      // Draw each segment with individual white outline circles
       for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
+        const outlineSize = 2;
         
         ctx.globalAlpha = segment.opacity;
         
-        // Draw only segment body
+        // Draw white outline circle (slightly larger)
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius + outlineSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw segment body on top
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
