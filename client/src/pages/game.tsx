@@ -998,7 +998,7 @@ export default function GamePage() {
         return;
       }
       
-      // Check if player snake kills any bot snakes
+      // Check if player snake kills any bot snakes (excluding head segment)
       for (let i = botSnakes.length - 1; i >= 0; i--) {
         const bot = botSnakes[i];
         const botBaseRadius = 8;
@@ -1006,7 +1006,9 @@ export default function GamePage() {
         const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
         const botRadius = botBaseRadius * botScaleFactor;
         
-        for (const segment of snake.visibleSegments) {
+        // Check collision with snake body segments (skip first segment/head at index 0)
+        for (let j = 1; j < snake.visibleSegments.length; j++) {
+          const segment = snake.visibleSegments[j];
           const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
             // Player killed a bot - drop food and money squares
