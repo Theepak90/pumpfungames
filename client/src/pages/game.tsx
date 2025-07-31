@@ -660,7 +660,19 @@ export default function GamePage() {
         ctx.shadowBlur = 0;
       });
 
-      // First pass: Draw all segment fills
+      // First pass: Draw white outline behind body (larger circles)
+      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
+        const segment = snake.visibleSegments[i];
+        const segmentRadius = snake.getSegmentRadius();
+        
+        // White outline circle (slightly bigger)
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Second pass: Draw actual body segments on top
       for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
         const segment = snake.visibleSegments[i];
         const segmentRadius = snake.getSegmentRadius();
@@ -671,37 +683,23 @@ export default function GamePage() {
         ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
       }
-      
-      // Second pass: Draw white outlines on top
-      for (let i = snake.visibleSegments.length - 1; i > 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
-        
-        // White outline only on the outside
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
 
       // Draw head on top (always rendered last to appear above body)
       if (snake.visibleSegments.length > 0) {
         const headSeg = snake.visibleSegments[0];
         const headRadius = snake.getSegmentRadius();
         
-        // Same solid orange color as body
+        // White outline behind head (slightly bigger)
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(headSeg.x, headSeg.y, headRadius + 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Same solid orange color as body on top
         ctx.fillStyle = "#d55400";
         ctx.beginPath();
         ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
         ctx.fill();
-        
-        // White outline for head
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(headSeg.x, headSeg.y, headRadius, 0, Math.PI * 2);
-        ctx.stroke();
       }
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
