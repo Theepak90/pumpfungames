@@ -245,7 +245,19 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
-  const [snake] = useState(new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y));
+  const [snake] = useState(() => {
+    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
+    newSnake.segmentSpacing = 400; // Force the new spacing immediately
+    // Recreate segments with new spacing
+    newSnake.segments = [];
+    for (let i = 0; i < 5; i++) {
+      newSnake.segments.push({ 
+        x: MAP_CENTER_X - i * newSnake.segmentSpacing, 
+        y: MAP_CENTER_Y 
+      });
+    }
+    return newSnake;
+  });
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
