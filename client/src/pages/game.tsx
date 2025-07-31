@@ -37,37 +37,6 @@ interface BotSnake {
   targetFood: Food | null;
 }
 
-// Death drop utility function
-function dropDeathFood(snake: SmoothSnake | BotSnake): Food[] {
-  const deathFoods: Food[] = [];
-  const segments = 'visibleSegments' in snake ? snake.visibleSegments : [];
-  const mass = snake.totalMass;
-  const amount = Math.floor(mass / 10);
-  
-  if (segments.length === 0 || amount === 0) return deathFoods;
-  
-  const segmentSpacing = Math.max(1, Math.floor(segments.length / amount));
-  
-  for (let i = 0; i < amount && i * segmentSpacing < segments.length; i++) {
-    const segIndex = i * segmentSpacing;
-    const segment = segments[segIndex];
-    
-    // Add slight randomness to prevent perfect stacking
-    const offsetX = (Math.random() - 0.5) * 20;
-    const offsetY = (Math.random() - 0.5) * 20;
-    
-    deathFoods.push({
-      x: segment.x + offsetX,
-      y: segment.y + offsetY,
-      size: 8,
-      color: '#ff8800', // Orange death food
-      mass: 10
-    });
-  }
-  
-  return deathFoods;
-}
-
 // Bot snake utility functions
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
@@ -132,14 +101,11 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.targetAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
   }
   
-  // Add random drift to prevent circles and make movement more natural
-  bot.targetAngle += (Math.random() - 0.5) * 0.15; // Random drift
-  
   // Smooth angle interpolation
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-  bot.currentAngle += angleDiff * 0.05; // Smoother turning
+  bot.currentAngle += angleDiff * 0.024; // 20% slower turning (0.03 * 0.8), maintaining slower than player
   
   // Move bot head
   const dx = Math.cos(bot.currentAngle) * bot.speed;
@@ -754,66 +720,11 @@ export default function GamePage() {
         for (const segment of bot.visibleSegments) {
           const dist = Math.sqrt((updatedHead.x - segment.x) ** 2 + (updatedHead.y - segment.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
-            // Player died - drop death food
-            const deathFoods = dropDeathFood(snake);
-            setFoods(prevFoods => [...prevFoods, ...deathFoods]);
             setGameOver(true);
             return;
           }
         }
       }
-
-      // Check collision between bot snakes (bot vs bot)
-      setBotSnakes(prevBots => {
-        const newBots = [...prevBots];
-        const botsToRemove: number[] = [];
-        
-        for (let i = 0; i < newBots.length; i++) {
-          for (let j = i + 1; j < newBots.length; j++) {
-            const bot1 = newBots[i];
-            const bot2 = newBots[j];
-            
-            // Check if bot1 head hits bot2 body
-            const bot1Radius = 8 * Math.min(1 + (bot1.totalMass - 10) / 100, 5);
-            const bot2Radius = 8 * Math.min(1 + (bot2.totalMass - 10) / 100, 5);
-            
-            for (const segment of bot2.visibleSegments) {
-              const dist = Math.sqrt((bot1.head.x - segment.x) ** 2 + (bot1.head.y - segment.y) ** 2);
-              if (dist < bot1Radius + bot2Radius) {
-                // Bot1 dies
-                const deathFoods = dropDeathFood(bot1);
-                setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-                botsToRemove.push(i);
-                break;
-              }
-            }
-            
-            // Check if bot2 head hits bot1 body (if bot1 not already dead)
-            if (!botsToRemove.includes(i)) {
-              for (const segment of bot1.visibleSegments) {
-                const dist = Math.sqrt((bot2.head.x - segment.x) ** 2 + (bot2.head.y - segment.y) ** 2);
-                if (dist < bot1Radius + bot2Radius) {
-                  // Bot2 dies
-                  const deathFoods = dropDeathFood(bot2);
-                  setFoods(prevFoods => [...prevFoods, ...deathFoods]);
-                  botsToRemove.push(j);
-                  break;
-                }
-              }
-            }
-          }
-        }
-        
-        // Remove dead bots and spawn new ones
-        const filteredBots = newBots.filter((_, index) => !botsToRemove.includes(index));
-        
-        // Spawn new bots to maintain BOT_COUNT
-        while (filteredBots.length < BOT_COUNT) {
-          filteredBots.push(createBotSnake(`bot_${Date.now()}_${Math.random()}`));
-        }
-        
-        return filteredBots;
-      });
 
       // Let bot snakes eat food
       setBotSnakes(prevBots => {
@@ -1075,41 +986,6 @@ export default function GamePage() {
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
-        }
-        
-        // Draw bot eyes (similar to player)
-        if (bot.visibleSegments.length > 0) {
-          const botHead = bot.visibleSegments[0];
-          const movementAngle = bot.currentAngle;
-          const eyeDistance = 5 * botScaleFactor;
-          const eyeSize = 3 * botScaleFactor;
-          const pupilSize = 1.5 * botScaleFactor;
-          
-          // Eye positions perpendicular to movement direction
-          const eye1X = botHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
-          const eye1Y = botHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
-          const eye2X = botHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
-          const eye2Y = botHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
-          
-          // Draw rotated square eyes
-          [
-            { x: eye1X, y: eye1Y },
-            { x: eye2X, y: eye2Y }
-          ].forEach(eye => {
-            ctx.save();
-            ctx.translate(eye.x, eye.y);
-            ctx.rotate(movementAngle);
-            
-            // White eye square
-            ctx.fillStyle = "white";
-            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-            
-            // Black pupil square
-            ctx.fillStyle = "black";
-            ctx.fillRect(-pupilSize, -pupilSize, pupilSize * 2, pupilSize * 2);
-            
-            ctx.restore();
-          });
         }
       });
       
