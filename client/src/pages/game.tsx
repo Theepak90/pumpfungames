@@ -464,6 +464,7 @@ export default function GamePage() {
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [gameIsVisible, setGameIsVisible] = useState(!document.hidden);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -837,6 +838,35 @@ export default function GamePage() {
     if (!ctx) return;
 
     let animationId: number;
+    let backgroundMovementInterval: number;
+    
+    // Background movement when tab is inactive
+    const handleVisibilityChange = () => {
+      setGameIsVisible(!document.hidden);
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Background movement timer - only moves snake when tab is inactive
+    backgroundMovementInterval = window.setInterval(() => {
+      if (document.hidden && !gameOver) {
+        // Only update snake position, nothing else
+        const dx = Math.cos(snake.currentAngle) * snake.speed;
+        const dy = Math.sin(snake.currentAngle) * snake.speed;
+        
+        snake.head.x += dx;
+        snake.head.y += dy;
+        
+        // Add to trail for smooth movement
+        snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
+        
+        // Keep trail length reasonable
+        const maxTrailLength = Math.floor((snake.totalMass / snake.MASS_PER_SEGMENT) * snake.SEGMENT_SPACING * 2);
+        if (snake.segmentTrail.length > maxTrailLength) {
+          snake.segmentTrail.length = maxTrailLength;
+        }
+      }
+    }, 30); // 30ms interval for smooth background movement
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -1393,7 +1423,11 @@ export default function GamePage() {
     };
 
     animationId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animationId);
+    return () => {
+      cancelAnimationFrame(animationId);
+      clearInterval(backgroundMovementInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [mouseDirection, snake, foods, gameOver, canvasSize, score]);
 
   const resetGame = () => {
