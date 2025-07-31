@@ -304,12 +304,19 @@ class SmoothSnake {
     // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
-    // Smooth angle interpolation
+    // Smooth angle interpolation with boosted turning
     let angleDiff = targetAngle - this.currentAngle;
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
     
-    this.currentAngle += angleDiff * this.turnSpeed;
+    // Increase turn speed while boosting to maintain same turn radius
+    const baseTurnSpeed = this.turnSpeed;
+    const boostTurnMultiplier = 2.0; // Turn 2x faster when boosting
+    const currentTurnSpeed = this.isBoosting 
+      ? baseTurnSpeed * boostTurnMultiplier 
+      : baseTurnSpeed;
+    
+    this.currentAngle += angleDiff * currentTurnSpeed;
     
     // Keep angle in range
     if (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
