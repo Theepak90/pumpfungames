@@ -248,15 +248,15 @@ export default function GamePage() {
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     newSnake.segmentSpacing = 24; // Connected segments like a worm
-    // Recreate segments with proper spacing - start with 60 segments for 300 mass
+    // Start with fewer visible segments, let growth system handle the rest
     newSnake.segments = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 5; i++) {
       newSnake.segments.push({ 
         x: MAP_CENTER_X - i * newSnake.segmentSpacing, 
         y: MAP_CENTER_Y 
       });
     }
-    newSnake.growthRemaining = 300; // Start with 300 mass
+    newSnake.growthRemaining = 300; // Start with 300 mass ready to grow
     newSnake.minimumMass = 300; // Cannot go below starting mass
     return newSnake;
   });
@@ -786,10 +786,10 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
-    // Reset snake to initial state (60 segments, 300 mass) with new spacing
+    // Reset snake to initial state (5 segments, 300 mass ready to grow) with new spacing
     snake.segments = [];
     const START_MASS = 300;
-    const START_SEGMENTS = 60;
+    const START_SEGMENTS = 5;
     snake.segmentSpacing = 24; // Ensure spacing is updated on reset
     for (let i = 0; i < START_SEGMENTS; i++) {
       snake.segments.push({ x: MAP_CENTER_X - i * snake.segmentSpacing, y: MAP_CENTER_Y });
