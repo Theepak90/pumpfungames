@@ -226,7 +226,7 @@ export default function GamePage() {
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   
   // Fixed zoom level
-  const zoom = 0.3;
+  const zoom = 1.2;
   
   // Game constants - fullscreen
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -319,6 +319,35 @@ export default function GamePage() {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
     return () => window.removeEventListener('resize', updateCanvasSize);
+  }, []);
+
+  // Prevent browser zoom
+  useEffect(() => {
+    const preventZoom = (e: WheelEvent | KeyboardEvent) => {
+      if ('ctrlKey' in e && e.ctrlKey) {
+        e.preventDefault();
+        return false;
+      }
+      if ('metaKey' in e && e.metaKey) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    const preventKeyboardZoom = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    document.addEventListener('wheel', preventZoom, { passive: false });
+    document.addEventListener('keydown', preventKeyboardZoom, { passive: false });
+    
+    return () => {
+      document.removeEventListener('wheel', preventZoom);
+      document.removeEventListener('keydown', preventKeyboardZoom);
+    };
   }, []);
 
 
