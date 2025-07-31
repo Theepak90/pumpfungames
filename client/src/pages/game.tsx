@@ -89,16 +89,17 @@ class SmoothSnake {
     }
     this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
     
-    // Calculate how many segments to render and fade amount
-    const maxCount = Math.ceil(this.currentSegmentCount);
-    const fadeAmount = this.currentSegmentCount - Math.floor(this.currentSegmentCount);
+    // Use floor for solid segments, check if we need a fading segment
+    const solidSegmentCount = Math.floor(this.currentSegmentCount);
+    const fadeAmount = this.currentSegmentCount - solidSegmentCount;
+    const shouldHaveFadingSegment = fadeAmount > 0;
     
     this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
     
-    // Walk through the trail and interpolate segment positions smoothly
-    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < maxCount; i++) {
+    // First, add all solid segments
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < solidSegmentCount; i++) {
       const a = this.segmentTrail[i - 1];
       const b = this.segmentTrail[i];
       
@@ -107,7 +108,7 @@ class SmoothSnake {
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
       // Check if we need to place a segment in this trail section
-      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < maxCount) {
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < solidSegmentCount) {
         const targetDistance = segmentIndex * this.SEGMENT_SPACING;
         const overshoot = targetDistance - distanceSoFar;
         const t = segmentDist > 0 ? overshoot / segmentDist : 0;
@@ -116,17 +117,40 @@ class SmoothSnake {
         const x = a.x + dx * t;
         const y = a.y + dy * t;
         
-        // Calculate opacity - last segment fades in/out based on fractional part
-        let opacity = 1.0;
-        if (this.visibleSegments.length === maxCount - 1) {
-          opacity = fadeAmount; // Fade the last segment based on currentSegmentCount fraction
-        }
-        
-        this.visibleSegments.push({ x, y, opacity });
+        this.visibleSegments.push({ x, y, opacity: 1.0 });
         segmentIndex++;
       }
       
       distanceSoFar += segmentDist;
+    }
+    
+    // Add fading segment if needed (only if opacity > 0.2 to avoid ghosting)
+    if (shouldHaveFadingSegment && fadeAmount > 0.2) {
+      // Continue searching for the position of the fading segment
+      for (let i = 1; i < this.segmentTrail.length; i++) {
+        const a = this.segmentTrail[i - 1];
+        const b = this.segmentTrail[i];
+        
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const segmentDist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if this is where the fading segment should be
+        if (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING) {
+          const targetDistance = segmentIndex * this.SEGMENT_SPACING;
+          const overshoot = targetDistance - distanceSoFar;
+          const t = segmentDist > 0 ? overshoot / segmentDist : 0;
+          
+          // Linear interpolation for fading segment position
+          const x = a.x + dx * t;
+          const y = a.y + dy * t;
+          
+          this.visibleSegments.push({ x, y, opacity: fadeAmount });
+          break;
+        }
+        
+        distanceSoFar += segmentDist;
+      }
     }
   }
   
