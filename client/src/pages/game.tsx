@@ -653,6 +653,8 @@ export default function GamePage() {
   const [cashOutProgress, setCashOutProgress] = useState(0);
   const [cashOutStartTime, setCashOutStartTime] = useState<number | null>(null);
   const [qKeyPressed, setQKeyPressed] = useState(false);
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [cashedOutAmount, setCashedOutAmount] = useState(0);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -1123,7 +1125,10 @@ export default function GamePage() {
         
         // Complete cash-out after 3 seconds
         if (progress >= 1) {
-          console.log(`Cashed out $${snake.money.toFixed(2)}!`);
+          const amount = snake.money;
+          console.log(`Cashed out $${amount.toFixed(2)}!`);
+          setCashedOutAmount(amount);
+          setShowCongrats(true);
           snake.money = 1.00; // Reset to starting money
           setCashingOut(false);
           setCashOutProgress(0);
@@ -1913,6 +1918,7 @@ export default function GamePage() {
   const resetGame = () => {
     setGameOver(false);
     setScore(0);
+    setShowCongrats(false);
     // Reset snake to initial state using new system
     snake.head = { x: MAP_CENTER_X, y: MAP_CENTER_Y };
     snake.currentAngle = 0;
@@ -2015,6 +2021,30 @@ export default function GamePage() {
                 className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
                 Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCongrats && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="bg-dark-card/90 backdrop-blur-sm border border-neon-green rounded-lg p-8 text-center">
+            <div className="text-neon-green text-4xl font-bold mb-4">Congratulations!</div>
+            <div className="text-white text-2xl mb-2">You cashed out:</div>
+            <div className="text-neon-yellow text-3xl font-bold mb-6">${cashedOutAmount.toFixed(2)}</div>
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={resetGame}
+                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-bold"
+              >
+                Play Again
+              </Button>
+              <Button
+                onClick={exitGame}
+                className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Continue
               </Button>
             </div>
           </div>
