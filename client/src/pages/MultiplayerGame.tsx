@@ -655,6 +655,10 @@ export default function GamePage() {
   const [qKeyPressed, setQKeyPressed] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [cashedOutAmount, setCashedOutAmount] = useState(0);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [multiplayerPlayers, setMultiplayerPlayers] = useState<any[]>([]);
+  const [multiplayerFoods, setMultiplayerFoods] = useState<any[]>([]);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -941,14 +945,71 @@ export default function GamePage() {
       
       initialFoods.push(food);
     }
-    setFoods(initialFoods);
+    // setFoods(initialFoods); // Commented out - foods come from server now
     
-    // Initialize bot snakes
-    const initialBots: BotSnake[] = [];
-    for (let i = 0; i < BOT_COUNT; i++) {
-      initialBots.push(createBotSnake(`bot_${i}`));
-    }
-    setBotSnakes(initialBots);
+    // Connect to WebSocket for multiplayer instead of bots
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    const websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = () => {
+      console.log('Connected to multiplayer server');
+      setWs(websocket);
+      
+      // Join the game
+      websocket.send(JSON.stringify({
+        type: 'join',
+        data: {
+          name: 'Player',
+          x: MAP_CENTER_X,
+          y: MAP_CENTER_Y,
+          color: '#d55400'
+        }
+      }));
+    };
+    
+    websocket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'player_id') {
+          setPlayerId(message.data.id);
+          console.log('Received player ID:', message.data.id);
+        } else if (message.type === 'game_state') {
+          const gameState = message.data;
+          setMultiplayerPlayers(gameState.players || []);
+          // Convert server foods to client format
+          const clientFoods = gameState.foods.map((serverFood: any) => ({
+            x: serverFood.x,
+            y: serverFood.y,
+            size: serverFood.type === 'money' ? 15 : (serverFood.mass >= 2 ? 15 : serverFood.mass >= 1 ? 12 : 8),
+            mass: serverFood.mass,
+            color: serverFood.color,
+            type: serverFood.type === 'money' ? 'money' : 'normal',
+            value: serverFood.type === 'money' ? 0.1 : undefined
+          }));
+          setFoods(clientFoods);
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    };
+    
+    websocket.onclose = () => {
+      console.log('Disconnected from multiplayer server');
+      setWs(null);
+    };
+    
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    return () => {
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
+      }
+    };
   }, []);
 
   // Mouse tracking
@@ -1110,6 +1171,23 @@ export default function GamePage() {
         snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
           setFoods(prevFoods => [...prevFoods, droppedFood]);
         });
+      }
+      
+      // Send player update to server
+      if (ws && playerId && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'player_update',
+          data: {
+            id: playerId,
+            x: snake.head.x,
+            y: snake.head.y,
+            angle: snake.currentAngle,
+            mass: snake.totalMass,
+            money: snake.money,
+            isBoosting: snake.isBoosting,
+            segments: snake.visibleSegments
+          }
+        }));
       }
 
       // Update bot snakes
@@ -1609,31 +1687,33 @@ export default function GamePage() {
         }
       });
 
-      // Draw bot snakes first (behind player)
-      botSnakes.forEach(bot => {
-        // Bot dynamic scaling based on mass (caps at 5x width)
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
-        const botOutlineThickness = 2 * botScaleFactor;
+      // Draw other multiplayer players first (behind local player)
+      multiplayerPlayers.forEach(player => {
+        if (player.id === playerId) return; // Skip our own snake
         
-        // Bot outline only when boosting
-        if (bot.isBoosting) {
+        // Player dynamic scaling based on mass (caps at 5x width)
+        const playerBaseRadius = 8;
+        const maxScale = 5;
+        const playerScaleFactor = Math.min(1 + (player.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
+        const playerOutlineThickness = 2 * playerScaleFactor;
+        
+        // Player outline only when boosting
+        if (player.isBoosting) {
           ctx.fillStyle = "white";
-          for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-            const segment = bot.visibleSegments[i];
-            ctx.globalAlpha = segment.opacity;
+          for (let i = player.visibleSegments.length - 1; i >= 0; i--) {
+            const segment = player.visibleSegments[i];
+            ctx.globalAlpha = segment.opacity || 1;
             ctx.beginPath();
-            ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
+            ctx.arc(segment.x, segment.y, playerRadius + playerOutlineThickness, 0, Math.PI * 2);
             ctx.fill();
           }
         }
         
-        // Bot body with shadow (like player snake)
+        // Player body with shadow (like local player snake)
         ctx.save();
         
-        if (!bot.isBoosting) {
+        if (!player.isBoosting) {
           // Add subtle drop shadow when not boosting
           ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
           ctx.shadowBlur = 6;
@@ -1647,12 +1727,12 @@ export default function GamePage() {
           ctx.shadowOffsetY = 0;
         }
         
-        ctx.fillStyle = bot.color;
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
+        ctx.fillStyle = player.color;
+        for (let i = player.visibleSegments.length - 1; i >= 0; i--) {
+          const segment = player.visibleSegments[i];
+          ctx.globalAlpha = segment.opacity || 1;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, playerRadius, 0, Math.PI * 2);
           ctx.fill();
         }
         
@@ -1999,7 +2079,7 @@ export default function GamePage() {
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
           <div className="text-gray-400 text-xs">Hold Q (no control) to Cash Out</div>
-          <div className="text-blue-400 text-xs">Collect food and money crates</div>
+          <div className="text-blue-400 text-xs">Real Players: {multiplayerPlayers.length}</div>
         </div>
       </div>
       
