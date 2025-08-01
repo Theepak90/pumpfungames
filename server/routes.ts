@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { MultiplayerGameServer } from "./multiplayer";
 import {
   insertUserSchema,
   insertGameSchema,
@@ -21,6 +22,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // WebSocket server for real-time game communication
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Initialize multiplayer game server
+  const multiplayerServer = new MultiplayerGameServer();
+  multiplayerServer.init(wss);
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {

@@ -10,12 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Secret Access System (Latest)
-- Implemented secure game access via secret URL `/game8999`
-- Password protection with `secretserveradd119988` as access key
-- Removed direct game access from home page for security
-- Session-based access control using sessionStorage
-- Game now only accessible through protected route system
+### Dual Game System (Latest)
+- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with real-time multiplayer
+- **Private Single-player**: Secret URL `/game8999` with password `secretserveradd119988` for bot-based gameplay
+- WebSocket-based multiplayer server with real-time player synchronization
+- Separate game modes: multiplayer (no bots, real players) vs single-player (AI bots)
+- Session-based access control for private game using sessionStorage
 
 ### Enhanced Bot AI System
 - State-based AI with wander, foodHunt, avoid, and aggro behaviors

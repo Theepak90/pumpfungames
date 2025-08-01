@@ -8,6 +8,7 @@ import { GameProvider } from "@/contexts/game-context";
 import Home from "@/pages/home";
 import SecretGameAccess from "@/pages/SecretGameAccess";
 import ProtectedGame from "@/pages/ProtectedGame";
+import MultiplayerGame from "@/pages/MultiplayerGame";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/game8999" component={SecretGameAccess} />
       <Route path="/game" component={ProtectedGame} />
+      <Route path="/multiplayer" component={MultiplayerGame} />
       <Route component={NotFound} />
     </Switch>
   );
