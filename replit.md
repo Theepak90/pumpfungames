@@ -16,16 +16,7 @@ Preferred communication style: Simple, everyday language.
 - Money resets to $1.00 when game restarts
 - Display scales with snake size and has outline for visibility
 
-### Lightning Bolt Power Crate System (Latest)
-- Added special floating power crate with lightning bolt image that moves around the map
-- Runs away from approaching snakes at 0.75x their speed within 150px detection range
-- Provides 15 mass when collected (major growth boost)
-- Enables super boost mode: 4x speed instead of normal 2x boost for 10 seconds
-- Creates slight zoom effect (1.15x) when consumed, returns to normal when boost expires
-- Has pulsing yellow glow effect for high visibility
-- Respawns 30 seconds after being collected
-
-### Tab Switching System
+### Tab Switching System (Latest)
 - Implemented time-based catch-up movement for when browser tab is inactive
 - Tracks exact time while tab is hidden using performance.now()
 - When tab becomes active again, snake moves forward based on elapsed time
