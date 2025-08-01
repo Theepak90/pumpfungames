@@ -623,6 +623,7 @@ export default function GamePage() {
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverFood, setServerFood] = useState<any[]>([]);
+  const [serverPlayers, setServerPlayers] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
@@ -877,7 +878,8 @@ export default function GamePage() {
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           setServerFood(data.food || []);
-          console.log(`Received shared world: ${data.bots?.length} bots, ${data.food?.length} food`);
+          setServerPlayers(data.players || []);
+          console.log(`Received shared world: ${data.bots?.length} bots, ${data.food?.length} food, ${data.players?.length} players`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1542,7 +1544,33 @@ export default function GamePage() {
         }
       });
 
-      // Draw other players first (behind everything)
+      // Draw all server players (including yourself and others)
+      serverPlayers.forEach(serverPlayer => {
+        if (serverPlayer.segments && serverPlayer.segments.length > 0) {
+          serverPlayer.segments.forEach((segment: any, index: number) => {
+            ctx.save();
+            
+            // Different color for each player
+            ctx.fillStyle = serverPlayer.color || '#d55400';
+            ctx.beginPath();
+            const radius = (index === 0 ? 12 : 8);
+            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw player money above head
+            if (index === 0) {
+              ctx.fillStyle = '#fff';
+              ctx.font = `12px Arial`;
+              ctx.textAlign = 'center';
+              ctx.fillText(`$${serverPlayer.money?.toFixed(2) || '1.00'}`, segment.x, segment.y - 25);
+            }
+            
+            ctx.restore();
+          });
+        }
+      });
+
+      // Draw other players first (behind everything) - fallback
       otherPlayers.forEach(player => {
         if (player.segments && player.segments.length > 0) {
           player.segments.forEach((segment, index) => {

@@ -179,6 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const gameWorld = {
     bots: [] as any[],
     food: [] as any[],
+    players: new Map() as Map<string, any>,
     initialized: false
   };
 
@@ -249,11 +250,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         players: Array.from(activePlayers.values())
       }));
       
-      // Send shared game world state
+      // Send shared game world state including all players
       ws.send(JSON.stringify({
         type: 'gameWorld',
         bots: gameWorld.bots,
-        food: gameWorld.food
+        food: gameWorld.food,
+        players: Array.from(gameWorld.players.values())
       }));
     }, 100);
 
@@ -261,15 +263,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = JSON.parse(message.toString());
         if (data.type === 'update') {
-          // Update player data, preserving assigned color
+          // Update player data in both activePlayers and gameWorld
           const existingPlayer = activePlayers.get(playerId);
-          activePlayers.set(playerId, {
+          const player = {
             id: playerId,
             segments: data.segments || [],
             color: existingPlayer?.color || '#d55400',
             money: data.money || 1.00,
             lastUpdate: Date.now()
-          });
+          };
+          activePlayers.set(playerId, player);
+          gameWorld.players.set(playerId, player);
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -279,6 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("close", () => {
       console.log(`Player ${playerId} left multiplayer. Remaining: ${wss.clients.size - 1}`);
       activePlayers.delete(playerId);
+      gameWorld.players.delete(playerId);
     });
 
     ws.on("error", (error: any) => {
@@ -306,7 +311,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
         bots: gameWorld.bots,
-        food: gameWorld.food
+        food: gameWorld.food,
+        players: Array.from(gameWorld.players.values())
       });
       
       wss.clients.forEach(client => {
