@@ -1801,7 +1801,7 @@ export default function GamePage() {
         const snakeHead = snake.visibleSegments[0];
         const scaleFactor = snake.getScaleFactor();
         
-        ctx.font = `${Math.floor(14 * scaleFactor)}px 'Press Start 2P', monospace`;
+        ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#134242";
         ctx.lineWidth = 3 * scaleFactor;
@@ -2021,6 +2021,30 @@ export default function GamePage() {
                 className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
                 Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCongrats && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
+            <div className="text-green-500 text-4xl font-bold mb-4">Congratulations!</div>
+            <div className="text-white text-2xl mb-2">You cashed out!</div>
+            <div className="text-neon-yellow text-xl mb-6">${cashedOutAmount.toFixed(2)}</div>
+            <div className="flex gap-4">
+              <Button
+                onClick={resetGame}
+                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Play Again
+              </Button>
+              <Button
+                onClick={exitGame}
+                className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Continue
               </Button>
             </div>
           </div>
