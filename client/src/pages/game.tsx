@@ -769,7 +769,7 @@ export default function GamePage() {
           x: x,
           y: y,
           size: 10,
-          mass: 0.4, // Was 2, now 0.2x = 0.4
+          mass: 0.8, // Was 0.4, now doubled to 0.8
           color: getRandomFoodColor(),
           type: 'normal'
         };
@@ -778,7 +778,7 @@ export default function GamePage() {
           x: x,
           y: y,
           size: 6,
-          mass: 0.2, // Was 1, now 0.2x = 0.2
+          mass: 0.4, // Was 0.2, now doubled to 0.4
           color: getRandomFoodColor(),
           type: 'normal'
         };
@@ -787,7 +787,7 @@ export default function GamePage() {
           x: x,
           y: y,
           size: 4,
-          mass: 0.1, // Was 0.5, now 0.2x = 0.1
+          mass: 0.2, // Was 0.1, now doubled to 0.2
           color: getRandomFoodColor(),
           type: 'normal'
         };
@@ -1085,11 +1085,11 @@ export default function GamePage() {
                 const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
                 
                 if (foodType < 0.10) { // 10% big food (removed testing food)
-                  newFood = { x: newX, y: newY, size: 10, mass: 0.24, color: getRandomFoodColor(), type: 'normal' }; // Was 1.2, now 0.2x = 0.24
+                  newFood = { x: newX, y: newY, size: 10, mass: 0.48, color: getRandomFoodColor(), type: 'normal' }; // Was 0.24, now doubled to 0.48
                 } else if (foodType < 0.45) { // 35% medium food
-                  newFood = { x: newX, y: newY, size: 6, mass: 0.08, color: getRandomFoodColor(), type: 'normal' }; // Was 0.4, now 0.2x = 0.08
+                  newFood = { x: newX, y: newY, size: 6, mass: 0.16, color: getRandomFoodColor(), type: 'normal' }; // Was 0.08, now doubled to 0.16
                 } else { // 55% small food
-                  newFood = { x: newX, y: newY, size: 4, mass: 0.04, color: getRandomFoodColor(), type: 'normal' }; // Was 0.2, now 0.2x = 0.04
+                  newFood = { x: newX, y: newY, size: 4, mass: 0.08, color: getRandomFoodColor(), type: 'normal' }; // Was 0.04, now doubled to 0.08
                 }
                 
                 newFoods.push(newFood);
@@ -1165,7 +1165,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 10,
-                mass: 0.24, // Was 1.2, now 0.2x = 0.24
+                mass: 0.48, // Was 0.24, now doubled to 0.48
                 color: getRandomFoodColor(),
                 type: 'normal'
               };
@@ -1174,7 +1174,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 6,
-                mass: 0.08, // Was 0.4, now 0.2x = 0.08
+                mass: 0.16, // Was 0.08, now doubled to 0.16
                 color: getRandomFoodColor(),
                 type: 'normal'
               };
@@ -1183,7 +1183,7 @@ export default function GamePage() {
                 x: newX,
                 y: newY,
                 size: 4,
-                mass: 0.04, // Was 0.2, now 0.2x = 0.04
+                mass: 0.08, // Was 0.04, now doubled to 0.08
                 color: getRandomFoodColor(),
                 type: 'normal'
               };
