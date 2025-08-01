@@ -109,33 +109,49 @@ class DecorativeSnake {
   }
   
   draw(ctx: CanvasRenderingContext2D) {
-    // Draw snake segments
-    ctx.fillStyle = '#d55400';
+    // Draw snake segments like in the game
     for (let i = this.segments.length - 1; i >= 0; i--) {
       const segment = this.segments[i];
-      const radius = i === 0 ? 10 : 8; // Head slightly larger
+      const radius = i === 0 ? 12 : 10; // Head slightly larger
       
+      // Create gradient for sphere effect
+      const gradient = ctx.createRadialGradient(
+        segment.x - radius * 0.3, segment.y - radius * 0.3, 0,
+        segment.x, segment.y, radius
+      );
+      gradient.addColorStop(0, '#ff6b35'); // Lighter orange center
+      gradient.addColorStop(1, '#d55400'); // Darker orange edge
+      
+      ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
       ctx.fill();
       
-      // Draw simple eyes on head
+      // Draw white eyes on head like in the game
       if (i === 0) {
         ctx.fillStyle = 'white';
-        const eyeDistance = 4;
-        const eye1X = segment.x + Math.cos(this.angle + Math.PI/2) * eyeDistance;
-        const eye1Y = segment.y + Math.sin(this.angle + Math.PI/2) * eyeDistance;
-        const eye2X = segment.x + Math.cos(this.angle - Math.PI/2) * eyeDistance;
-        const eye2Y = segment.y + Math.sin(this.angle - Math.PI/2) * eyeDistance;
+        const eyeDistance = 6;
+        const eyeSize = 3;
+        const eye1X = segment.x + Math.cos(this.angle + 0.5) * eyeDistance;
+        const eye1Y = segment.y + Math.sin(this.angle + 0.5) * eyeDistance;
+        const eye2X = segment.x + Math.cos(this.angle - 0.5) * eyeDistance;
+        const eye2Y = segment.y + Math.sin(this.angle - 0.5) * eyeDistance;
         
         ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, 2, 0, Math.PI * 2);
+        ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, 2, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
         ctx.fill();
         
-        ctx.fillStyle = '#d55400'; // Reset color
+        // Add black pupils
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eye2X, eye2Y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
   }
@@ -436,9 +452,24 @@ export default function Home() {
         });
       }
       
-      // Draw food
-      ctx.fillStyle = '#00ff00';
+      // Draw food with glow effect
       currentFoods.forEach(food => {
+        // Create glow effect
+        const glowGradient = ctx.createRadialGradient(
+          food.x, food.y, 0,
+          food.x, food.y, 12
+        );
+        glowGradient.addColorStop(0, '#53d493');
+        glowGradient.addColorStop(0.3, 'rgba(83, 212, 147, 0.8)');
+        glowGradient.addColorStop(1, 'rgba(83, 212, 147, 0)');
+        
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw solid food center
+        ctx.fillStyle = '#53d493';
         ctx.beginPath();
         ctx.arc(food.x, food.y, 4, 0, Math.PI * 2);
         ctx.fill();
