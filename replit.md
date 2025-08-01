@@ -10,30 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Enhanced Bot AI System (Latest - January 2025)
-- Rebuilt bot movement system to eliminate circular patterns
-- Implemented state-based AI: hunting, exploring, escaping modes
-- Added straight-line goal-based movement with distant waypoints
-- Drastically reduced boost frequency with longer cooldowns (120-240 frames)
-- Bots now actively hunt player when advantageous and collect food strategically
-- Added stuck detection and anti-circular movement algorithms
-- Enhanced threat avoidance with appropriate sensitivity levels
-- All bots start with exactly $1.00, only increase from money crates
-
-### Visual and Collision System Updates
-- Bot eyes now use player's rotated square system with proper orientation
-- Added drop shadows for bots when not boosting, outlines only when boosting
-- Capped snake segments at maximum 250 for performance
-- Enhanced eye-based collision detection for precise gameplay
-- Big orange test food added back (5% spawn rate, 25 mass, size 20)
-
-### Money Balance System
+### Money Balance System (Latest)
 - Added money balance display above snake head starting at $1.00
 - Money only increases when killing other snakes (minimum $0.50 or 5% of bot's mass)
 - Money resets to $1.00 when game restarts
 - Display scales with snake size and has outline for visibility
 
-### Tab Switching System
+### Tab Switching System (Latest)
 - Implemented time-based catch-up movement for when browser tab is inactive
 - Tracks exact time while tab is hidden using performance.now()
 - When tab becomes active again, snake moves forward based on elapsed time
