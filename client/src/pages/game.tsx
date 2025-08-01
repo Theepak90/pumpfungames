@@ -1816,10 +1816,10 @@ export default function GamePage() {
         
         // Draw cash-out progress bar under money counter
         if (cashingOut) {
-          const barWidth = 60 * scaleFactor;
-          const barHeight = 4 * scaleFactor;
+          const barWidth = 40 * scaleFactor; // Smaller width
+          const barHeight = 3 * scaleFactor; // Smaller height
           const barX = snakeHead.x - barWidth / 2;
-          const barY = snakeHead.y - offsetY + 20;
+          const barY = snakeHead.y - offsetY + 15; // Closer to money counter
           
           // Background bar
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
