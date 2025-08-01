@@ -1533,20 +1533,20 @@ export default function GamePage() {
           ctx.fill();
         }
         
-        // Draw bot eyes using player's eye system (perpendicular to movement direction)
+        // Draw bot eyes facing the direction of movement
         if (bot.visibleSegments.length > 0) {
           const head = bot.visibleSegments[0];
           ctx.globalAlpha = 1.0;
           
-          // Calculate eye positions like player - perpendicular to movement direction
+          // Calculate eye positions facing forward in movement direction
           const eyeDistance = 5 * botScaleFactor; // Scale with bot size
           const eyeSize = 3 * botScaleFactor; // Scale with bot size
           
-          // Eye positions perpendicular to movement direction (like player)
-          const eye1X = head.x + Math.cos(bot.currentAngle + Math.PI/2) * eyeDistance;
-          const eye1Y = head.y + Math.sin(bot.currentAngle + Math.PI/2) * eyeDistance;
-          const eye2X = head.x + Math.cos(bot.currentAngle - Math.PI/2) * eyeDistance;
-          const eye2Y = head.y + Math.sin(bot.currentAngle - Math.PI/2) * eyeDistance;
+          // Eye positions facing forward in movement direction
+          const eye1X = head.x + Math.cos(bot.currentAngle - 0.3) * eyeDistance;
+          const eye1Y = head.y + Math.sin(bot.currentAngle - 0.3) * eyeDistance;
+          const eye2X = head.x + Math.cos(bot.currentAngle + 0.3) * eyeDistance;
+          const eye2Y = head.y + Math.sin(bot.currentAngle + 0.3) * eyeDistance;
           
           // Draw square eyes (white background, black centers)
           ctx.fillStyle = 'white';
