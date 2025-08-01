@@ -24,6 +24,7 @@ interface Food {
   mass?: number; // Mass value for growth
   type?: 'normal' | 'money'; // Food type
   value?: number; // Money value for money type
+  spawnTime?: number; // Timestamp when money crate was created
 }
 
 interface BotSnake {
@@ -558,6 +559,7 @@ export default function GamePage() {
     const crateValue = 0.05;
     const segments = snake.visibleSegments;
     const segmentCount = segments.length;
+    const currentTime = Date.now();
     
     // Limit spread zone to first 40 segments or fewer
     const spreadLength = Math.min(segmentCount, 40);
@@ -593,7 +595,8 @@ export default function GamePage() {
         mass: 0,
         color: '#00ff00', // Green color for money crates
         type: 'money',
-        value: crateValue
+        value: crateValue,
+        spawnTime: currentTime
       });
     }
     
@@ -941,6 +944,18 @@ export default function GamePage() {
         return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
       });
 
+      // Remove expired money crates (fade out over 10 seconds)
+      const MONEY_CRATE_LIFETIME = 10000; // 10 seconds in milliseconds
+      setFoods(prevFoods => {
+        return prevFoods.filter(food => {
+          if (food.type === 'money' && food.spawnTime) {
+            const age = currentTime - food.spawnTime;
+            return age < MONEY_CRATE_LIFETIME;
+          }
+          return true; // Keep all non-money food
+        });
+      });
+
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
@@ -1263,7 +1278,23 @@ export default function GamePage() {
       // Draw food items
       foods.forEach((food, index) => {
         if (food.type === 'money') {
-          // Draw money crates with dollar sign image, shadow, and wobble
+          // Calculate fade effect for money crates (fade over last 5 seconds of 10 second lifetime)
+          const currentTime = Date.now();
+          const MONEY_CRATE_LIFETIME = 10000; // 10 seconds
+          const FADE_DURATION = 5000; // Fade over last 5 seconds
+          let alpha = 1.0;
+          
+          if (food.spawnTime) {
+            const age = currentTime - food.spawnTime;
+            const fadeStartTime = MONEY_CRATE_LIFETIME - FADE_DURATION;
+            
+            if (age > fadeStartTime) {
+              const fadeProgress = (age - fadeStartTime) / FADE_DURATION;
+              alpha = Math.max(0, 1 - fadeProgress);
+            }
+          }
+          
+          // Draw money crates with dollar sign image, shadow, wobble, and fade
           const time = Date.now() * 0.003; // Time for animation
           const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
           const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
@@ -1271,12 +1302,15 @@ export default function GamePage() {
           const drawX = food.x + wobbleX;
           const drawY = food.y + wobbleY;
           
+          // Apply alpha for fade effect
+          ctx.globalAlpha = alpha;
+          
           // Draw shadow first
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowColor = `rgba(0, 0, 0, ${0.3 * alpha})`;
           ctx.shadowBlur = 8;
           ctx.shadowOffsetX = 3;
           ctx.shadowOffsetY = 3;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillStyle = `rgba(0, 0, 0, ${0.2 * alpha})`;
           ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
           
           // Reset shadow for main square
@@ -1299,6 +1333,9 @@ export default function GamePage() {
               20
             );
           }
+          
+          // Reset alpha for other elements
+          ctx.globalAlpha = 1.0;
         } else {
           // Draw regular food as circles with glow effect
           ctx.shadowColor = food.color;
