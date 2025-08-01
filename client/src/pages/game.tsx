@@ -925,11 +925,11 @@ export default function GamePage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
         const updateData = {
           type: 'update',
-          segments: snake.visibleSegments.slice(0, 20).map(seg => ({ x: seg.x, y: seg.y })), // Send more segments
+          segments: snake.visibleSegments.slice(0, 50).map(seg => ({ x: seg.x, y: seg.y })), // Send many more segments
           color: '#d55400',
           money: snake.money
         };
-        console.log(`Sending update with ${updateData.segments.length} segments to server`);
+        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)})`);
         wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
@@ -1597,27 +1597,8 @@ export default function GamePage() {
             }
           }
           
-          // Extend the tail if we have fewer segments than expected
-          if (fullSnakeBody.length < 30 && serverPlayer.segments.length >= 2) {
-            const lastSeg = serverPlayer.segments[serverPlayer.segments.length - 1];
-            const secondLastSeg = serverPlayer.segments[serverPlayer.segments.length - 2];
-            const dx = lastSeg.x - secondLastSeg.x;
-            const dy = lastSeg.y - secondLastSeg.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            
-            if (length > 0) {
-              const dirX = dx / length;
-              const dirY = dy / length;
-              
-              // Add more tail segments
-              for (let i = 0; i < 20; i++) {
-                fullSnakeBody.push({
-                  x: lastSeg.x + dirX * segmentSpacing * (i + 1),
-                  y: lastSeg.y + dirY * segmentSpacing * (i + 1)
-                });
-              }
-            }
-          }
+          // Use all segments as-is since we're now sending many more segments
+          // No need for tail extension - just use the received segments with interpolation
           
           // Draw the complete snake body with proper sizing and overlap
           fullSnakeBody.forEach((segment: any, index: number) => {

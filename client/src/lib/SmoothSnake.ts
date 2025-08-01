@@ -44,14 +44,21 @@ export class SmoothSnake {
     this.boostCooldown = 0;
     
     // Snake system constants
-    this.START_MASS = 6; // Start with just 6 segments instead of 30
+    this.START_MASS = 25; // Start with 25 segments for a proper snake length
     this.MASS_PER_SEGMENT = 1;
     this.SEGMENT_SPACING = 10; // Heavy overlap (radius=10, so 10px overlap for maximum density)
     this.SEGMENT_RADIUS = 10;
     this.MIN_MASS_TO_BOOST = 4;
     
-    // Initialize trail and segments
-    this.segmentTrail = [{ x, y }];
+    // Initialize trail and segments with longer starting trail
+    this.segmentTrail = [];
+    // Create initial trail going backwards from start position
+    for (let i = 0; i < 30; i++) {
+      this.segmentTrail.push({ 
+        x: x - i * this.SEGMENT_SPACING * 0.8, 
+        y: y 
+      });
+    }
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
     this.growthRemaining = 0;
