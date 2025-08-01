@@ -35,13 +35,17 @@ interface BotSnake {
   totalMass: number;
   currentAngle: number;
   speed: number;
+  baseSpeed: number;
   color: string;
   targetAngle: number;
   lastDirectionChange: number;
   targetFood: Food | null;
   money: number; // Bot's money balance
+  state: 'wander' | 'foodHunt' | 'avoid' | 'aggro'; // Bot behavior state
   isBoosting: boolean;
-  boostCooldown: number;
+  boostTime: number;
+  lastStateChange: number;
+  aggroTarget: SmoothSnake | BotSnake | null;
 }
 
 // Utility function to generate random food colors
@@ -65,6 +69,7 @@ function createBotSnake(id: string): BotSnake {
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+  const baseSpeed = 1.8 + Math.random() * 0.8; // Slightly slower than player
   
   return {
     id,
@@ -73,14 +78,18 @@ function createBotSnake(id: string): BotSnake {
     segmentTrail: [{ x, y }],
     totalMass: 8 + Math.random() * 12, // Start with 8-20 mass
     currentAngle: Math.random() * Math.PI * 2,
-    speed: 1.8 + Math.random() * 0.8, // Slightly slower than player
+    speed: baseSpeed,
+    baseSpeed: baseSpeed,
     color: colors[Math.floor(Math.random() * colors.length)],
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
     targetFood: null,
     money: 1.00, // All bots start with exactly $1.00
+    state: 'wander',
     isBoosting: false,
-    boostCooldown: 0
+    boostTime: 0,
+    lastStateChange: Date.now(),
+    aggroTarget: null
   };
 }
 
@@ -90,10 +99,7 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   const SEGMENT_RADIUS = 10;
   const currentTime = Date.now();
   
-  // Update boost cooldown
-  if (bot.boostCooldown > 0) {
-    bot.boostCooldown--;
-  }
+
   
   // Check for nearby threats (less sensitive for more aggressive play)
   let nearestThreat: { x: number, y: number, distance: number } | null = null;
@@ -138,9 +144,9 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.lastDirectionChange = currentTime;
     
     // Boost when escaping danger
-    if (bot.totalMass > 4 && bot.boostCooldown === 0) {
+    if (bot.totalMass > 4 && !bot.isBoosting && Math.random() < 0.05) {
       bot.isBoosting = true;
-      bot.boostCooldown = 30; // Cooldown frames
+      bot.boostTime = currentTime;
     }
   } else if (shouldHuntPlayer) {
     // Hunt the player aggressively
@@ -148,9 +154,9 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.lastDirectionChange = currentTime;
     
     // Boost when hunting if close enough
-    if (playerHeadDist < 100 && bot.totalMass > 6 && bot.boostCooldown === 0) {
+    if (playerHeadDist < 100 && bot.totalMass > 6 && !bot.isBoosting && Math.random() < 0.03) {
       bot.isBoosting = true;
-      bot.boostCooldown = 45; // Longer cooldown for hunting
+      bot.boostTime = currentTime;
     }
   } else {
     // Find food strategically (avoid big test food, prefer money crates)
@@ -191,9 +197,9 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
       
       // Boost toward valuable food
       const distToFood = Math.sqrt(dx * dx + dy * dy);
-      if (bot.targetFood.type === 'money' && distToFood < 120 && bot.totalMass > 5 && bot.boostCooldown === 0) {
+      if (bot.targetFood.type === 'money' && distToFood < 120 && bot.totalMass > 5 && !bot.isBoosting && Math.random() < 0.02) {
         bot.isBoosting = true;
-        bot.boostCooldown = 60;
+        bot.boostTime = currentTime;
       }
     } else {
       // Less circular movement - more direct exploration
@@ -225,8 +231,13 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   if (bot.currentAngle > Math.PI) bot.currentAngle -= 2 * Math.PI;
   if (bot.currentAngle < -Math.PI) bot.currentAngle += 2 * Math.PI;
   
+  // Update boost state timing
+  if (bot.isBoosting && currentTime - bot.boostTime > 1200) {
+    bot.isBoosting = false;
+  }
+  
   // Calculate speed with boosting
-  let currentSpeed = bot.speed;
+  let currentSpeed = bot.baseSpeed;
   if (bot.isBoosting && bot.totalMass > 4) {
     currentSpeed *= 1.8; // Boost multiplier
     // Lose mass when boosting (like player)
@@ -234,8 +245,6 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     if (bot.totalMass < 4) {
       bot.isBoosting = false; // Stop boosting if too small
     }
-  } else {
-    bot.isBoosting = false; // Stop boosting
   }
   
   // Move bot
