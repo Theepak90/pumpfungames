@@ -1015,6 +1015,56 @@ export default function GamePage() {
         setGameOver(true);
         return;
       }
+
+      // Check for head-on collisions between player and bot snakes
+      for (let i = botSnakes.length - 1; i >= 0; i--) {
+        const bot = botSnakes[i];
+        const playerEyePositions = snake.getEyePositions();
+        
+        // Calculate bot's current radius based on mass
+        const botBaseRadius = 8;
+        const maxScale = 5;
+        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
+        const botRadius = botBaseRadius * botScaleFactor;
+        
+        // Check if player's eyes collide with bot's head (head-on collision)
+        let headOnCollision = false;
+        for (const eye of playerEyePositions) {
+          const dist = Math.sqrt((eye.x - bot.head.x) ** 2 + (eye.y - bot.head.y) ** 2);
+          if (dist < eye.size + botRadius) {
+            headOnCollision = true;
+            break;
+          }
+        }
+        
+        if (headOnCollision) {
+          // Both snakes die in head-on collision
+          // Player snake dies
+          dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+          dropMoneyCrates();
+          snake.money = 0;
+          
+          // Bot snake also dies
+          dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
+          
+          // Drop money crates for bot death too
+          const originalSegments = snake.visibleSegments;
+          snake.visibleSegments = bot.visibleSegments;
+          dropMoneyCrates();
+          snake.visibleSegments = originalSegments;
+          
+          // Remove the bot
+          setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
+          
+          // Spawn a new bot to replace the killed one
+          setTimeout(() => {
+            setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
+          }, 3000);
+          
+          setGameOver(true);
+          return;
+        }
+      }
       
       // Check if player snake kills any bot snakes (excluding head segment)
       for (let i = botSnakes.length - 1; i >= 0; i--) {
