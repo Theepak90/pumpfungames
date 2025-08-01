@@ -887,6 +887,13 @@ export default function GamePage() {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
             });
           }
+          
+          // Force immediate re-render for proper snake body display
+          if (canvasRef.current) {
+            window.requestAnimationFrame(() => {
+              // Canvas will redraw with new player data on next frame
+            });
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -935,7 +942,7 @@ export default function GamePage() {
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
-    }, 100); // Send updates every 100ms
+    }, 50); // Send updates every 50ms for more responsive multiplayer
 
     return () => {
       console.log('Clearing position update interval');

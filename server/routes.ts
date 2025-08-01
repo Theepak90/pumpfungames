@@ -298,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 100ms
+  // Broadcast game state every 50ms for more responsive multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Update bot positions (simple movement simulation)
@@ -327,7 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     }
-  }, 100);
+  }, 50);
 
   return httpServer;
 }
