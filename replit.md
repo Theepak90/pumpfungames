@@ -10,7 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Home Screen Snake Improvements (Latest)
+### Multiplayer WebSocket System Implementation (Latest)
+- **Regional server selection**: Auto-detects user region (EU/US) using timezone and browser locale
+- **WebSocket game server**: Complete multiplayer infrastructure with room management (5 players max per room)
+- **Real-time synchronization**: Player positions, movements, boosts, deaths, and food collection
+- **Load balancing**: Automatic room assignment to least-full servers in user's region
+- **Region selector UI**: Manual region selection with server status, player counts, and ping indicators
+- **Scalable architecture**: Supports multiple game rooms per region with automatic cleanup
+- **Connection management**: Automatic reconnection with exponential backoff and error handling
+
+### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance
 - **Enhanced food attraction**: Increased gravitational pull from 0.3 to 1.8 (6x stronger) for very dynamic interaction
 - **Consistent visuals**: Home screen snake now identical to in-game snake with proper segment spacing
@@ -31,10 +40,11 @@ Preferred communication style: Simple, everyday language.
 - **Minimal interface**: Games now have clean canvas-only display with essential minimap and controls
 
 ### Dual Game System
-- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with real-time multiplayer
+- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with regional WebSocket servers
 - **Private Single-player**: Secret URL `/game8999` with password `secretserveradd119988` for bot-based gameplay
-- WebSocket-based multiplayer server with real-time player synchronization
-- Separate game modes: multiplayer (no bots, real players) vs single-player (AI bots)
+- **Regional multiplayer**: Auto-detects US/EU regions with manual override option
+- **Room-based gameplay**: Maximum 5 players per room with automatic load balancing
+- **Real-time synchronization**: WebSocket communication for all game events
 - Session-based access control for private game using sessionStorage
 
 ### Enhanced Bot AI System
