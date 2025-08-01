@@ -1533,39 +1533,58 @@ export default function GamePage() {
           ctx.fill();
         }
         
-        // Draw bot eyes facing the direction of movement
+        // Draw bot eyes using player's rotated square eye system
         if (bot.visibleSegments.length > 0) {
           const head = bot.visibleSegments[0];
           ctx.globalAlpha = 1.0;
           
-          // Calculate eye positions facing forward in movement direction
+          const movementAngle = bot.currentAngle;
           const eyeDistance = 5 * botScaleFactor; // Scale with bot size
-          const eyeSize = 3 * botScaleFactor; // Scale with bot size
+          const eyeSize = 3 * botScaleFactor; // Scale eye size
+          const pupilSize = 1.5 * botScaleFactor; // Scale pupil size
           
-          // Eye positions facing forward in movement direction
-          const eye1X = head.x + Math.cos(bot.currentAngle - 0.3) * eyeDistance;
-          const eye1Y = head.y + Math.sin(bot.currentAngle - 0.3) * eyeDistance;
-          const eye2X = head.x + Math.cos(bot.currentAngle + 0.3) * eyeDistance;
-          const eye2Y = head.y + Math.sin(bot.currentAngle + 0.3) * eyeDistance;
+          // Eye positions perpendicular to movement direction (like player)
+          const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+          const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+          const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+          const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
           
-          // Draw square eyes (white background, black centers)
+          // Draw rotated square eyes (copying player's system exactly)
+          ctx.save();
+          
+          // Draw first eye with rotation
+          ctx.translate(eye1X, eye1Y);
+          ctx.rotate(movementAngle);
           ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
           
-          // Eye 1
-          ctx.fillRect(eye1X - eyeSize, eye1Y - eyeSize, eyeSize * 2, eyeSize * 2);
-          
-          // Eye 2  
-          ctx.fillRect(eye2X - eyeSize, eye2Y - eyeSize, eyeSize * 2, eyeSize * 2);
-          
-          // Black eye centers (pupils)
+          // Draw first pupil looking forward (not tracking anything)
+          const pupilOffset = 1.2;
           ctx.fillStyle = 'black';
-          const pupilSize = eyeSize * 0.6;
+          ctx.fillRect(
+            pupilOffset - pupilSize, // Forward direction
+            0 - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
           
-          // Pupil 1
-          ctx.fillRect(eye1X - pupilSize, eye1Y - pupilSize, pupilSize * 2, pupilSize * 2);
+          // Draw second eye with rotation
+          ctx.save();
+          ctx.translate(eye2X, eye2Y);
+          ctx.rotate(movementAngle);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
           
-          // Pupil 2
-          ctx.fillRect(eye2X - pupilSize, eye2Y - pupilSize, pupilSize * 2, pupilSize * 2);
+          // Draw second pupil looking forward (not tracking anything)
+          ctx.fillStyle = 'black';
+          ctx.fillRect(
+            pupilOffset - pupilSize, // Forward direction
+            0 - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
         }
         
         // Draw money balance above bot head
