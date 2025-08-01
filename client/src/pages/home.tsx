@@ -115,52 +115,75 @@ class DecorativeSnake {
   }
   
   draw(ctx: CanvasRenderingContext2D) {
-    // Draw snake segments with overlapping style like the game
+    // Draw snake segments exactly like the multiplayer game
+    ctx.save();
+    
+    // Add subtle drop shadow (not boosting)
+    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    const segmentRadius = 10;
+    ctx.fillStyle = '#d55400'; // Orange snake color
+    
+    // Draw all segments with shadow
     for (let i = this.visibleSegments.length - 1; i >= 0; i--) {
       const segment = this.visibleSegments[i];
-      const isHead = i === 0;
-      const radius = isHead ? 12 : 10;
-      
-      // Create gradient for sphere effect
-      const gradient = ctx.createRadialGradient(
-        segment.x - radius * 0.3, segment.y - radius * 0.3, 0,
-        segment.x, segment.y, radius
-      );
-      gradient.addColorStop(0, '#ff6b35');
-      gradient.addColorStop(1, '#d55400');
-      
-      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+      ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
       ctx.fill();
     }
     
-    // Draw eyes on head
+    ctx.restore();
+    
+    // Draw rotated square eyes exactly like multiplayer game
     if (this.visibleSegments.length > 0) {
       const head = this.visibleSegments[0];
-      ctx.fillStyle = 'white';
-      const eyeDistance = 6;
+      const eyeDistance = 5;
       const eyeSize = 3;
-      const eye1X = head.x + Math.cos(this.currentAngle + 0.5) * eyeDistance;
-      const eye1Y = head.y + Math.sin(this.currentAngle + 0.5) * eyeDistance;
-      const eye2X = head.x + Math.cos(this.currentAngle - 0.5) * eyeDistance;
-      const eye2Y = head.y + Math.sin(this.currentAngle - 0.5) * eyeDistance;
+      const pupilSize = 1.5;
       
-      ctx.beginPath();
-      ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
-      ctx.fill();
+      // Eye positions perpendicular to movement direction
+      const eye1X = head.x + Math.cos(this.currentAngle + Math.PI/2) * eyeDistance;
+      const eye1Y = head.y + Math.sin(this.currentAngle + Math.PI/2) * eyeDistance;
+      const eye2X = head.x + Math.cos(this.currentAngle - Math.PI/2) * eyeDistance;
+      const eye2Y = head.y + Math.sin(this.currentAngle - Math.PI/2) * eyeDistance;
       
-      // Add black pupils
+      // Draw first eye with rotation (exact copy from multiplayer)
+      ctx.save();
+      ctx.translate(eye1X, eye1Y);
+      ctx.rotate(this.currentAngle);
+      ctx.fillStyle = 'white';
+      ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+      
+      // Draw first pupil looking forward
+      const pupilOffset = 1.2;
       ctx.fillStyle = 'black';
-      ctx.beginPath();
-      ctx.arc(eye1X, eye1Y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(eye2X, eye2Y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(
+        pupilOffset - pupilSize,
+        0 - pupilSize,
+        pupilSize * 2, 
+        pupilSize * 2
+      );
+      ctx.restore();
+      
+      // Draw second eye with rotation
+      ctx.save();
+      ctx.translate(eye2X, eye2Y);
+      ctx.rotate(this.currentAngle);
+      ctx.fillStyle = 'white';
+      ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+      
+      // Draw second pupil looking forward
+      ctx.fillStyle = 'black';
+      ctx.fillRect(
+        pupilOffset - pupilSize,
+        0 - pupilSize,
+        pupilSize * 2, 
+        pupilSize * 2
+      );
+      ctx.restore();
     }
   }
   
@@ -432,7 +455,7 @@ export default function Home() {
     setDecorativeSnake(snake);
     
     // Create initial food with wobble properties
-    let currentFoods = [];
+    let currentFoods: Array<{ x: number; y: number; wobbleX: number; wobbleY: number }> = [];
     for (let i = 0; i < 20; i++) {
       currentFoods.push({
         x: Math.random() * canvas.width,
