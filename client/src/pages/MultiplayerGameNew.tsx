@@ -26,9 +26,10 @@ interface Food {
 }
 
 interface OtherPlayer {
-  x: number;
-  y: number;
-  angle: number;
+  id: number;
+  segments: Array<{ x: number; y: number; opacity?: number }>;
+  color: string;
+  money: number;
 }
 
 export default function MultiplayerGameNew() {
@@ -415,41 +416,84 @@ export default function MultiplayerGameNew() {
       ctx.fillText(moneyText, head.x, textY);
     }
 
-    // Draw other players' snakes
+    // Draw other players' complete snakes
     if (isMultiplayerActive && otherPlayers.length > 0) {
       otherPlayers.forEach((player, index) => {
-        // Draw a simple snake for other players
+        if (!player.segments || player.segments.length === 0) return;
+        
         ctx.save();
         
         // Different colors for each player
         const playerColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6ab04c'];
-        ctx.fillStyle = playerColors[index % playerColors.length];
+        const playerColor = playerColors[index % playerColors.length];
         
-        // Draw other player's head (simple circle)
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, 15, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw other player's full snake body
+        ctx.fillStyle = playerColor;
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
         
-        // Draw simple eyes for other players
-        const eyeDistance = 8;
-        const eyeSize = 3;
+        // Draw all segments
+        for (let i = player.segments.length - 1; i >= 0; i--) {
+          const segment = player.segments[i];
+          ctx.globalAlpha = segment.opacity || 1.0;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, 10, 0, Math.PI * 2); // Same radius as player snake
+          ctx.fill();
+        }
         
-        const eye1X = player.x + Math.cos(player.angle - 0.4) * eyeDistance;
-        const eye1Y = player.y + Math.sin(player.angle - 0.4) * eyeDistance;
-        const eye2X = player.x + Math.cos(player.angle + 0.4) * eyeDistance;
-        const eye2Y = player.y + Math.sin(player.angle + 0.4) * eyeDistance;
+        // Draw money above other player's head
+        if (player.segments.length > 0) {
+          const head = player.segments[0];
+          const moneyText = `$${player.money.toFixed(2)}`;
+          
+          ctx.globalAlpha = 1.0;
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          ctx.font = '10px "Press Start 2P", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = '#134242';
+          ctx.lineWidth = 2;
+          
+          ctx.strokeText(moneyText, head.x, head.y - 25);
+          ctx.fillText(moneyText, head.x, head.y - 25);
+        }
         
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
-        ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, eyeSize / 2, 0, Math.PI * 2);
-        ctx.arc(eye2X, eye2Y, eyeSize / 2, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw simple eyes on the head
+        if (player.segments.length > 0) {
+          const head = player.segments[0];
+          const eyeDistance = 8;
+          const eyeSize = 3;
+          
+          // Calculate angle from head to second segment for eye direction
+          let eyeAngle = 0;
+          if (player.segments.length > 1) {
+            const second = player.segments[1];
+            eyeAngle = Math.atan2(head.y - second.y, head.x - second.x);
+          }
+          
+          const eye1X = head.x + Math.cos(eyeAngle - 0.4) * eyeDistance;
+          const eye1Y = head.y + Math.sin(eyeAngle - 0.4) * eyeDistance;
+          const eye2X = head.x + Math.cos(eyeAngle + 0.4) * eyeDistance;
+          const eye2Y = head.y + Math.sin(eyeAngle + 0.4) * eyeDistance;
+          
+          ctx.fillStyle = 'white';
+          ctx.beginPath();
+          ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
+          ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = 'black';
+          ctx.beginPath();
+          ctx.arc(eye1X, eye1Y, eyeSize / 2, 0, Math.PI * 2);
+          ctx.arc(eye2X, eye2Y, eyeSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
         
         ctx.restore();
       });
@@ -568,10 +612,11 @@ export default function MultiplayerGameNew() {
   useEffect(() => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       const sendInterval = setInterval(() => {
+        // Send full snake data including all segments
         socketRef.current?.send(JSON.stringify({
-          x: snake.head.x,
-          y: snake.head.y,
-          angle: snake.currentAngle,
+          segments: snake.visibleSegments,
+          color: '#d55400', // Player's snake color
+          money: snake.money
         }));
       }, 50);
 
