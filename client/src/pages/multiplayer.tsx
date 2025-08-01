@@ -35,7 +35,8 @@ const MultiplayerGame: React.FC = () => {
     isVisible: true,
     lastVisibilityTime: 0,
     segmentTrail: [] as Array<{ x: number; y: number; time: number }>,
-    animationId: null as number | null
+    animationId: null as number | null,
+    ws: null as WebSocket | null
   });
 
   // Initialize loading sequence
@@ -56,47 +57,64 @@ const MultiplayerGame: React.FC = () => {
     return () => clearInterval(progressInterval);
   }, []);
 
-  // Generate unique player ID
-  const playerIdRef = useRef<string>(`player_${Date.now()}_${Math.random()}`);
-
-  // Multiplayer polling
+  // WebSocket connection
   useEffect(() => {
     if (!gameStarted) return;
 
-    setConnectionStatus('Connected');
+    console.log("Connecting to multiplayer server...");
     
-    // Poll for other players every 100ms
-    const pollInterval = setInterval(async () => {
+    // Connect to WebSocket server
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/game-ws`);
+    
+    socket.onopen = () => {
+      console.log("Connected to multiplayer server!");
+      setConnectionStatus('Connected');
+      gameStateRef.current.ws = socket;
+    };
+
+    socket.onmessage = (event) => {
       try {
-        const response = await fetch('/api/multiplayer/players');
-        const data = await response.json();
-        // Filter out our own player
-        const others = data.players.filter((p: Player) => p.id !== playerIdRef.current);
-        setOtherPlayers(others);
+        const data = JSON.parse(event.data);
+        if (data.type === 'players') {
+          // Filter out our own player data
+          const others = data.players.filter((p: Player) => p.id !== socket);
+          setOtherPlayers(others);
+        }
       } catch (error) {
-        console.error('Error fetching players:', error);
-        setConnectionStatus('Connection Error');
+        console.error('Error parsing WebSocket message:', error);
       }
-    }, 100);
+    };
+
+    socket.onclose = () => {
+      console.log("Disconnected from multiplayer server");
+      setConnectionStatus('Disconnected');
+      gameStateRef.current.ws = null;
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionStatus('Connection Error');
+    };
 
     return () => {
-      clearInterval(pollInterval);
+      if (socket) {
+        socket.close();
+      }
     };
   }, [gameStarted]);
 
   // Send player data to server
   const sendPlayerData = useCallback(() => {
-    const { snake, money } = gameStateRef.current;
-    fetch('/api/multiplayer/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        playerId: playerIdRef.current,
+    const { ws, snake, money } = gameStateRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
         segments: snake.segments,
         color: snake.color,
         money: money
-      })
-    }).catch(error => console.error('Error sending player data:', error));
+      }));
+    }
   }, []);
 
   // Initialize game
@@ -269,60 +287,29 @@ const MultiplayerGame: React.FC = () => {
         ctx.fill();
       });
 
-      // Unified snake drawing function
-      const drawSnake = (snakeData: any, isLocal = false) => {
-        if (!snakeData.segments || snakeData.segments.length === 0) return;
-        
-        const segments = snakeData.segments;
-        const segmentCount = isLocal ? snake.currentSegmentCount : segments.length;
-        
-        // Draw shadow when not boosting (like local snake)
-        if (!snake.boosting && isLocal) {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-        }
-
-        // Draw segments with same logic as local snake
-        for (let i = 0; i < Math.min(segmentCount, segments.length); i++) {
-          const segment = segments[i];
-          if (!segment) continue;
-          
-          ctx.fillStyle = snakeData.color;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, i === 0 ? 12 : 8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Reset shadow
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-
-        // Draw boost glow when boosting (only for local player)
-        if (isLocal && snake.boosting) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-          ctx.lineWidth = 3;
-          for (let i = 0; i < Math.min(segmentCount, segments.length); i++) {
-            const segment = segments[i];
-            if (!segment) continue;
-            
-            ctx.beginPath();
-            ctx.arc(segment.x, segment.y, i === 0 ? 12 : 8, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        }
-      };
-
-      // Draw other players using same function as local snake
+      // Draw other players
       otherPlayers.forEach(player => {
-        drawSnake(player, false);
+        if (player.segments && player.segments.length > 0) {
+          player.segments.forEach((segment, index) => {
+            ctx.fillStyle = player.color;
+            ctx.globalAlpha = segment.opacity || 1;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, index === 0 ? 12 : 8, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          ctx.globalAlpha = 1;
+        }
       });
 
-      // Draw local player snake
-      drawSnake(snake, true);
+      // Draw player snake
+      snake.segments.forEach((segment, index) => {
+        if (index < snake.currentSegmentCount) {
+          ctx.fillStyle = snake.color;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, index === 0 ? 12 : 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
 
       // Draw money display
       ctx.fillStyle = '#fff';

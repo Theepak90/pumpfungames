@@ -1,9 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-
-// Simple in-memory multiplayer storage
-const players = new Map();
 import {
   insertUserSchema,
   insertGameSchema,
@@ -11,25 +8,6 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Multiplayer API endpoints
-  app.post('/api/multiplayer/update', (req, res) => {
-    const { playerId, segments, color, money } = req.body;
-    if (playerId) {
-      players.set(playerId, {
-        id: playerId,
-        segments: segments || [],
-        color: color || '#d55400',
-        money: money || 1.00,
-        lastUpdate: Date.now()
-      });
-    }
-    res.json({ success: true });
-  });
-
-  app.get('/api/multiplayer/players', (req, res) => {
-    const allPlayers = Array.from(players.values());
-    res.json({ players: allPlayers });
-  });
   const httpServer = createServer(app);
 
   // Auth routes
