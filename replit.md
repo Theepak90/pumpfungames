@@ -10,7 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Dual Game System (Latest)
+### Clean UI Overhaul (Latest)
+- **Removed all UI clutter**: Exit buttons, score displays, control instructions removed from all game modes
+- **Eliminated audio system**: Complete removal of background music, sound effects, and volume controls
+- **Added circular minimap**: Top-left corner showing snake positions with red dot for player and colored dots for AI bots
+- **Clean instructions**: Bottom-left text showing "Hold Q to cash out" and "Left click to boost"
+- **Minimal interface**: Games now have clean canvas-only display with essential minimap and controls
+
+### Dual Game System
 - **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with real-time multiplayer
 - **Private Single-player**: Secret URL `/game8999` with password `secretserveradd119988` for bot-based gameplay
 - WebSocket-based multiplayer server with real-time player synchronization

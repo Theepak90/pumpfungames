@@ -1827,12 +1827,7 @@ export default function GamePage() {
       // Restore context
       ctx.restore();
 
-      // Draw UI (fixed position)
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText(`Score: ${score}`, 20, 40);
-      ctx.fillText(`Segments: ${snake.visibleSegments.length}`, 20, 70);
-      ctx.fillText(`Mass: ${Math.floor(snake.totalMass)}`, 20, 100);
+      // No UI display needed
       
 
 
@@ -1875,7 +1870,7 @@ export default function GamePage() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
       {/* Minimap */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 left-4 z-10">
         <div className="w-24 h-24 bg-black/60 border border-gray-500 rounded">
           <svg width="96" height="96" className="w-full h-full">
             {/* Map boundary circle */}
