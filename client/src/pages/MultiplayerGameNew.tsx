@@ -565,7 +565,9 @@ export default function MultiplayerGameNew() {
     // Try to connect to WebSocket server (will be used when available)
     try {
       // Connect to the simple WebSocket server on port 3000
-      const socket = new WebSocket('ws://localhost:3000');
+      // Use the correct host for Replit environment
+      const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
+      const socket = new WebSocket(`ws://${wsHost}`);
       
       socket.onopen = () => {
         console.log("WebSocket connected - multiplayer active");
