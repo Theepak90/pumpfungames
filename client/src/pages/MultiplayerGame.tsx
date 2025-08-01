@@ -1355,6 +1355,27 @@ export default function GamePage() {
         }
       }
 
+      // Food gravitation toward snake head (Slither.io style floating behavior)
+      const suctionRadius = 50;
+      const suctionStrength = 1.6;
+      
+      setFoods(prevFoods => {
+        return prevFoods.map(food => {
+          const dx = snake.head.x - food.x;
+          const dy = snake.head.y - food.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < suctionRadius && dist > 0) {
+            return {
+              ...food,
+              x: food.x + (dx / dist) * suctionStrength,
+              y: food.y + (dy / dist) * suctionStrength
+            };
+          }
+          return food;
+        });
+      });
+
       // Handle local food collision detection (food comes from server but we need local collision)
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
@@ -1376,8 +1397,16 @@ export default function GamePage() {
               snake.money += food.value || 0.1;
             }
                 
-            // Remove eaten food - let server handle respawning
+            // Remove eaten food and notify server
             newFoods.splice(i, 1);
+            
+            // Send food eaten event to server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'food_eaten',
+                data: { foodIndex: i }
+              }));
+            }
             break;
           }
         }

@@ -80,7 +80,8 @@ class MultiplayerGameServer {
       
       ws.on('close', () => {
         // Remove player on disconnect
-        for (const [id, player] of this.players) {
+        const entries = Array.from(this.players.entries());
+        for (const [id, player] of entries) {
           if (player.ws === ws) {
             this.players.delete(id);
             console.log(`Player ${id} disconnected`);
@@ -98,6 +99,9 @@ class MultiplayerGameServer {
         break;
       case 'player_update':
         this.handlePlayerUpdate(message.data);
+        break;
+      case 'food_eaten':
+        this.handleFoodEaten(message.data);
         break;
     }
   }
@@ -145,10 +149,23 @@ class MultiplayerGameServer {
     player.lastUpdate = Date.now();
   }
 
+  private handleFoodEaten(data: any) {
+    // Remove food and spawn new one
+    if (data.foodIndex >= 0 && data.foodIndex < this.foods.length) {
+      this.foods.splice(data.foodIndex, 1);
+      this.spawnNewFood();
+    }
+  }
+
+  private spawnNewFood() {
+    this.spawnFood();
+  }
+
   private gameLoop() {
-    // Remove inactive players (haven't updated in 10 seconds)
+    // Remove inactive players (haven't updated in 10 seconds)  
     const now = Date.now();
-    for (const [id, player] of this.players) {
+    const entries = Array.from(this.players.entries());
+    for (const [id, player] of entries) {
       if (now - player.lastUpdate > 10000) {
         this.players.delete(id);
         console.log(`Removed inactive player ${id}`);
@@ -220,7 +237,7 @@ class MultiplayerGameServer {
     });
     
     // Send to all connected players
-    for (const player of this.players.values()) {
+    for (const player of Array.from(this.players.values())) {
       if (player.ws.readyState === WebSocket.OPEN) {
         player.ws.send(message);
       }
