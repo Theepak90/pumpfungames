@@ -1914,24 +1914,39 @@ export default function GamePage() {
       </div>
       
       {gameOver && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-          <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
-            <div className="text-red-500 text-4xl font-bold mb-4">Game Over!</div>
-            <div className="text-white text-lg mb-2">Final Score: {score}</div>
-            <div className="text-white text-lg mb-6">Final Segments: {snake.visibleSegments.length}</div>
-            <div className="flex gap-4">
-              <Button
+        <div className="absolute inset-0 z-20" style={{ backgroundColor: '#15161b' }}>
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            {/* Game Over Title */}
+            <div className="text-red-500 text-8xl font-bold mb-12" style={{ 
+              fontFamily: "'Press Start 2P', monospace",
+              textShadow: '4px 4px 0px #000000, 8px 8px 20px rgba(255, 0, 0, 0.5)'
+            }}>
+              GAME OVER
+            </div>
+            
+            {/* Buttons */}
+            <div className="flex gap-8">
+              <button
                 onClick={resetGame}
-                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
+                style={{ 
+                  fontFamily: "'Press Start 2P', monospace",
+                  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                }}
               >
-                Play Again
-              </Button>
-              <Button
+                RESPAWN
+              </button>
+              
+              <button
                 onClick={exitGame}
-                className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                className="px-8 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
+                style={{ 
+                  fontFamily: "'Press Start 2P', monospace",
+                  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                }}
               >
-                Exit
-              </Button>
+                CONTINUE
+              </button>
             </div>
           </div>
         </div>
