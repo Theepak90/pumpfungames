@@ -4,14 +4,13 @@ import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 import LoadingScreen from '@/components/LoadingScreen';
-import MultiplayerLayer from '@/components/MultiplayerLayer';
 
-// Game constants - MULTIPLAYER VERSION (WITH BOTS)
+// Game constants - MULTIPLAYER VERSION (NO BOTS)
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 300; // Doubled from 150
-const BOT_COUNT = 8; // 8 BOTS IN MULTIPLAYER
+const BOT_COUNT = 0; // NO BOTS IN MULTIPLAYER
 
 interface Position {
   x: number;
@@ -31,7 +30,6 @@ interface Food {
 
 interface BotSnake {
   id: string;
-  name: string; // Bot's display name
   head: Position;
   visibleSegments: Array<{ x: number; y: number; opacity: number }>;
   segmentTrail: Position[];
@@ -44,24 +42,11 @@ interface BotSnake {
   lastDirectionChange: number;
   targetFood: Food | null;
   money: number; // Bot's money balance
-  state: 'wander' | 'foodHunt' | 'avoid' | 'aggro' | 'trap' | 'patrol'; // Enhanced bot behavior states
+  state: 'wander' | 'foodHunt' | 'avoid' | 'aggro'; // Bot behavior state
   isBoosting: boolean;
   boostTime: number;
   lastStateChange: number;
   aggroTarget: SmoothSnake | BotSnake | null;
-  // Advanced AI properties
-  angleVelocity: number; // Smooth turning velocity
-  territoryCenter: Position; // Bot's patrol area
-  territoryRadius: number; // Size of patrol area
-  lastRadarScan: number; // When bot last scanned for threats
-  radarRange: number; // Detection range (400-600px)
-  mistakeChance: number; // 5-10% chance to make mistakes
-  lastMistake: number; // When bot last made a mistake
-  pathfindingTarget: Position | null; // Strategic pathfinding target
-  trapAttemptTarget: SmoothSnake | BotSnake | null; // Target being trapped
-  escapeVector: { x: number; y: number } | null; // Emergency escape direction
-  aggressionLevel: number; // How aggressive the bot is (0-1)
-  decisionCooldown: number; // Prevent too frequent state changes
 }
 
 // Utility function to generate random food colors
@@ -76,152 +61,23 @@ function getRandomFoodColor(): string {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// Bot name generation function
-function generateBotName(): string {
-  const adjectives = [
-    'Quick', 'Silent', 'Deadly', 'Swift', 'Pro', 'Elite', 'Mega', 'Super', 'Dark', 'Red',
-    'Blue', 'Gold', 'Fire', 'Ice', 'Storm', 'Shadow', 'Night', 'Speed', 'Power', 'Cyber',
-    'Neon', 'Wild', 'Epic', 'Rage', 'Steel', 'Venom', 'Ghost', 'Blade', 'Frost', 'Flame'
-  ];
-  
-  const nouns = [
-    'Hunter', 'Slayer', 'Master', 'Legend', 'King', 'Warrior', 'Ninja', 'Dragon', 'Wolf', 'Eagle',
-    'Viper', 'Falcon', 'Tiger', 'Shark', 'Phoenix', 'Reaper', 'Destroyer', 'Champion', 'Beast', 'Demon',
-    'Angel', 'Knight', 'Wizard', 'Samurai', 'Assassin', 'Sniper', 'Pilot', 'Racer', 'Gamer', 'Player'
-  ];
-  
-  const suffixes = ['47', '88', '99', '21', '777', '420', '69', '13', '666', '123', 'X', 'XX', 'Pro', 'YT', 'TTV'];
-  
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-  
-  return `${adjective}${noun}${suffix}`;
-}
-
-// Advanced AI helper functions
-function calculateSafeVector(bot: BotSnake, threats: Array<{x: number, y: number, radius: number}>, 
-                           massTargets: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): number {
-  const vectors: Array<{angle: number, score: number}> = [];
-  const angleStep = Math.PI / 16; // 32 directions to check
-  
-  for (let angle = 0; angle < Math.PI * 2; angle += angleStep) {
-    let score = 100; // Base score
-    
-    // Check for threats in this direction
-    const checkDistance = 150;
-    const checkX = bot.head.x + Math.cos(angle) * checkDistance;
-    const checkY = bot.head.y + Math.sin(angle) * checkDistance;
-    
-    // Penalize directions with threats
-    for (const threat of threats) {
-      const dist = Math.sqrt((checkX - threat.x) ** 2 + (checkY - threat.y) ** 2);
-      if (dist < threat.radius + 50) {
-        score -= 80; // Heavy penalty for danger
-      }
-    }
-    
-    // Reward directions with food clusters
-    for (const food of massTargets) {
-      const dist = Math.sqrt((checkX - food.x) ** 2 + (checkY - food.y) ** 2);
-      if (dist < 100) {
-        score += (food.mass || 1) * 10; // Reward based on food value
-      }
-    }
-    
-    // Avoid map edges
-    const distFromCenter = Math.sqrt((checkX - MAP_CENTER_X) ** 2 + (checkY - MAP_CENTER_Y) ** 2);
-    if (distFromCenter > MAP_RADIUS - 100) {
-      score -= 60; // Penalty for getting too close to edge
-    }
-    
-    vectors.push({angle, score});
-  }
-  
-  // Find best direction
-  const bestVector = vectors.reduce((best, current) => current.score > best.score ? current : best);
-  return bestVector.angle;
-}
-
-function detectTraps(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotSnake[]): boolean {
-  // Check if bot is being surrounded or trapped
-  const surroundingSnakes = [];
-  
-  // Check player snake
-  const playerDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
-  if (playerDist < 200) {
-    surroundingSnakes.push({
-      head: playerSnake.head,
-      angle: playerSnake.currentAngle,
-      mass: playerSnake.totalMass
-    });
-  }
-  
-  // Check other bots
-  for (const otherBot of otherBots) {
-    if (otherBot.id === bot.id) continue;
-    const dist = Math.sqrt((bot.head.x - otherBot.head.x) ** 2 + (bot.head.y - otherBot.head.y) ** 2);
-    if (dist < 200) {
-      surroundingSnakes.push({
-        head: otherBot.head,
-        angle: otherBot.currentAngle,
-        mass: otherBot.totalMass
-      });
-    }
-  }
-  
-  // If surrounded by 2+ larger snakes, it's likely a trap
-  return surroundingSnakes.filter(s => s.mass > bot.totalMass * 0.8).length >= 2;
-}
-
-function findMassClusters(foods: Food[], centerX: number, centerY: number, radius: number): Food[] {
-  // Find high-value food clusters within radius
-  const nearbyFoods = foods.filter(food => {
-    const dist = Math.sqrt((food.x - centerX) ** 2 + (food.y - centerY) ** 2);
-    return dist < radius && (food.mass || 1) > 0.3; // Only consider valuable food
-  });
-  
-  // Sort by value and return top targets
-  return nearbyFoods.sort((a, b) => (b.mass || 1) - (a.mass || 1)).slice(0, 5);
-}
-
-function predictPlayerPath(snake: SmoothSnake): Position {
-  // Predict where player will be in next 0.5 seconds
-  const futureTime = 0.5; // seconds
-  const distance = snake.speed * futureTime * 60; // 60 FPS
-  
-  return {
-    x: snake.head.x + Math.cos(snake.currentAngle) * distance,
-    y: snake.head.y + Math.sin(snake.currentAngle) * distance
-  };
-}
-
-// Enhanced bot creation with advanced AI properties
+// Bot snake utility functions
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 300);
+  const radius = Math.random() * (MAP_RADIUS - 200);
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-  const baseSpeed = 2.0 + Math.random() * 0.5; // Pro-level speed
-  
-  // Assign territory for patrol behavior
-  const territoryAngle = Math.random() * Math.PI * 2;
-  const territoryDistance = 200 + Math.random() * 400;
-  const territoryCenter = {
-    x: MAP_CENTER_X + Math.cos(territoryAngle) * territoryDistance,
-    y: MAP_CENTER_Y + Math.sin(territoryAngle) * territoryDistance
-  };
+  const baseSpeed = 1.8 + Math.random() * 0.8; // Slightly slower than player
   
   return {
     id,
-    name: generateBotName(),
     head: { x, y },
     visibleSegments: [{ x, y, opacity: 1.0 }],
     segmentTrail: [{ x, y }],
-    totalMass: 12 + Math.random() * 18, // Start stronger (12-30 mass)
+    totalMass: 8 + Math.random() * 12, // Start with 8-20 mass
     currentAngle: Math.random() * Math.PI * 2,
     speed: baseSpeed,
     baseSpeed: baseSpeed,
@@ -229,316 +85,191 @@ function createBotSnake(id: string): BotSnake {
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
     targetFood: null,
-    money: 1.00,
-    state: 'patrol', // Start in patrol mode
+    money: 1.00, // All bots start with exactly $1.00
+    state: 'wander',
     isBoosting: false,
     boostTime: 0,
     lastStateChange: Date.now(),
-    aggroTarget: null,
-    // Advanced AI properties
-    angleVelocity: 0,
-    territoryCenter,
-    territoryRadius: 300 + Math.random() * 200,
-    lastRadarScan: 0,
-    radarRange: 500 + Math.random() * 100, // 500-600px detection
-    mistakeChance: 0.05 + Math.random() * 0.05, // 5-10% mistake rate
-    lastMistake: 0,
-    pathfindingTarget: null,
-    trapAttemptTarget: null,
-    escapeVector: null,
-    aggressionLevel: 0.7 + Math.random() * 0.3, // 70-100% aggression
-    decisionCooldown: 0
+    aggroTarget: null
   };
 }
 
 function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): BotSnake {
-  // ✅ EXTREMELY ADVANCED AI - PRO SLITHER.IO LEVEL
+  // Enhanced AI Decision making with aggressive behavior
   const SEGMENT_SPACING = 10;
+  const SEGMENT_RADIUS = 10;
   const currentTime = Date.now();
   
-  // 🎲 Realistic Mistakes (5-10% chance)
-  const shouldMakeMistake = Math.random() < bot.mistakeChance && (currentTime - bot.lastMistake) > 3000;
+
   
-  // 👁️ Virtual Radar Scan (400-600px range)
-  if (currentTime - bot.lastRadarScan > 100) { // Scan every 100ms
-    bot.lastRadarScan = currentTime;
-    
-    // Detect all threats within radar range
-    const threats: Array<{x: number, y: number, radius: number}> = [];
-    
-    // Scan player snake
-    const playerDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
-    if (playerDist < bot.radarRange) {
-      threats.push({ x: playerSnake.head.x, y: playerSnake.head.y, radius: 60 });
-      
-      // Check if player is boosting toward bot
-      const playerPredicted = predictPlayerPath(playerSnake);
-      const playerApproachDist = Math.sqrt((bot.head.x - playerPredicted.x) ** 2 + (bot.head.y - playerPredicted.y) ** 2);
-      if (playerApproachDist < playerDist && playerSnake.isBoosting) {
-        // Player is boosting at bot - emergency escape!
-        bot.escapeVector = {
-          x: bot.head.x - playerSnake.head.x,
-          y: bot.head.y - playerSnake.head.y
-        };
-        bot.state = 'avoid';
+  // Check for nearby threats (less sensitive for more aggressive play)
+  let nearestThreat: { x: number, y: number, distance: number } | null = null;
+  let threatDistance = Infinity;
+  
+  // Check player snake segments for collision avoidance (reduced sensitivity)
+  for (let i = 1; i < playerSnake.visibleSegments.length; i++) { // Skip head (index 0)
+    const segment = playerSnake.visibleSegments[i];
+    const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+    if (dist < 60 && dist < threatDistance) { // Reduced danger zone for more aggressive play
+      threatDistance = dist;
+      nearestThreat = { x: segment.x, y: segment.y, distance: dist };
+    }
+  }
+  
+  // Check other bot snakes for collision avoidance
+  for (const otherBot of otherBots) {
+    if (otherBot.id === bot.id) continue;
+    for (const segment of otherBot.visibleSegments) {
+      const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+      if (dist < 40 && dist < threatDistance) { // Smaller danger zone for other bots
+        threatDistance = dist;
+        nearestThreat = { x: segment.x, y: segment.y, distance: dist };
       }
     }
+  }
+  
+  // Aggressive player hunting behavior
+  const playerHeadDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
+  let shouldHuntPlayer = false;
+  
+  // Hunt player if bot is bigger or player is close and vulnerable
+  if (bot.totalMass > playerSnake.totalMass * 0.8 && playerHeadDist < 200) {
+    shouldHuntPlayer = true;
+  }
+  
+  // Threat avoidance (less sensitive)
+  if (nearestThreat && nearestThreat.distance < 40) { // Reduced avoidance threshold
+    // Calculate escape angle (away from threat)
+    const threatAngle = Math.atan2(nearestThreat.y - bot.head.y, nearestThreat.x - bot.head.x);
+    bot.targetAngle = threatAngle + Math.PI; // Opposite direction
+    bot.lastDirectionChange = currentTime;
     
-    // Scan other bots
-    for (const otherBot of otherBots) {
-      if (otherBot.id === bot.id) continue;
-      const dist = Math.sqrt((bot.head.x - otherBot.head.x) ** 2 + (bot.head.y - otherBot.head.y) ** 2);
-      if (dist < bot.radarRange) {
-        threats.push({ x: otherBot.head.x, y: otherBot.head.y, radius: 50 });
-      }
-    }
-    
-    // 💀 Trap Detection
-    if (detectTraps(bot, playerSnake, otherBots)) {
-      bot.state = 'avoid';
+    // Boost when escaping danger
+    if (bot.totalMass > 4 && !bot.isBoosting && Math.random() < 0.05) {
       bot.isBoosting = true;
       bot.boostTime = currentTime;
     }
+  } else if (shouldHuntPlayer) {
+    // Hunt the player aggressively
+    bot.targetAngle = Math.atan2(playerSnake.head.y - bot.head.y, playerSnake.head.x - bot.head.x);
+    bot.lastDirectionChange = currentTime;
     
-    // 🎯 Strategic Pathfinding
-    const massClusters = findMassClusters(foods, bot.head.x, bot.head.y, 300);
-    if (massClusters.length > 0 && bot.state !== 'avoid' && bot.state !== 'trap') {
-      bot.pathfindingTarget = massClusters[0]; // Go for highest value cluster
-      bot.state = 'foodHunt';
+    // Boost when hunting if close enough
+    if (playerHeadDist < 100 && bot.totalMass > 6 && !bot.isBoosting && Math.random() < 0.03) {
+      bot.isBoosting = true;
+      bot.boostTime = currentTime;
+    }
+  } else {
+    // Find food strategically (avoid big test food, prefer money crates)
+    if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 150) {
+      let bestFood: Food | null = null;
+      let bestScore = -1;
+      
+      foods.forEach(food => {
+        // Skip big test food (size 20, mass 25)
+        if (food.mass === 25) return;
+        
+        const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+        
+        // Prioritize money crates highly, then regular food
+        let foodValue = 1;
+        if (food.type === 'money') {
+          foodValue = (food.value || 0) * 15; // High priority for money
+        } else {
+          foodValue = food.mass || 1;
+        }
+        
+        const score = foodValue / (dist + 1);
+        
+        if (score > bestScore && dist < 250) {
+          bestScore = score;
+          bestFood = food;
+        }
+      });
+      
+      bot.targetFood = bestFood;
     }
     
-    // 💀 Aggression Mode (When Bigger)
-    let potentialVictim: SmoothSnake | BotSnake | null = null;
-    
-    // Check if bot can dominate player
-    if (bot.totalMass > playerSnake.totalMass * 1.2 && playerDist < 250) {
-      potentialVictim = playerSnake;
-    }
-    
-    // Check other bots for victims
-    for (const otherBot of otherBots) {
-      if (otherBot.id === bot.id) continue;
-      const dist = Math.sqrt((bot.head.x - otherBot.head.x) ** 2 + (bot.head.y - otherBot.head.y) ** 2);
-      if (bot.totalMass > otherBot.totalMass * 1.3 && dist < 200) {
-        potentialVictim = otherBot;
-        break;
+    // Movement toward food
+    if (bot.targetFood) {
+      const dx = bot.targetFood.x - bot.head.x;
+      const dy = bot.targetFood.y - bot.head.y;
+      bot.targetAngle = Math.atan2(dy, dx);
+      
+      // Boost toward valuable food
+      const distToFood = Math.sqrt(dx * dx + dy * dy);
+      if (bot.targetFood.type === 'money' && distToFood < 120 && bot.totalMass > 5 && !bot.isBoosting && Math.random() < 0.02) {
+        bot.isBoosting = true;
+        bot.boostTime = currentTime;
+      }
+    } else {
+      // Less circular movement - more direct exploration
+      if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
+        const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
+        if (distFromCenter > MAP_RADIUS * 0.6) {
+          // Move toward center when near edges
+          const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+          bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
+        } else {
+          // Random but more purposeful movement
+          bot.targetAngle = Math.random() * Math.PI * 2;
+        }
+        bot.lastDirectionChange = currentTime;
       }
     }
-    
-    if (potentialVictim && bot.aggressionLevel > 0.6) {
-      bot.state = 'trap';
-      bot.trapAttemptTarget = potentialVictim;
-    }
   }
   
-  // Prevent too frequent state changes
-  if (currentTime - bot.decisionCooldown < 200) {
-    // Keep current behavior for stability
-  } else {
-    bot.decisionCooldown = currentTime;
-    
-    // 🧠 ADVANCED DECISION MAKING
-    switch (bot.state) {
-      case 'avoid':
-        // Emergency escape with counter-boost
-        if (bot.escapeVector) {
-          const magnitude = Math.sqrt(bot.escapeVector.x ** 2 + bot.escapeVector.y ** 2);
-          if (magnitude > 0) {
-            bot.targetAngle = Math.atan2(bot.escapeVector.y, bot.escapeVector.x);
-            bot.isBoosting = true;
-            bot.boostTime = currentTime;
-          }
-        } else {
-          // Calculate safe vector using strategic pathfinding
-          const threats: Array<{x: number, y: number, radius: number}> = [];
-          threats.push({ x: playerSnake.head.x, y: playerSnake.head.y, radius: 80 });
-          bot.targetAngle = calculateSafeVector(bot, threats, foods, playerSnake, otherBots);
-        }
-        
-        // Reset avoid state after escape
-        if (currentTime - bot.lastStateChange > 2000) {
-          bot.state = 'patrol';
-          bot.escapeVector = null;
-          bot.lastStateChange = currentTime;
-        }
-        break;
-        
-      case 'trap':
-        // Advanced trapping behavior - circle and corner
-        if (bot.trapAttemptTarget) {
-          const target = bot.trapAttemptTarget;
-          const targetDist = Math.sqrt((bot.head.x - target.head.x) ** 2 + (bot.head.y - target.head.y) ** 2);
-          
-          if (targetDist < 150) {
-            // Close enough to attempt trap - circle around target
-            const angleToTarget = Math.atan2(target.head.y - bot.head.y, target.head.x - bot.head.x);
-            
-            // Calculate circular path around target
-            const circleAngle = angleToTarget + Math.PI / 2; // Perpendicular for circling
-            bot.targetAngle = circleAngle;
-            
-            // Use boost to close distance and trap
-            if (targetDist > 60 && bot.totalMass > 8) {
-              bot.isBoosting = true;
-              bot.boostTime = currentTime;
-            }
-          } else {
-            // Move toward target to get in trapping range
-            bot.targetAngle = Math.atan2(target.head.y - bot.head.y, target.head.x - bot.head.x);
-          }
-        }
-        
-        // Exit trap mode if target too far or too long
-        if (currentTime - bot.lastStateChange > 10000) {
-          bot.state = 'patrol';
-          bot.trapAttemptTarget = null;
-          bot.lastStateChange = currentTime;
-        }
-        break;
-        
-      case 'foodHunt':
-        // Strategic food hunting with cluster targeting
-        if (bot.pathfindingTarget) {
-          const target = bot.pathfindingTarget;
-          const targetDist = Math.sqrt((bot.head.x - target.x) ** 2 + (bot.head.y - target.y) ** 2);
-          
-          if (targetDist < 30) {
-            // Reached target, find next cluster
-            bot.pathfindingTarget = null;
-            bot.state = 'patrol';
-            bot.lastStateChange = currentTime;
-          } else {
-            // Move strategically toward food cluster
-            bot.targetAngle = Math.atan2(target.y - bot.head.y, target.x - bot.head.x);
-            
-            // Boost for valuable food
-            if ((target.mass || 1) > 0.5 && bot.totalMass > 6) {
-              bot.isBoosting = true;
-              bot.boostTime = currentTime;
-            }
-          }
-        } else {
-          bot.state = 'patrol';
-          bot.lastStateChange = currentTime;
-        }
-        break;
-        
-      case 'patrol':
-      default:
-        // 🔁 Area Holding and Looping Behavior
-        const territoryDist = Math.sqrt(
-          (bot.head.x - bot.territoryCenter.x) ** 2 + 
-          (bot.head.y - bot.territoryCenter.y) ** 2
-        );
-        
-        if (territoryDist > bot.territoryRadius) {
-          // Return to territory
-          bot.targetAngle = Math.atan2(
-            bot.territoryCenter.y - bot.head.y, 
-            bot.territoryCenter.x - bot.head.x
-          );
-        } else {
-          // Patrol within territory with personality
-          if (currentTime - bot.lastDirectionChange > 3000 + Math.random() * 2000) {
-            // Switch zones periodically for dynamic behavior
-            if (Math.random() < 0.1) { // 10% chance to switch territory
-              const newAngle = Math.random() * Math.PI * 2;
-              const newDistance = 200 + Math.random() * 400;
-              bot.territoryCenter = {
-                x: MAP_CENTER_X + Math.cos(newAngle) * newDistance,
-                y: MAP_CENTER_Y + Math.sin(newAngle) * newDistance
-              };
-            }
-            
-            // Random patrol direction within territory
-            bot.targetAngle = Math.random() * Math.PI * 2;
-            bot.lastDirectionChange = currentTime;
-          }
-        }
-        break;
-    }
-  }
-  
-  // 🎲 Apply Realistic Mistakes
-  if (shouldMakeMistake) {
-    bot.lastMistake = currentTime;
-    // Random mistake: wrong direction, hesitation, or delayed reaction
-    const mistakeType = Math.random();
-    if (mistakeType < 0.4) {
-      // Wrong direction
-      bot.targetAngle += (Math.random() - 0.5) * Math.PI;
-    } else if (mistakeType < 0.7) {
-      // Hesitation - reduce turn speed
-      bot.angleVelocity *= 0.3;
-    } else {
-      // Delayed reaction - stick with current angle
-      bot.targetAngle = bot.currentAngle;
-    }
-  }
-  
-  // ➿ Smooth Turning with Angle Velocity (Human-like)
+  // Smooth angle interpolation
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
   
-  // Advanced turning with velocity
-  const maxTurnSpeed = bot.isBoosting ? 0.08 : 0.05; // Faster when boosting
-  const acceleration = 0.02;
-  
-  // Apply acceleration to angle velocity
-  if (Math.abs(angleDiff) > 0.1) {
-    bot.angleVelocity += Math.sign(angleDiff) * acceleration;
-    bot.angleVelocity = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, bot.angleVelocity));
-  } else {
-    bot.angleVelocity *= 0.9; // Decelerate when close to target
-  }
-  
-  bot.currentAngle += bot.angleVelocity;
+  // Faster turning for more responsive movement
+  const turnSpeed = bot.isBoosting ? 0.06 : 0.04; // Faster turning when boosting
+  bot.currentAngle += angleDiff * turnSpeed;
   
   // Keep angle in range
   if (bot.currentAngle > Math.PI) bot.currentAngle -= 2 * Math.PI;
   if (bot.currentAngle < -Math.PI) bot.currentAngle += 2 * Math.PI;
   
-  // ⚙️ Avoidance Heuristics - Always avoid dangerous situations
-  const mapDistFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (mapDistFromCenter > MAP_RADIUS - 80) {
-    // Emergency map boundary avoidance
-    const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-    bot.targetAngle = angleToCenter;
-    bot.isBoosting = true; // Boost away from death zone
-    bot.boostTime = currentTime;
-  }
-  
   // Update boost state timing
-  if (bot.isBoosting && currentTime - bot.boostTime > 1500) { // Longer boost duration for pro play
+  if (bot.isBoosting && currentTime - bot.boostTime > 1200) {
     bot.isBoosting = false;
   }
   
-  // Calculate pro-level speed
+  // Calculate speed with boosting
   let currentSpeed = bot.baseSpeed;
   if (bot.isBoosting && bot.totalMass > 4) {
-    currentSpeed *= 2.0; // Higher boost multiplier for pro speed
-    bot.totalMass -= 0.025; // Slightly less mass loss for efficiency
+    currentSpeed *= 1.8; // Boost multiplier
+    // Lose mass when boosting (like player)
+    bot.totalMass -= 0.03;
     if (bot.totalMass < 4) {
-      bot.isBoosting = false;
+      bot.isBoosting = false; // Stop boosting if too small
     }
   }
   
-  // Move bot with smooth physics
+  // Move bot
   const dx = Math.cos(bot.currentAngle) * currentSpeed;
   const dy = Math.sin(bot.currentAngle) * currentSpeed;
   
   bot.head.x += dx;
   bot.head.y += dy;
   
-  // Update trail and segments (enhanced for pro movement)
+  // Keep bot within circular map bounds
+  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
+  if (distFromCenter > MAP_RADIUS - 50) {
+    const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+    bot.targetAngle = angleToCenter;
+  }
+  
+  // Update trail
   bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
-  const maxTrailLength = Math.floor((bot.totalMass / 1) * SEGMENT_SPACING * 2.5); // Longer trail for pro bots
+  const maxTrailLength = Math.floor((bot.totalMass / 1) * SEGMENT_SPACING * 2);
   if (bot.segmentTrail.length > maxTrailLength) {
     bot.segmentTrail.length = maxTrailLength;
   }
   
-  // Update visible segments with pro precision
+  // Update visible segments
   bot.visibleSegments = [];
   let distanceSoFar = 0;
   let segmentIndex = 0;
@@ -1012,39 +743,6 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newCrates]);
   };
 
-  // Function to drop money crates when bots die (exactly 20 crates worth $0.05 each)
-  const dropBotMoneyCrates = (bot: BotSnake) => {
-    const currentTime = Date.now();
-    const newCrates: Food[] = [];
-    const cratesCount = 20; // Always drop exactly 20 crates
-    const moneyPerCrate = 0.05; // Each crate worth $0.05
-    
-    // Spread crates around bot's death location
-    for (let i = 0; i < cratesCount; i++) {
-      const angle = (i / cratesCount) * Math.PI * 2 + Math.random() * 0.3; // Slight randomness
-      const radius = 20 + Math.random() * 60; // Random radius from 20-80 pixels
-      const x = bot.head.x + Math.cos(angle) * radius;
-      const y = bot.head.y + Math.sin(angle) * radius;
-      
-      // Make sure crates stay within map bounds
-      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
-      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
-      
-      newCrates.push({
-        x: clampedX,
-        y: clampedY,
-        size: 20, // 20x20 crate size
-        mass: 1, // Each crate worth 1 mass
-        color: '#00ff00', // Green color for money crates
-        type: 'money',
-        value: moneyPerCrate, // Each crate worth $0.05
-        spawnTime: currentTime
-      });
-    }
-    
-    setFoods(prevFoods => [...prevFoods, ...newCrates]);
-  };
-
 
 
   // Load background image
@@ -1124,8 +822,10 @@ export default function GamePage() {
 
 
 
-  // Initialize food with mass system
+  // Initialize food with mass system - only after loading is complete
   useEffect(() => {
+    if (!gameStarted) return; // Don't initialize until loading is complete
+    
     const initialFoods: Food[] = [];
     for (let i = 0; i < FOOD_COUNT; i++) {
       // Generate food within circular boundary
@@ -1185,7 +885,7 @@ export default function GamePage() {
       initialBots.push(createBotSnake(`bot_${i}`));
     }
     setBotSnakes(initialBots);
-  }, []);
+  }, [gameStarted]);
 
   // Mouse tracking
   useEffect(() => {
@@ -1273,7 +973,7 @@ export default function GamePage() {
 
   // Game loop
   useEffect(() => {
-    if (gameOver) return;
+    if (gameOver || !gameStarted) return; // Don't start game loop until loading is complete
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1478,8 +1178,14 @@ export default function GamePage() {
           // Bot snake also dies
           dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
           
-          // Drop money crates for bot death using new system
-          dropBotMoneyCrates(bot);
+          // Drop money crates for bot death too
+          const originalSegments = snake.visibleSegments;
+          const originalMoney = snake.money;
+          snake.visibleSegments = bot.visibleSegments;
+          snake.money = bot.money; // Use bot's money value
+          dropMoneyCrates();
+          snake.visibleSegments = originalSegments;
+          snake.money = originalMoney; // Restore player money
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1510,8 +1216,15 @@ export default function GamePage() {
             // Player killed a bot - drop food and money squares
             dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
             
-            // Drop money crates when bot dies using new system
-            dropBotMoneyCrates(bot);
+            // Drop money crates when bot dies - use bot's actual money value
+            // Create temporary function call for bot death
+            const originalSegments = snake.visibleSegments;
+            const originalMoney = snake.money;
+            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
+            snake.money = bot.money; // Use bot's money value
+            dropMoneyCrates();
+            snake.visibleSegments = originalSegments; // Restore player segments
+            snake.money = originalMoney; // Restore player money
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1935,33 +1648,24 @@ export default function GamePage() {
           ctx.restore();
         }
         
-        // Draw bot name and money balance above bot head
+        // Draw money balance above bot head
         if (bot.visibleSegments.length > 0) {
           const head = bot.visibleSegments[0];
           const moneyText = `$${bot.money.toFixed(2)}`;
           
-          // Calculate text positions above head
-          const nameY = head.y - botRadius - 45; // Bot name position
-          const moneyY = head.y - botRadius - 25; // Money position below name
+          // Calculate text position above head
+          const textY = head.y - botRadius - 25; // Position above the bot
           
           // Set text style with retro font and custom outline color
-          ctx.font = `${Math.max(8, Math.floor(6 * botScaleFactor))}px 'Press Start 2P', monospace`; // Smaller font for name
+          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
           ctx.textAlign = 'center';
           ctx.fillStyle = 'white';
           ctx.strokeStyle = '#134242';
-          ctx.lineWidth = 2;
-          
-          // Draw bot name with outline for visibility
-          ctx.strokeText(bot.name, head.x, nameY);
-          ctx.fillText(bot.name, head.x, nameY);
-          
-          // Draw money balance with slightly larger font
-          ctx.font = `${Math.max(10, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
           ctx.lineWidth = 3;
           
-          // Draw money text with outline for visibility
-          ctx.strokeText(moneyText, head.x, moneyY);
-          ctx.fillText(moneyText, head.x, moneyY);
+          // Draw text with outline for visibility
+          ctx.strokeText(moneyText, head.x, textY);
+          ctx.fillText(moneyText, head.x, textY);
         }
       });
       
@@ -2140,7 +1844,7 @@ export default function GamePage() {
       cancelAnimationFrame(animationId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt, gameStarted]);
 
   const resetGame = () => {
     setGameOver(false);
@@ -2174,12 +1878,11 @@ export default function GamePage() {
   };
 
   return (
-    <MultiplayerLayer enableMultiplayer={true}>
-      <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-        {/* Loading Screen */}
-        {isLoading && <LoadingScreen onLoadingComplete={handleLoadingComplete} />}
-        
-        {/* Minimap */}
+    <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
+      {/* Loading Screen */}
+      {isLoading && <LoadingScreen onLoadingComplete={handleLoadingComplete} />}
+      
+      {/* Minimap */}
       <div className="absolute top-4 left-4 z-10">
         <svg width="96" height="96" className="w-full h-full">
           {/* Map boundary circle */}
@@ -2310,14 +2013,13 @@ export default function GamePage() {
         </div>
       )}
       
-        <canvas
-          ref={canvasRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
-          className="cursor-default block"
-          style={{ background: '#15161b' }}
-        />
-      </div>
-    </MultiplayerLayer>
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        className="cursor-default block"
+        style={{ background: '#15161b' }}
+      />
+    </div>
   );
 }

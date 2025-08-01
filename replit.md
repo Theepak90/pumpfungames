@@ -10,7 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Home Screen Snake Improvements (Latest)
+### Multiplayer WebSocket System Implementation (Latest)
+- **Regional server selection**: Auto-detects user region (EU/US) using timezone and browser locale
+- **WebSocket game server**: Complete multiplayer infrastructure with room management (5 players max per room)
+- **Real-time synchronization**: Player positions, movements, boosts, deaths, and food collection
+- **Load balancing**: Automatic room assignment to least-full servers in user's region
+- **Region selector UI**: Manual region selection with server status, player counts, and ping indicators
+- **Scalable architecture**: Supports multiple game rooms per region with automatic cleanup
+- **Connection management**: Automatic reconnection with exponential backoff and error handling
+
+### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance
 - **Enhanced food attraction**: Increased gravitational pull from 0.3 to 1.8 (6x stronger) for very dynamic interaction
 - **Consistent visuals**: Home screen snake now identical to in-game snake with proper segment spacing
@@ -18,9 +27,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Loading Screen System
 - **Retro loading screen**: Dark background (#15161b) with "SNAKE ARENA" title in Press Start 2P font
-- **Progressive loading**: Shows loading steps (initializing, assets, spawning snakes, preparing arena)
-- **Visual progress bar**: Green gradient progress bar with percentage indicator
-- **Game initialization**: Loading screen appears when entering game, then starts gameplay
+- **Fixed progress bar**: Now properly reaches 100% with defined stages (20%, 40%, 70%, 90%, 100%)
+- **Proper initialization**: Game elements (food, bots, game loop) only spawn after loading completes
+- **Smooth progression**: Eliminates jittering between 40-60% with stable step progression
 - **Applied to both modes**: Both single-player (/game8999) and multiplayer (/multiplayer) versions
 
 ### Clean UI Overhaul
@@ -31,25 +40,22 @@ Preferred communication style: Simple, everyday language.
 - **Minimal interface**: Games now have clean canvas-only display with essential minimap and controls
 
 ### Dual Game System
-- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with real-time multiplayer
+- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with regional WebSocket servers
 - **Private Single-player**: Secret URL `/game8999` with password `secretserveradd119988` for bot-based gameplay
-- WebSocket-based multiplayer server with real-time player synchronization
-- Separate game modes: multiplayer (no bots, real players) vs single-player (AI bots)
+- **Regional multiplayer**: Auto-detects US/EU regions with manual override option
+- **Room-based gameplay**: Maximum 5 players per room with automatic load balancing
+- **Real-time synchronization**: WebSocket communication for all game events
 - Session-based access control for private game using sessionStorage
 
-### Extremely Advanced AI Bot System (Pro Slither.io Level)
-- **Strategic Pathfinding**: Bots constantly scan for mass clusters, threats, and barriers with 32-direction vector analysis
-- **Virtual Radar System**: 400-600px detection range with real-time threat assessment every 100ms
-- **Advanced State Machine**: patrol, foodHunt, avoid, trap, aggro modes with intelligent state transitions
-- **Trap Detection & Avoidance**: Bots recognize and escape coordinated trap attempts by multiple players
-- **Aggressive Trapping**: When larger, bots circle and corner smaller snakes using advanced geometry
-- **Smooth Turning Physics**: Angle velocity system with acceleration for human-like but optimal movement
-- **Realistic Mistakes**: 5-10% mistake rate including wrong directions, hesitation, and delayed reactions
-- **Territory Control**: Each bot patrols assigned zones and switches areas dynamically for personality
-- **Predictive AI**: Bots predict player paths 0.5 seconds ahead and intercept boost attacks
-- **Emergency Systems**: Instant counter-boost when players boost toward bots, map boundary escape protocols
-- **Pro-Level Speed**: 2.0x boost multiplier with optimized mass loss for competitive gameplay
-- **Field Awareness**: Comprehensive collision avoidance with enhanced visual range and threat prioritization
+### Enhanced Bot AI System
+- State-based AI with wander, foodHunt, avoid, and aggro behaviors
+- Bots start with exactly $1.00 and only increase money through crate collection
+- Bots avoid big orange test food but actively hunt regular food and money crates
+- Aggressive player hunting when bots are larger than player
+- Strategic boosting for escaping, hunting, and collecting valuable items
+- Reduced dodging sensitivity for more aggressive gameplay
+- Shadows like player snake when not boosting, white outline only when boosting
+- Realistic movement patterns instead of circular wandering
 
 ### Money Balance System
 - Added money balance display above snake head starting at $1.00
