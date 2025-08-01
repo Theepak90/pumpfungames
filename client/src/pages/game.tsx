@@ -895,38 +895,70 @@ export default function GamePage() {
     setBotSnakes(initialBots);
   }, [gameStarted]);
 
-  // Multiplayer simulation (placeholder until WebSocket is ready)
+  // WebSocket connection for real multiplayer
   useEffect(() => {
     if (!gameStarted) return;
+
+    console.log("Connecting to multiplayer server...");
     
-    setConnectionStatus('Single Player Mode');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
     
-    // Add some demo players to show how multiplayer would work
-    const demoPlayers = [
-      {
-        id: 'demo1',
-        segments: [
-          { x: MAP_CENTER_X + 200, y: MAP_CENTER_Y + 100 },
-          { x: MAP_CENTER_X + 190, y: MAP_CENTER_Y + 100 },
-          { x: MAP_CENTER_X + 180, y: MAP_CENTER_Y + 100 }
-        ],
-        color: '#4ecdc4',
-        money: 2.50
-      },
-      {
-        id: 'demo2', 
-        segments: [
-          { x: MAP_CENTER_X - 150, y: MAP_CENTER_Y - 80 },
-          { x: MAP_CENTER_X - 140, y: MAP_CENTER_Y - 80 },
-          { x: MAP_CENTER_X - 130, y: MAP_CENTER_Y - 80 }
-        ],
-        color: '#ff6b6b',
-        money: 1.75
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      console.log("Connected to multiplayer server!");
+      setConnectionStatus('Connected');
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'players') {
+          // Filter out our own player data and update others
+          setOtherPlayers(data.players.filter((p: any) => p.segments.length > 0));
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
-    ];
-    
-    setOtherPlayers(demoPlayers);
+    };
+
+    socket.onclose = () => {
+      console.log("Disconnected from multiplayer server");
+      setConnectionStatus('Disconnected');
+      wsRef.current = null;
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionStatus('Connection Error');
+    };
+
+    return () => {
+      if (socket) {
+        socket.close();
+      }
+    };
   }, [gameStarted]);
+
+  // Send player data to server
+  useEffect(() => {
+    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    const sendInterval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'update',
+          segments: snake.visibleSegments.map(seg => ({ x: seg.x, y: seg.y })),
+          color: '#d55400',
+          money: snake.money
+        }));
+      }
+    }, 100); // Send updates every 100ms
+
+    return () => clearInterval(sendInterval);
+  }, [gameStarted, snake]);
 
   // Mouse tracking
   useEffect(() => {

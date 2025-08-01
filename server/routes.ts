@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import {
   insertUserSchema,
@@ -92,18 +93,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameData = insertGameSchema.parse(req.body);
       const game = await storage.createGame(gameData);
-      
-      // Initialize game state with larger world for slither.io style
-      const gameState: GameState = {
-        id: game.id,
-        players: [],
-        food: generateFood(100, { width: 4000, height: 4000 }), // Much larger world
-        gameArea: { width: 4000, height: 4000 },
-        status: 'waiting',
-        betAmount: parseFloat(game.betAmount)
-      };
-      
-      await storage.updateGameState(game.id, gameState);
       res.json(game);
     } catch (error) {
       res.status(400).json({ message: "Invalid game data" });
@@ -170,30 +159,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket handling now managed by NewGameServer
 
-  // Region and server selection API
-  app.get("/api/regions", (req, res) => {
-    const regions = RegionManager.getRegions();
-    res.json({ regions });
-  });
-
-  app.get("/api/regions/best", (req, res) => {
-    const bestRegion = RegionManager.getBestRegion();
-    res.json({ region: bestRegion });
-  });
-
-  app.post("/api/regions/select", (req, res) => {
-    const { regionId } = req.body;
-    const region = RegionManager.getRegion(regionId);
-    
-    if (!region) {
-      return res.status(400).json({ message: "Invalid region" });
-    }
-
+  // Simple health check for multiplayer
+  app.get("/api/multiplayer/status", (req, res) => {
     res.json({ 
-      region,
-      endpoint: RegionManager.getRegionEndpoint(regionId)
+      status: 'active',
+      timestamp: Date.now()
     });
   });
+
+  // WebSocket server for multiplayer on /ws path
+  const wss = new WebSocketServer({ 
+    server: httpServer,
+    path: '/ws'
+  });
+
+  const activePlayers = new Map();
+
+  wss.on("connection", function connection(ws: any) {
+    const playerId = `player_${Date.now()}_${Math.random()}`;
+    console.log(`Player ${playerId} joined multiplayer. Active: ${wss.clients.size}`);
+    
+    ws.playerId = playerId;
+    activePlayers.set(playerId, {
+      id: playerId,
+      segments: [],
+      color: '#d55400',
+      money: 1.00,
+      lastUpdate: Date.now()
+    });
+
+    // Send current players to new player
+    ws.send(JSON.stringify({
+      type: 'players',
+      players: Array.from(activePlayers.values())
+    }));
+
+    ws.on("message", function incoming(message: any) {
+      try {
+        const data = JSON.parse(message.toString());
+        if (data.type === 'update') {
+          // Update player data
+          activePlayers.set(playerId, {
+            id: playerId,
+            segments: data.segments || [],
+            color: data.color || '#d55400',
+            money: data.money || 1.00,
+            lastUpdate: Date.now()
+          });
+        }
+      } catch (error) {
+        console.error("WebSocket message error:", error);
+      }
+    });
+
+    ws.on("close", () => {
+      console.log(`Player ${playerId} left multiplayer. Remaining: ${wss.clients.size - 1}`);
+      activePlayers.delete(playerId);
+    });
+
+    ws.on("error", (error: any) => {
+      console.error("WebSocket error:", error);
+      activePlayers.delete(playerId);
+    });
+  });
+
+  // Broadcast game state every 100ms
+  setInterval(() => {
+    if (wss.clients.size > 0) {
+      const playerList = Array.from(activePlayers.values());
+      const message = JSON.stringify({
+        type: 'players',
+        players: playerList
+      });
+      
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          try {
+            client.send(message);
+          } catch (error) {
+            console.error('Broadcast error:', error);
+          }
+        }
+      });
+    }
+  }, 100);
 
   return httpServer;
 }
