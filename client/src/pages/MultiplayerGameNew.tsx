@@ -31,6 +31,7 @@ export default function MultiplayerGameNew() {
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [multiplayerPlayers, setMultiplayerPlayers] = useState<Map<string, MultiplayerPlayer>>(new Map());
   const [multiplayerFoods, setMultiplayerFoods] = useState<Map<string, MultiplayerFood>>(new Map());
+  const [localFoods, setLocalFoods] = useState<MultiplayerFood[]>([]);
   const [localPlayer] = useState(() => new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y));
   const [isBoosting, setIsBoosting] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -210,7 +211,9 @@ export default function MultiplayerGameNew() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(true);
         localPlayer.setBoost(true);
-        wsClient.sendPlayerBoost(true);
+        if (wsClient.isConnected()) {
+          wsClient.sendPlayerBoost(true);
+        }
       }
     };
 
@@ -218,7 +221,9 @@ export default function MultiplayerGameNew() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(false);
         localPlayer.setBoost(false);
-        wsClient.sendPlayerBoost(false);
+        if (wsClient.isConnected()) {
+          wsClient.sendPlayerBoost(false);
+        }
       }
     };
 
@@ -226,7 +231,9 @@ export default function MultiplayerGameNew() {
       if (e.button === 0) { // Left click
         setIsBoosting(true);
         localPlayer.setBoost(true);
-        wsClient.sendPlayerBoost(true);
+        if (wsClient.isConnected()) {
+          wsClient.sendPlayerBoost(true);
+        }
       }
     };
 
@@ -234,7 +241,9 @@ export default function MultiplayerGameNew() {
       if (e.button === 0) { // Left click
         setIsBoosting(false);
         localPlayer.setBoost(false);
-        wsClient.sendPlayerBoost(false);
+        if (wsClient.isConnected()) {
+          wsClient.sendPlayerBoost(false);
+        }
       }
     };
 
@@ -264,19 +273,71 @@ export default function MultiplayerGameNew() {
     let animationId: number;
 
     const gameLoop = () => {
-      // Move local player
+      // Always move local player regardless of connection status
       localPlayer.move(mouseDirection.x, mouseDirection.y, () => {});
 
-      // Send player update to server
-      wsClient.sendPlayerMove({
-        x: localPlayer.head.x,
-        y: localPlayer.head.y,
-        angle: localPlayer.currentAngle,
-        mass: localPlayer.totalMass,
-        money: localPlayer.money,
-        segments: localPlayer.visibleSegments,
-        isBoosting: localPlayer.isBoosting
+      // Check food collisions manually
+      const allFoods = wsClient.isConnected() ? 
+        Array.from(multiplayerFoods.values()) : 
+        localFoods;
+
+      const collisionRadius = 15;
+      const head = localPlayer.head;
+
+      allFoods.forEach((food, index) => {
+        const distance = Math.sqrt(
+          (head.x - food.x) ** 2 + (head.y - food.y) ** 2
+        );
+
+        if (distance < collisionRadius) {
+          // Consume food
+          localPlayer.grow(food.mass);
+          if (food.type === 'money' && food.value) {
+            localPlayer.addMoney(food.value);
+          }
+
+          if (wsClient.isConnected()) {
+            // Remove from multiplayer foods and notify server
+            wsClient.sendFoodEaten(food.id);
+          } else {
+            // Remove from local foods and regenerate
+            setLocalFoods(prev => {
+              const newFoods = [...prev];
+              newFoods.splice(index, 1);
+              
+              // Add a new food to maintain count
+              const angle = Math.random() * Math.PI * 2;
+              const radius = Math.random() * (MAP_RADIUS - 100);
+              const x = MAP_CENTER_X + Math.cos(angle) * radius;
+              const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+              
+              newFoods.push({
+                id: `local_food_${Date.now()}_${Math.random()}`,
+                x, y,
+                size: 4,
+                mass: 0.2,
+                color: '#45b7d1',
+                type: 'normal'
+              });
+              
+              return newFoods;
+            });
+          }
+        }
       });
+
+      // Send player update to server only if connected
+      if (wsClient.isConnected()) {
+        wsClient.sendPlayerMove({
+          x: localPlayer.head.x,
+          y: localPlayer.head.y,
+          angle: localPlayer.currentAngle,
+          mass: localPlayer.totalMass,
+          money: localPlayer.money,
+          segments: localPlayer.visibleSegments,
+          isBoosting: localPlayer.isBoosting
+        });
+      }
 
       // Check boundary collision
       const distanceFromCenter = Math.sqrt(
@@ -284,13 +345,15 @@ export default function MultiplayerGameNew() {
       );
       
       if (distanceFromCenter > MAP_RADIUS) {
-        wsClient.sendPlayerDeath({
-          x: localPlayer.head.x,
-          y: localPlayer.head.y,
-          mass: localPlayer.totalMass,
-          money: localPlayer.money,
-          segments: localPlayer.visibleSegments
-        });
+        if (wsClient.isConnected()) {
+          wsClient.sendPlayerDeath({
+            x: localPlayer.head.x,
+            y: localPlayer.head.y,
+            mass: localPlayer.totalMass,
+            money: localPlayer.money,
+            segments: localPlayer.visibleSegments
+          });
+        }
         setGameOver(true);
         return;
       }
@@ -331,14 +394,18 @@ export default function MultiplayerGameNew() {
     }
 
     // Draw circular boundary
-    ctx.strokeStyle = '#ff4444';
+    ctx.strokeStyle = '#333333';
     ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Draw multiplayer foods
-    Array.from(multiplayerFoods.values()).forEach(food => {
+    // Draw foods (multiplayer or local)
+    const foodsToRender = wsClient.isConnected() ? 
+      Array.from(multiplayerFoods.values()) : 
+      localFoods;
+
+    foodsToRender.forEach(food => {
       if (food.type === 'money') {
         // Draw money crates
         const time = Date.now() * 0.003;
@@ -398,39 +465,41 @@ export default function MultiplayerGameNew() {
       }
     });
 
-    // Draw local player
-    const scaleFactor = localPlayer.getScaleFactor();
-    const segmentRadius = 8 * scaleFactor;
+    // Draw local player (ensure it's always visible)
+    if (localPlayer.visibleSegments && localPlayer.visibleSegments.length > 0) {
+      const scaleFactor = localPlayer.getScaleFactor();
+      const segmentRadius = 8 * scaleFactor;
 
-    // Player outline when boosting
-    if (localPlayer.isBoosting) {
-      ctx.fillStyle = "white";
+      // Player outline when boosting
+      if (localPlayer.isBoosting) {
+        ctx.fillStyle = "white";
+        localPlayer.visibleSegments.forEach(segment => {
+          ctx.globalAlpha = segment.opacity || 1.0;
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // Player body with shadow
+      ctx.save();
+      if (!localPlayer.isBoosting) {
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+      }
+
+      ctx.fillStyle = '#d55400';
       localPlayer.visibleSegments.forEach(segment => {
-        ctx.globalAlpha = segment.opacity;
+        ctx.globalAlpha = segment.opacity || 1.0;
         ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
+        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
         ctx.fill();
       });
+      ctx.restore();
+      ctx.globalAlpha = 1.0;
     }
-
-    // Player body with shadow
-    ctx.save();
-    if (!localPlayer.isBoosting) {
-      ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-    }
-
-    ctx.fillStyle = '#d55400';
-    localPlayer.visibleSegments.forEach(segment => {
-      ctx.globalAlpha = segment.opacity;
-      ctx.beginPath();
-      ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.restore();
-    ctx.globalAlpha = 1.0;
 
     // Draw local player money
     if (localPlayer.visibleSegments.length > 0) {
@@ -509,19 +578,83 @@ export default function MultiplayerGameNew() {
 
   const handleJoinGame = useCallback(async () => {
     setIsLoading(true);
+    setShowRegionSelector(false);
+    setGameStarted(true);
+    
+    // Start game even if connection fails
     const connected = await wsClient.connect();
     if (connected) {
       setConnectionStatus('connected');
     } else {
       setConnectionStatus('error');
+      console.log('Playing in offline mode - multiplayer features disabled');
     }
     setIsLoading(false);
   }, [wsClient]);
 
+  // Generate local foods for offline play
+  const generateLocalFoods = useCallback(() => {
+    const foods: MultiplayerFood[] = [];
+    const FOOD_COUNT = 200;
+
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (MAP_RADIUS - 100);
+      const x = MAP_CENTER_X + Math.cos(angle) * radius;
+      const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+
+      const foodType = Math.random();
+      let food: MultiplayerFood;
+
+      if (foodType < 0.05) {
+        food = {
+          id: `local_food_${i}_${Date.now()}`,
+          x, y,
+          size: 20,
+          mass: 25,
+          color: '#ff8c00',
+          type: 'normal'
+        };
+      } else if (foodType < 0.15) {
+        food = {
+          id: `local_food_${i}_${Date.now()}`,
+          x, y,
+          size: 10,
+          mass: 0.8,
+          color: '#4ecdc4',
+          type: 'normal'
+        };
+      } else if (foodType < 0.50) {
+        food = {
+          id: `local_food_${i}_${Date.now()}`,
+          x, y,
+          size: 6,
+          mass: 0.4,
+          color: '#ff6b6b',
+          type: 'normal'
+        };
+      } else {
+        food = {
+          id: `local_food_${i}_${Date.now()}`,
+          x, y,
+          size: 4,
+          mass: 0.2,
+          color: '#45b7d1',
+          type: 'normal'
+        };
+      }
+
+      foods.push(food);
+    }
+
+    setLocalFoods(foods);
+  }, []);
+
   const handleLoadingComplete = useCallback(() => {
     setIsLoading(false);
     setGameStarted(true);
-  }, []);
+    generateLocalFoods();
+  }, [generateLocalFoods]);
 
   const exitGame = () => {
     wsClient.disconnect();
