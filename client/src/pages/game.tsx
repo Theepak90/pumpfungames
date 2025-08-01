@@ -646,6 +646,14 @@ export default function GamePage() {
   const [qKeyPressed, setQKeyPressed] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [cashedOutAmount, setCashedOutAmount] = useState(0);
+  const [otherPlayers, setOtherPlayers] = useState<Array<{
+    id: string;
+    segments: Array<{ x: number; y: number }>;
+    color: string;
+    money: number;
+  }>>([]);
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -885,6 +893,39 @@ export default function GamePage() {
       initialBots.push(createBotSnake(`bot_${i}`));
     }
     setBotSnakes(initialBots);
+  }, [gameStarted]);
+
+  // Multiplayer simulation (placeholder until WebSocket is ready)
+  useEffect(() => {
+    if (!gameStarted) return;
+    
+    setConnectionStatus('Single Player Mode');
+    
+    // Add some demo players to show how multiplayer would work
+    const demoPlayers = [
+      {
+        id: 'demo1',
+        segments: [
+          { x: MAP_CENTER_X + 200, y: MAP_CENTER_Y + 100 },
+          { x: MAP_CENTER_X + 190, y: MAP_CENTER_Y + 100 },
+          { x: MAP_CENTER_X + 180, y: MAP_CENTER_Y + 100 }
+        ],
+        color: '#4ecdc4',
+        money: 2.50
+      },
+      {
+        id: 'demo2', 
+        segments: [
+          { x: MAP_CENTER_X - 150, y: MAP_CENTER_Y - 80 },
+          { x: MAP_CENTER_X - 140, y: MAP_CENTER_Y - 80 },
+          { x: MAP_CENTER_X - 130, y: MAP_CENTER_Y - 80 }
+        ],
+        color: '#ff6b6b',
+        money: 1.75
+      }
+    ];
+    
+    setOtherPlayers(demoPlayers);
   }, [gameStarted]);
 
   // Mouse tracking
@@ -1545,6 +1586,36 @@ export default function GamePage() {
         }
       });
 
+      // Draw other players first (behind everything)
+      otherPlayers.forEach(player => {
+        if (player.segments && player.segments.length > 0) {
+          player.segments.forEach((segment, index) => {
+            ctx.save();
+            
+            // Draw segment (world coordinates are already transformed)
+            const screenX = segment.x;
+            const screenY = segment.y;
+            
+            // Draw segment
+            ctx.fillStyle = player.color || '#4ecdc4';
+            ctx.beginPath();
+            const radius = (index === 0 ? 12 : 8); // Head is larger
+            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw player money above head
+            if (index === 0) {
+              ctx.fillStyle = '#fff';
+              ctx.font = `12px Arial`;
+              ctx.textAlign = 'center';
+              ctx.fillText(`$${player.money.toFixed(2)}`, segment.x, segment.y - 25);
+            }
+            
+            ctx.restore();
+          });
+        }
+      });
+
       // Draw bot snakes first (behind player)
       botSnakes.forEach(bot => {
         // Bot dynamic scaling based on mass (caps at 5x width)
@@ -1916,6 +1987,21 @@ export default function GamePage() {
               />
             ))}
         </svg>
+      </div>
+
+      {/* Connection Status */}
+      <div className="absolute top-4 right-4 z-10">
+        <div className="bg-black/60 border border-gray-500 rounded px-3 py-2">
+          <div className={`text-sm font-mono ${
+            connectionStatus === 'Connected' ? 'text-green-400' : 
+            connectionStatus === 'Connecting...' ? 'text-yellow-400' : 'text-red-400'
+          }`}>
+            {connectionStatus}
+          </div>
+          <div className="text-white text-xs font-mono">
+            Players: {otherPlayers.length + 1}
+          </div>
+        </div>
       </div>
 
       {/* Instructions */}
