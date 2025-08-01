@@ -276,6 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             money: data.money || 1.00,
             lastUpdate: Date.now()
           };
+          console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments`);
           activePlayers.set(playerId, player);
           gameWorld.players.set(playerId, player);
         }
