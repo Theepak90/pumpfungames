@@ -925,7 +925,7 @@ export default function GamePage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
         const updateData = {
           type: 'update',
-          segments: snake.visibleSegments.map(seg => ({ x: seg.x, y: seg.y })),
+          segments: snake.visibleSegments.slice(0, 20).map(seg => ({ x: seg.x, y: seg.y })), // Send more segments
           color: '#d55400',
           money: snake.money
         };
@@ -1573,18 +1573,18 @@ export default function GamePage() {
           const fullSnakeBody = [];
           const segmentSpacing = 8; // Same spacing as local snake
           
-          // Start with the received segments
+          // Use all received segments and interpolate densely between them
           for (let i = 0; i < serverPlayer.segments.length; i++) {
             fullSnakeBody.push(serverPlayer.segments[i]);
             
-            // Add interpolated segments between received segments for smooth snake body
+            // Add many interpolated segments between received segments for smooth snake body
             if (i < serverPlayer.segments.length - 1) {
               const current = serverPlayer.segments[i];
               const next = serverPlayer.segments[i + 1];
               const dx = next.x - current.x;
               const dy = next.y - current.y;
               const distance = Math.sqrt(dx * dx + dy * dy);
-              const steps = Math.floor(distance / segmentSpacing);
+              const steps = Math.max(Math.floor(distance / segmentSpacing), 8); // Ensure minimum segments
               
               for (let step = 1; step < steps; step++) {
                 const t = step / steps;
@@ -1596,21 +1596,50 @@ export default function GamePage() {
             }
           }
           
-          // Draw the complete snake body
+          // Extend the tail if we have fewer segments than expected
+          if (fullSnakeBody.length < 30 && serverPlayer.segments.length >= 2) {
+            const lastSeg = serverPlayer.segments[serverPlayer.segments.length - 1];
+            const secondLastSeg = serverPlayer.segments[serverPlayer.segments.length - 2];
+            const dx = lastSeg.x - secondLastSeg.x;
+            const dy = lastSeg.y - secondLastSeg.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            if (length > 0) {
+              const dirX = dx / length;
+              const dirY = dy / length;
+              
+              // Add more tail segments
+              for (let i = 0; i < 20; i++) {
+                fullSnakeBody.push({
+                  x: lastSeg.x + dirX * segmentSpacing * (i + 1),
+                  y: lastSeg.y + dirY * segmentSpacing * (i + 1)
+                });
+              }
+            }
+          }
+          
+          // Draw the complete snake body with proper sizing and overlap
           fullSnakeBody.forEach((segment: any, index: number) => {
             ctx.save();
             
             // Different color for each player
             ctx.fillStyle = serverPlayer.color || '#ff0000';
+            
+            // Create proper size gradient like the local snake
+            const baseRadius = 8;
+            const headBonus = Math.max(0, (10 - index) * 0.5); // Head gets bigger
+            const radius = baseRadius + headBonus;
+            
             ctx.beginPath();
-            const radius = (index === 0 ? 12 : 8); // Head is larger
             ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
             ctx.fill();
             
-            // Add stroke for better visibility
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            // Add subtle outline
+            if (index === 0) {
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
             
             ctx.restore();
           });
