@@ -9,7 +9,6 @@ import Home from "@/pages/home";
 import SecretGameAccess from "@/pages/SecretGameAccess";
 import ProtectedGame from "@/pages/ProtectedGame";
 import MultiplayerGame from "@/pages/MultiplayerGame";
-import MultiplayerGameNew from "@/pages/MultiplayerGameNew";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,8 +17,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/game8999" component={SecretGameAccess} />
       <Route path="/game" component={ProtectedGame} />
-      <Route path="/multiplayer" component={MultiplayerGameNew} />
-      <Route path="/multiplayer-old" component={MultiplayerGame} />
+      <Route path="/multiplayer" component={MultiplayerGame} />
       <Route component={NotFound} />
     </Switch>
   );
