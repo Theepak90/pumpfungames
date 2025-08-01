@@ -6,10 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/auth-context";
 import { GameProvider } from "@/contexts/game-context";
 import Home from "@/pages/home";
-import SecretGameAccess from "@/pages/SecretGameAccess";
-import ProtectedGame from "@/pages/ProtectedGame";
 import Game from "@/pages/game";
-import MultiplayerGame from "@/pages/multiplayer";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -17,7 +14,6 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/game" component={Game} />
-      <Route path="/multiplayer" component={MultiplayerGame} />
       <Route component={NotFound} />
     </Switch>
   );
