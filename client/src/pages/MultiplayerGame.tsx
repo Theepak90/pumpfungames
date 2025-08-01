@@ -25,6 +25,7 @@ interface Food {
   type?: 'normal' | 'money'; // Food type
   value?: number; // Money value for money type
   spawnTime?: number; // Timestamp when money crate was created
+  shrinkScale?: number; // Scale factor for shrinking animation (0.1 to 1.0)
 }
 
 interface BotSnake {
@@ -1358,6 +1359,7 @@ export default function GamePage() {
       // Combined food attraction and collision detection (prevents jittering)
       const suctionRadius = 50;
       const suctionStrength = 1.6;
+      const shrinkDistance = 10; // Start shrinking when 10px away from mouth
       
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
@@ -1393,13 +1395,29 @@ export default function GamePage() {
                 data: { foodIndex: i }
               }));
             }
-          } else if (dist < suctionRadius && dist > playerRadius + collisionRadius + 5) {
-            // Only apply suction if not too close (prevents jittering near collision)
-            newFoods[i] = {
-              ...food,
-              x: food.x + (dx / dist) * suctionStrength,
-              y: food.y + (dy / dist) * suctionStrength
-            };
+          } else {
+            // Calculate shrinking effect when close to mouth
+            let shrinkScale = 1.0;
+            if (dist <= shrinkDistance) {
+              // Linear shrinking from full size to 0 as it approaches the mouth
+              shrinkScale = Math.max(0.1, dist / shrinkDistance);
+            }
+            
+            // Apply suction if within radius and not too close to collision
+            if (dist < suctionRadius && dist > playerRadius + collisionRadius + 2) {
+              newFoods[i] = {
+                ...food,
+                x: food.x + (dx / dist) * suctionStrength,
+                y: food.y + (dy / dist) * suctionStrength,
+                shrinkScale: shrinkScale // Add shrink scale property
+              };
+            } else if (dist <= shrinkDistance) {
+              // Still apply shrinking even if not moving
+              newFoods[i] = {
+                ...food,
+                shrinkScale: shrinkScale
+              };
+            }
           }
         }
         
@@ -1491,10 +1509,15 @@ export default function GamePage() {
             }
           }
           
-          // Draw money crates with dollar sign image, shadow, wobble, and fade
+          // Draw money crates with dollar sign image, shadow, wobble, fade, and shrinking
           const time = Date.now() * 0.003; // Time for animation
           const wobbleX = Math.sin(time + index * 0.5) * 2; // Wobble offset X
           const wobbleY = Math.cos(time * 1.2 + index * 0.7) * 1.5; // Wobble offset Y
+          
+          // Apply shrinking effect when close to snake mouth
+          const scale = food.shrinkScale || 1.0;
+          const size = 20 * scale; // Scale the 20x20 size
+          const halfSize = size / 2;
           
           const drawX = food.x + wobbleX;
           const drawY = food.y + wobbleY;
@@ -1502,13 +1525,13 @@ export default function GamePage() {
           // Apply alpha for fade effect
           ctx.globalAlpha = alpha;
           
-          // Draw shadow first
+          // Draw shadow first (scaled)
           ctx.shadowColor = `rgba(0, 0, 0, ${0.3 * alpha})`;
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 3;
-          ctx.shadowOffsetY = 3;
+          ctx.shadowBlur = 8 * scale;
+          ctx.shadowOffsetX = 3 * scale;
+          ctx.shadowOffsetY = 3 * scale;
           ctx.fillStyle = `rgba(0, 0, 0, ${0.2 * alpha})`;
-          ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
+          ctx.fillRect(drawX - halfSize + 2 * scale, drawY - halfSize + 2 * scale, size, size);
           
           // Reset shadow for main square
           ctx.shadowColor = 'transparent';
@@ -1516,38 +1539,44 @@ export default function GamePage() {
           ctx.shadowOffsetX = 0;
           ctx.shadowOffsetY = 0;
           
-          // Draw green background square (20x20px)
+          // Draw green background square (scaled)
           ctx.fillStyle = food.color;
-          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+          ctx.fillRect(drawX - halfSize, drawY - halfSize, size, size);
           
-          // Draw dollar sign image if loaded (20x20px)
+          // Draw dollar sign image if loaded (scaled)
           if (dollarSignImage && dollarSignImage.complete) {
             ctx.drawImage(
               dollarSignImage,
-              drawX - 10,
-              drawY - 10,
-              20,
-              20
+              drawX - halfSize,
+              drawY - halfSize,
+              size,
+              size
             );
           }
           
           // Reset alpha for other elements
           ctx.globalAlpha = 1.0;
         } else {
-          // Draw regular food as circles with glow effect
-          ctx.shadowColor = food.color;
-          ctx.shadowBlur = 15;
-          ctx.fillStyle = food.color;
-          ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-          ctx.fill();
+          // Draw regular food as circles with glow effect and shrinking
+          const scale = food.shrinkScale || 1.0;
+          const scaledSize = food.size * scale;
           
-          // Draw the solid circle on top (no shadow)
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = food.color;
-          ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-          ctx.fill();
+          // Only draw if scale is significant (avoid invisible tiny circles)
+          if (scale > 0.1) {
+            ctx.shadowColor = food.color;
+            ctx.shadowBlur = 15 * scale;
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, scaledSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw the solid circle on top (no shadow)
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, scaledSize, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       });
 
