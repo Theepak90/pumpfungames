@@ -654,6 +654,8 @@ export default function GamePage() {
     segments: Array<{ x: number; y: number }>;
     color: string;
     money: number;
+    smoothedSegments?: Array<{ x: number; y: number }>; // For smooth interpolation
+    lastUpdateTime?: number;
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -871,7 +873,30 @@ export default function GamePage() {
           const filteredPlayers = data.players.filter((p: any) => 
             p.id !== myPlayerId && p.segments.length > 0
           );
-          setOtherPlayers(filteredPlayers);
+          // Add smooth interpolation to reduce jittering
+          const currentTime = Date.now();
+          const updatedPlayers = filteredPlayers.map((player: any) => {
+            const existingPlayer = otherPlayers.find(p => p.id === player.id);
+            if (existingPlayer && existingPlayer.smoothedSegments) {
+              // Smooth interpolation between old and new positions
+              const lerpFactor = 0.3;
+              player.smoothedSegments = player.segments.map((newSeg: any, i: number) => {
+                const oldSeg = existingPlayer.smoothedSegments?.[i];
+                if (oldSeg) {
+                  return {
+                    x: oldSeg.x + (newSeg.x - oldSeg.x) * lerpFactor,
+                    y: oldSeg.y + (newSeg.y - oldSeg.y) * lerpFactor
+                  };
+                }
+                return newSeg;
+              });
+            } else {
+              player.smoothedSegments = [...player.segments];
+            }
+            player.lastUpdateTime = currentTime;
+            return player;
+          });
+          setOtherPlayers(updatedPlayers);
           console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
         } else if (data.type === 'welcome') {
           setMyPlayerId(data.playerId);
@@ -1564,38 +1589,33 @@ export default function GamePage() {
         }
       });
 
-      // Draw only OTHER server players (exclude yourself)
+      // Draw only OTHER server players (exclude yourself) with smooth interpolation to reduce jittering
       const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
       console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Create full snake body trail by interpolating between segments
-          const fullSnakeBody = [];
-          const segmentSpacing = 8; // Same spacing as local snake
+          // Find existing player data for smooth interpolation
+          const existingOtherPlayer = otherPlayers.find(p => p.id === serverPlayer.id);
+          let smoothedSegments = serverPlayer.segments;
           
-          // Use all received segments and interpolate densely between them
-          for (let i = 0; i < serverPlayer.segments.length; i++) {
-            fullSnakeBody.push(serverPlayer.segments[i]);
-            
-            // Add many interpolated segments between received segments for smooth snake body
-            if (i < serverPlayer.segments.length - 1) {
-              const current = serverPlayer.segments[i];
-              const next = serverPlayer.segments[i + 1];
-              const dx = next.x - current.x;
-              const dy = next.y - current.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              const steps = Math.max(Math.floor(distance / segmentSpacing), 8); // Ensure minimum segments
-              
-              for (let step = 1; step < steps; step++) {
-                const t = step / steps;
-                fullSnakeBody.push({
-                  x: current.x + dx * t,
-                  y: current.y + dy * t
-                });
+          // Apply smooth interpolation to reduce jittering
+          if (existingOtherPlayer && existingOtherPlayer.smoothedSegments) {
+            const lerpFactor = 0.3; // Smooth interpolation
+            smoothedSegments = serverPlayer.segments.map((newSeg: any, i: number) => {
+              const oldSeg = existingOtherPlayer.smoothedSegments?.[i];
+              if (oldSeg) {
+                return {
+                  x: oldSeg.x + (newSeg.x - oldSeg.x) * lerpFactor,
+                  y: oldSeg.y + (newSeg.y - oldSeg.y) * lerpFactor
+                };
               }
-            }
+              return newSeg;
+            });
           }
+          
+          // NO INTERPOLATION - Use segments as distinct round balls
+          const fullSnakeBody = smoothedSegments;
           
           // Use all segments as-is since we're now sending many more segments
           // No need for tail extension - just use the received segments with interpolation
@@ -1609,16 +1629,15 @@ export default function GamePage() {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
-          // Draw all segments with shadow
-          for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
-            const segment = fullSnakeBody[i];
+          // Draw each segment as a distinct round ball (no smooth interpolation)
+          fullSnakeBody.forEach((segment: any, segIndex: number) => {
             const segmentRadius = 10; // Same as local snake
             
             ctx.fillStyle = serverPlayer.color || '#ff0000';
             ctx.beginPath();
             ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
             ctx.fill();
-          }
+          });
           
           ctx.restore();
           

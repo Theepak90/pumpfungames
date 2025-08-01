@@ -61,15 +61,20 @@ export class SmoothSnake {
     }
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
+    console.log(`Snake constructor: START_MASS=${this.START_MASS}, totalMass=${this.totalMass}`);
     this.growthRemaining = 0;
     this.partialGrowth = 0; // Initialize partialGrowth for faster mass conversion
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with initial segment count
     
+    // Force immediate segment generation
+    console.log(`Before updateVisibleSegments: currentSegmentCount=${this.currentSegmentCount}`);
+    
     // Initialize money
     this.money = 1.00;
     
     this.updateVisibleSegments();
+    console.log(`After updateVisibleSegments: visibleSegments.length=${this.visibleSegments.length}`);
   }
   
   updateVisibleSegments() {
