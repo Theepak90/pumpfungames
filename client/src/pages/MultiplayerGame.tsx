@@ -1355,40 +1355,26 @@ export default function GamePage() {
         }
       }
 
-      // Food gravitation toward snake head (Slither.io style floating behavior)
+      // Combined food attraction and collision detection (prevents jittering)
       const suctionRadius = 50;
       const suctionStrength = 1.6;
       
-      setFoods(prevFoods => {
-        return prevFoods.map(food => {
-          const dx = snake.head.x - food.x;
-          const dy = snake.head.y - food.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < suctionRadius && dist > 0) {
-            return {
-              ...food,
-              x: food.x + (dx / dist) * suctionStrength,
-              y: food.y + (dy / dist) * suctionStrength
-            };
-          }
-          return food;
-        });
-      });
-
-      // Handle local food collision detection (food comes from server but we need local collision)
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
-          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+          const dx = snake.head.x - food.x;
+          const dy = snake.head.y - food.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
           
           // Calculate player's current radius for food collision
           const playerRadius = snake.getSegmentRadius();
+          const collisionRadius = food.type === 'money' ? 10 : (food.size || 4);
           
-          if (dist < playerRadius + food.size) {
-            // Player eats food
+          // Check if food should be eaten
+          if (dist < playerRadius + collisionRadius) {
+            // Player eats food - smooth consumption
             const mass = food.mass || 1;
             snake.totalMass += mass * 0.5;
             
@@ -1407,7 +1393,13 @@ export default function GamePage() {
                 data: { foodIndex: i }
               }));
             }
-            break;
+          } else if (dist < suctionRadius && dist > playerRadius + collisionRadius + 5) {
+            // Only apply suction if not too close (prevents jittering near collision)
+            newFoods[i] = {
+              ...food,
+              x: food.x + (dx / dist) * suctionStrength,
+              y: food.y + (dy / dist) * suctionStrength
+            };
           }
         }
         
