@@ -881,6 +881,11 @@ export default function GamePage() {
           setServerFood(data.food || []);
           setServerPlayers(data.players || []);
           console.log(`Received shared world: ${data.bots?.length} bots, ${data.food?.length} food, ${data.players?.length} players`);
+          if (data.players && data.players.length > 0) {
+            data.players.forEach((player: any, idx: number) => {
+              console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
+            });
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -913,12 +918,14 @@ export default function GamePage() {
 
     const sendInterval = setInterval(() => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
+        const updateData = {
           type: 'update',
           segments: snake.visibleSegments.map(seg => ({ x: seg.x, y: seg.y })),
           color: '#d55400',
           money: snake.money
-        }));
+        };
+        console.log(`Sending update with ${updateData.segments.length} segments to server`);
+        wsRef.current.send(JSON.stringify(updateData));
       }
     }, 100); // Send updates every 100ms
 
@@ -1548,24 +1555,31 @@ export default function GamePage() {
       });
 
       // Draw all server players (including yourself and others)
-      serverPlayers.forEach(serverPlayer => {
+      console.log(`Drawing ${serverPlayers.length} server players`);
+      serverPlayers.forEach((serverPlayer, playerIndex) => {
+        console.log(`Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
           serverPlayer.segments.forEach((segment: any, index: number) => {
             ctx.save();
             
-            // Different color for each player
-            ctx.fillStyle = serverPlayer.color || '#d55400';
+            // Different color for each player - make it more visible
+            ctx.fillStyle = serverPlayer.color || '#ff0000'; // Fallback to bright red
             ctx.beginPath();
-            const radius = (index === 0 ? 12 : 8);
+            const radius = (index === 0 ? 15 : 10); // Larger for visibility
             ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Add stroke for better visibility
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
             
             // Draw player money above head
             if (index === 0) {
               ctx.fillStyle = '#fff';
-              ctx.font = `12px Arial`;
+              ctx.font = `14px Arial`;
               ctx.textAlign = 'center';
-              ctx.fillText(`$${serverPlayer.money?.toFixed(2) || '1.00'}`, segment.x, segment.y - 25);
+              ctx.fillText(`Player: $${serverPlayer.money?.toFixed(2) || '1.00'}`, segment.x, segment.y - 30);
             }
             
             ctx.restore();
