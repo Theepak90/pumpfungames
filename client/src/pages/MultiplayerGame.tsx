@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
+import LoadingScreen from '@/components/LoadingScreen';
 
 // Game constants - MULTIPLAYER VERSION (NO BOTS)
 const MAP_CENTER_X = 2000;
@@ -623,6 +624,8 @@ export default function GamePage() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [gameStarted, setGameStarted] = useState(false);
 
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
@@ -1867,8 +1870,16 @@ export default function GamePage() {
     setLocation('/');
   };
 
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
+    setGameStarted(true);
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
+      {/* Loading Screen */}
+      {isLoading && <LoadingScreen onLoadingComplete={handleLoadingComplete} />}
+      
       {/* Minimap */}
       <div className="absolute top-4 left-4 z-10">
         <svg width="96" height="96" className="w-full h-full">

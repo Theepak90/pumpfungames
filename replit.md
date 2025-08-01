@@ -10,7 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Clean UI Overhaul (Latest)
+### Loading Screen System (Latest)
+- **Retro loading screen**: Dark background (#15161b) with "SNAKE ARENA" title in Press Start 2P font
+- **Progressive loading**: Shows loading steps (initializing, assets, spawning snakes, preparing arena)
+- **Visual progress bar**: Green gradient progress bar with percentage indicator
+- **Game initialization**: Loading screen appears when entering game, then starts gameplay
+- **Applied to both modes**: Both single-player (/game8999) and multiplayer (/multiplayer) versions
+
+### Clean UI Overhaul
 - **Removed all UI clutter**: Exit buttons, score displays, control instructions removed from all game modes
 - **Eliminated audio system**: Complete removal of background music, sound effects, and volume controls
 - **Added circular minimap**: Top-left corner showing snake positions with red dot for player and colored dots for AI bots
