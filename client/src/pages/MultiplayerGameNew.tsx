@@ -520,8 +520,8 @@ export default function MultiplayerGameNew() {
     
     // Try to connect to WebSocket server (will be used when available)
     try {
-      const wsUrl = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(`${wsUrl}//${window.location.host}/ws`);
+      // Connect to the simple WebSocket server on port 3000
+      const socket = new WebSocket('ws://localhost:3000');
       
       socket.onopen = () => {
         console.log("WebSocket connected - multiplayer active");
@@ -569,9 +569,9 @@ export default function MultiplayerGameNew() {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       const sendInterval = setInterval(() => {
         socketRef.current?.send(JSON.stringify({
-          x: snake.headX,
-          y: snake.headY,
-          angle: snake.angle,
+          x: snake.head.x,
+          y: snake.head.y,
+          angle: snake.currentAngle,
         }));
       }, 50);
 
