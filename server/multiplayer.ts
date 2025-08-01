@@ -80,7 +80,7 @@ class MultiplayerGameServer {
       
       ws.on('close', () => {
         // Remove player on disconnect
-        for (const [id, player] of this.players.entries()) {
+        for (const [id, player] of this.players) {
           if (player.ws === ws) {
             this.players.delete(id);
             console.log(`Player ${id} disconnected`);
@@ -148,7 +148,7 @@ class MultiplayerGameServer {
   private gameLoop() {
     // Remove inactive players (haven't updated in 10 seconds)
     const now = Date.now();
-    for (const [id, player] of this.players.entries()) {
+    for (const [id, player] of this.players) {
       if (now - player.lastUpdate > 10000) {
         this.players.delete(id);
         console.log(`Removed inactive player ${id}`);
@@ -220,7 +220,7 @@ class MultiplayerGameServer {
     });
     
     // Send to all connected players
-    for (const [, player] of this.players.entries()) {
+    for (const player of this.players.values()) {
       if (player.ws.readyState === WebSocket.OPEN) {
         player.ws.send(message);
       }

@@ -822,10 +822,8 @@ export default function GamePage() {
 
 
 
-  // Initialize food with mass system - only after loading is complete
+  // Initialize food with mass system
   useEffect(() => {
-    if (!gameStarted) return; // Don't initialize until loading is complete
-    
     const initialFoods: Food[] = [];
     for (let i = 0; i < FOOD_COUNT; i++) {
       // Generate food within circular boundary
@@ -885,7 +883,7 @@ export default function GamePage() {
       initialBots.push(createBotSnake(`bot_${i}`));
     }
     setBotSnakes(initialBots);
-  }, [gameStarted]);
+  }, []);
 
   // Mouse tracking
   useEffect(() => {
@@ -973,7 +971,7 @@ export default function GamePage() {
 
   // Game loop
   useEffect(() => {
-    if (gameOver || !gameStarted) return; // Don't start game loop until loading is complete
+    if (gameOver) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1844,7 +1842,7 @@ export default function GamePage() {
       cancelAnimationFrame(animationId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt, gameStarted]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt]);
 
   const resetGame = () => {
     setGameOver(false);
