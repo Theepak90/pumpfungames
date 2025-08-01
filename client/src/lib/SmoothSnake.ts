@@ -189,6 +189,13 @@ export class SmoothSnake {
   getScaleFactor(): number {
     return Math.min(1 + (this.totalMass - this.START_MASS) / 100, 3);
   }
+
+  getSegmentRadius(): number {
+    const baseRadius = 8;
+    const maxScale = 5;
+    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
+    return baseRadius * scaleFactor;
+  }
   
   addMoney(amount: number) {
     this.money += amount;

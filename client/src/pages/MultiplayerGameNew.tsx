@@ -393,8 +393,8 @@ export default function MultiplayerGameNew() {
       }
     }
 
-    // Draw circular boundary
-    ctx.strokeStyle = '#333333';
+    // Draw thin death barrier line (original green color)
+    ctx.strokeStyle = '#53d392';
     ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
@@ -465,82 +465,102 @@ export default function MultiplayerGameNew() {
       }
     });
 
-    // Draw local player (ensure it's always visible)
-    if (localPlayer.visibleSegments && localPlayer.visibleSegments.length > 0) {
-      const scaleFactor = localPlayer.getScaleFactor();
-      const segmentRadius = 8 * scaleFactor;
-
-      // Player outline when boosting
-      if (localPlayer.isBoosting) {
-        ctx.fillStyle = "white";
-        localPlayer.visibleSegments.forEach(segment => {
-          ctx.globalAlpha = segment.opacity || 1.0;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, segmentRadius + 2, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      // Player body with shadow
+    // Draw single glowing outline behind the whole snake when boosting
+    if (localPlayer.isBoosting && localPlayer.visibleSegments.length > 0) {
       ctx.save();
-      if (!localPlayer.isBoosting) {
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-      }
-
-      ctx.fillStyle = '#d55400';
+      ctx.shadowColor = "white";
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = "white";
+      
       localPlayer.visibleSegments.forEach(segment => {
         ctx.globalAlpha = segment.opacity || 1.0;
         ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+        ctx.arc(segment.x, segment.y, localPlayer.getSegmentRadius() + 3, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.restore();
-      ctx.globalAlpha = 1.0;
     }
 
-    // Draw local player money
+    // Draw player snake body with proper shadow
+    ctx.save();
+    
+    if (!localPlayer.isBoosting) {
+      ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+    } else {
+      // No shadow when boosting (outline effect already applied)
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+    
+    ctx.fillStyle = '#d55400';
+    for (let i = localPlayer.visibleSegments.length - 1; i >= 0; i--) {
+      const segment = localPlayer.visibleSegments[i];
+      ctx.globalAlpha = segment.opacity || 1.0;
+      ctx.beginPath();
+      ctx.arc(segment.x, segment.y, localPlayer.getSegmentRadius(), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    ctx.restore();
+
+    // Draw money balance above player head
     if (localPlayer.visibleSegments.length > 0) {
       const head = localPlayer.visibleSegments[0];
-      ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#134242";
-      ctx.lineWidth = 3 * scaleFactor;
-      ctx.textAlign = "center";
-      
       const moneyText = `$${localPlayer.money.toFixed(2)}`;
-      const offsetY = 35 * scaleFactor;
       
-      ctx.strokeText(moneyText, head.x, head.y - offsetY);
-      ctx.fillText(moneyText, head.x, head.y - offsetY);
+      const scaleFactor = localPlayer.getScaleFactor();
+      const segmentRadius = localPlayer.getSegmentRadius();
+      
+      // Calculate text position above head
+      const textY = head.y - segmentRadius - 25; // Position above the snake
+      
+      // Set text style with retro font and custom outline color
+      ctx.font = `${Math.max(12, Math.floor(8 * scaleFactor))}px 'Press Start 2P', monospace`; // Scale with snake size
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = '#134242';
+      ctx.lineWidth = 3;
+      
+      // Draw text with outline for visibility
+      ctx.strokeText(moneyText, head.x, textY);
+      ctx.fillText(moneyText, head.x, textY);
     }
 
-    // Draw local player eyes
+    // Draw player eyes using proper scaling system
     if (localPlayer.visibleSegments.length > 0) {
       const head = localPlayer.visibleSegments[0];
-      const movementAngle = localPlayer.currentAngle;
-      const eyeDistance = 5 * scaleFactor;
-      const eyeSize = 3 * scaleFactor;
-      const pupilSize = 1.5 * scaleFactor;
+      ctx.globalAlpha = 1.0;
       
+      const movementAngle = localPlayer.currentAngle;
+      const scaleFactor = localPlayer.getScaleFactor();
+      const eyeDistance = 5 * scaleFactor; // Scale with snake size
+      const eyeSize = 3 * scaleFactor; // Scale eye size
+      const pupilSize = 1.5 * scaleFactor; // Scale pupil size
+      
+      // Calculate cursor angle relative to snake head for pupil tracking
       const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
       
+      // Eye positions perpendicular to movement direction
       const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
       const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
       const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
       const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
       
-      // Draw square eyes
+      // Draw rotated square eyes
       ctx.save();
       
-      // First eye
+      // Draw first eye with rotation
       ctx.translate(eye1X, eye1Y);
       ctx.rotate(movementAngle);
       ctx.fillStyle = 'white';
       ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
       
+      // Draw first pupil with cursor tracking
       const pupilOffset = 1.2;
       ctx.fillStyle = 'black';
       ctx.fillRect(
@@ -551,13 +571,14 @@ export default function MultiplayerGameNew() {
       );
       ctx.restore();
       
-      // Second eye
+      // Draw second eye with rotation
       ctx.save();
       ctx.translate(eye2X, eye2Y);
       ctx.rotate(movementAngle);
       ctx.fillStyle = 'white';
       ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
       
+      // Draw second pupil with cursor tracking
       ctx.fillStyle = 'black';
       ctx.fillRect(
         (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
