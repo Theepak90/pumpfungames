@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
 import { useGame } from "@/contexts/game-context";
@@ -23,9 +23,141 @@ import {
 } from "lucide-react";
 import logoImage from "@assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png_1753912259610.png";
 
+// Decorative snake for background animation
+class DecorativeSnake {
+  x: number;
+  y: number;
+  angle: number;
+  segments: Array<{ x: number; y: number }>;
+  speed: number;
+  turnSpeed: number;
+  targetAngle: number;
+  nextTurnTime: number;
+  
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    this.angle = Math.random() * Math.PI * 2;
+    this.segments = [{ x, y }];
+    this.speed = 1;
+    this.turnSpeed = 0.02;
+    this.targetAngle = this.angle;
+    this.nextTurnTime = Date.now() + 2000;
+    
+    // Create initial segments
+    for (let i = 1; i < 8; i++) {
+      this.segments.push({
+        x: x - Math.cos(this.angle) * i * 12,
+        y: y - Math.sin(this.angle) * i * 12
+      });
+    }
+  }
+  
+  update(canvasWidth: number, canvasHeight: number, foods: Array<{ x: number; y: number }>) {
+    const currentTime = Date.now();
+    
+    // Random direction changes
+    if (currentTime > this.nextTurnTime) {
+      this.targetAngle = Math.random() * Math.PI * 2;
+      this.nextTurnTime = currentTime + 1000 + Math.random() * 3000;
+    }
+    
+    // Look for nearby food
+    const nearbyFood = foods.find(food => {
+      const distance = Math.sqrt((food.x - this.x) ** 2 + (food.y - this.y) ** 2);
+      return distance < 100;
+    });
+    
+    if (nearbyFood) {
+      this.targetAngle = Math.atan2(nearbyFood.y - this.y, nearbyFood.x - this.x);
+    }
+    
+    // Smooth angle interpolation
+    let angleDiff = this.targetAngle - this.angle;
+    if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    this.angle += angleDiff * this.turnSpeed;
+    
+    // Move forward
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
+    
+    // Wrap around screen edges
+    if (this.x < 0) this.x = canvasWidth;
+    if (this.x > canvasWidth) this.x = 0;
+    if (this.y < 0) this.y = canvasHeight;
+    if (this.y > canvasHeight) this.y = 0;
+    
+    // Update segments to follow head
+    this.segments[0] = { x: this.x, y: this.y };
+    for (let i = 1; i < this.segments.length; i++) {
+      const prevSegment = this.segments[i - 1];
+      const currentSegment = this.segments[i];
+      const distance = Math.sqrt(
+        (prevSegment.x - currentSegment.x) ** 2 + 
+        (prevSegment.y - currentSegment.y) ** 2
+      );
+      
+      if (distance > 12) {
+        const angle = Math.atan2(prevSegment.y - currentSegment.y, prevSegment.x - currentSegment.x);
+        this.segments[i] = {
+          x: prevSegment.x - Math.cos(angle) * 12,
+          y: prevSegment.y - Math.sin(angle) * 12
+        };
+      }
+    }
+  }
+  
+  draw(ctx: CanvasRenderingContext2D) {
+    // Draw snake segments
+    ctx.fillStyle = '#d55400';
+    for (let i = this.segments.length - 1; i >= 0; i--) {
+      const segment = this.segments[i];
+      const radius = i === 0 ? 10 : 8; // Head slightly larger
+      
+      ctx.beginPath();
+      ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw simple eyes on head
+      if (i === 0) {
+        ctx.fillStyle = 'white';
+        const eyeDistance = 4;
+        const eye1X = segment.x + Math.cos(this.angle + Math.PI/2) * eyeDistance;
+        const eye1Y = segment.y + Math.sin(this.angle + Math.PI/2) * eyeDistance;
+        const eye2X = segment.x + Math.cos(this.angle - Math.PI/2) * eyeDistance;
+        const eye2Y = segment.y + Math.sin(this.angle - Math.PI/2) * eyeDistance;
+        
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(eye2X, eye2Y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#d55400'; // Reset color
+      }
+    }
+  }
+  
+  eatFood(foods: Array<{ x: number; y: number }>) {
+    return foods.filter(food => {
+      const distance = Math.sqrt((food.x - this.x) ** 2 + (food.y - this.y) ** 2);
+      if (distance < 15) {
+        // Grow snake by adding segment
+        const lastSegment = this.segments[this.segments.length - 1];
+        this.segments.push({ x: lastSegment.x, y: lastSegment.y });
+        return false; // Remove this food
+      }
+      return true; // Keep this food
+    });
+  }
+}
+
 export default function Home() {
   const { user, login, register, logout, updateUser } = useAuth();
   const [, setLocation] = useLocation();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const { 
     selectedBetAmount, 
     setSelectedBetAmount, 
@@ -37,6 +169,10 @@ export default function Home() {
   } = useGame();
   const { isConnected, gameState, joinGame, move, leaveGame } = useWebSocket(user?.id || null);
   const { toast } = useToast();
+
+  // Decorative snake animation state
+  const [decorativeSnake, setDecorativeSnake] = useState<DecorativeSnake | null>(null);
+  const [foods, setFoods] = useState<Array<{ x: number; y: number }>>([]);
 
   // Animated player count effect - fluctuates realistically
   useEffect(() => {
@@ -253,9 +389,91 @@ export default function Home() {
 
   // Skip authentication for now - show homepage directly
 
+  // Initialize decorative snake and food
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Create snake at random position
+    const snake = new DecorativeSnake(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height
+    );
+    setDecorativeSnake(snake);
+    
+    // Create initial food
+    let currentFoods = [];
+    for (let i = 0; i < 20; i++) {
+      currentFoods.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height
+      });
+    }
+    setFoods(currentFoods);
+    
+    // Animation loop
+    const animate = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx || !snake) return;
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Update snake
+      snake.update(canvas.width, canvas.height, currentFoods);
+      
+      // Check for food consumption
+      currentFoods = snake.eatFood(currentFoods);
+      
+      // Add new food if some were eaten
+      while (currentFoods.length < 20) {
+        currentFoods.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height
+        });
+      }
+      
+      // Draw food
+      ctx.fillStyle = '#00ff00';
+      currentFoods.forEach(food => {
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      
+      // Draw snake
+      snake.draw(ctx);
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    // Handle window resize
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-retro" style={{backgroundColor: '#15161b'}}>
-      {/* Top Bar - Welcome with gaming controller icon */}
+    <div className="min-h-screen bg-gray-900 text-white font-retro relative overflow-hidden" style={{backgroundColor: '#15161b'}}>
+      {/* Background canvas for decorative snake */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 0 }}
+      />
+      
+      {/* Content wrapper with higher z-index */}
+      <div className="relative" style={{ zIndex: 10 }}>
+        {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center">
           <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
@@ -465,6 +683,8 @@ export default function Home() {
 
         </div>
       </div>
+      
+      </div> {/* End content wrapper */}
     </div>
   );
 }
