@@ -1177,14 +1177,8 @@ export default function GamePage() {
           // Bot snake also dies
           dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
           
-          // Drop money crates for bot death too
-          const originalSegments = snake.visibleSegments;
-          const originalMoney = snake.money;
-          snake.visibleSegments = bot.visibleSegments;
-          snake.money = bot.money; // Use bot's money value
-          dropMoneyCrates();
-          snake.visibleSegments = originalSegments;
-          snake.money = originalMoney; // Restore player money
+          // Drop money crates for bot death using new system
+          dropBotMoneyCrates(bot);
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1215,15 +1209,8 @@ export default function GamePage() {
             // Player killed a bot - drop food and money squares
             dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
             
-            // Drop money crates when bot dies - use bot's actual money value
-            // Create temporary function call for bot death
-            const originalSegments = snake.visibleSegments;
-            const originalMoney = snake.money;
-            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
-            snake.money = bot.money; // Use bot's money value
-            dropMoneyCrates();
-            snake.visibleSegments = originalSegments; // Restore player segments
-            snake.money = originalMoney; // Restore player money
+            // Drop money crates when bot dies using new system
+            dropBotMoneyCrates(bot);
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1647,24 +1634,33 @@ export default function GamePage() {
           ctx.restore();
         }
         
-        // Draw money balance above bot head
+        // Draw bot name and money balance above bot head
         if (bot.visibleSegments.length > 0) {
           const head = bot.visibleSegments[0];
           const moneyText = `$${bot.money.toFixed(2)}`;
           
-          // Calculate text position above head
-          const textY = head.y - botRadius - 25; // Position above the bot
+          // Calculate text positions above head
+          const nameY = head.y - botRadius - 45; // Bot name position
+          const moneyY = head.y - botRadius - 25; // Money position below name
           
           // Set text style with retro font and custom outline color
-          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
+          ctx.font = `${Math.max(8, Math.floor(6 * botScaleFactor))}px 'Press Start 2P', monospace`; // Smaller font for name
           ctx.textAlign = 'center';
           ctx.fillStyle = 'white';
           ctx.strokeStyle = '#134242';
+          ctx.lineWidth = 2;
+          
+          // Draw bot name with outline for visibility
+          ctx.strokeText(bot.name, head.x, nameY);
+          ctx.fillText(bot.name, head.x, nameY);
+          
+          // Draw money balance with slightly larger font
+          ctx.font = `${Math.max(10, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
           ctx.lineWidth = 3;
           
-          // Draw text with outline for visibility
-          ctx.strokeText(moneyText, head.x, textY);
-          ctx.fillText(moneyText, head.x, textY);
+          // Draw money text with outline for visibility
+          ctx.strokeText(moneyText, head.x, moneyY);
+          ctx.fillText(moneyText, head.x, moneyY);
         }
       });
       
