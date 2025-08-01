@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
+import lightningBoltImageSrc from '@assets/$ (2)_1754044478882.png';
 
 // Game constants
 const MAP_CENTER_X = 2000;
@@ -22,9 +23,19 @@ interface Food {
   size: number;
   color: string;
   mass?: number; // Mass value for growth
-  type?: 'normal' | 'money'; // Food type
+  type?: 'normal' | 'money' | 'power'; // Food type
   value?: number; // Money value for money type
   spawnTime?: number; // Timestamp when money crate was created
+}
+
+interface PowerCrate {
+  x: number;
+  y: number;
+  size: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  lastMoveTime: number;
 }
 
 interface BotSnake {
@@ -196,6 +207,7 @@ class SmoothSnake {
   
   // Money system
   money: number;
+  superBoost: boolean;
   
   constructor(x: number, y: number) {
     // Movement properties
@@ -226,6 +238,7 @@ class SmoothSnake {
     
     // Initialize money
     this.money = 1.00;
+    this.superBoost = false;
     
     this.updateVisibleSegments();
   }
@@ -363,7 +376,9 @@ class SmoothSnake {
   
   applyBoost(onDropFood?: (food: Food) => void) {
     if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST) {
-      this.speed = this.baseSpeed * this.boostMultiplier;
+      // Apply super boost if active
+      const currentBoostMultiplier = this.superBoost ? 4.0 : this.boostMultiplier;
+      this.speed = this.baseSpeed * currentBoostMultiplier;
       this.boostCooldown++;
       
       // Drop food more frequently for continuous trail effect
@@ -506,6 +521,10 @@ export default function GamePage() {
   });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
+  const [lightningBoltImage, setLightningBoltImage] = useState<HTMLImageElement | null>(null);
+  const [powerCrate, setPowerCrate] = useState<PowerCrate | null>(null);
+  const [superBoostActive, setSuperBoostActive] = useState(false);
+  const [superBoostEndTime, setSuperBoostEndTime] = useState(0);
   const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
   const [lastFrameTime, setLastFrameTime] = useState(Date.now());
   
@@ -614,6 +633,90 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newCrates]);
   };
 
+  const spawnPowerCrate = () => {
+    const newPowerCrate: PowerCrate = {
+      x: MAP_CENTER_X + (Math.random() - 0.5) * MAP_RADIUS * 1.5,
+      y: MAP_CENTER_Y + (Math.random() - 0.5) * MAP_RADIUS * 1.5,
+      size: 30,
+      targetX: 0,
+      targetY: 0,
+      speed: 2,
+      lastMoveTime: Date.now()
+    };
+    setPowerCrate(newPowerCrate);
+  };
+
+  const updatePowerCrate = () => {
+    if (!powerCrate) return;
+
+    const now = Date.now();
+    const deltaTime = (now - powerCrate.lastMoveTime) / 1000;
+    
+    // Find closest snake (player or bot)
+    let closestSnake = snake;
+    let closestDistance = Math.sqrt((powerCrate.x - snake.head.x) ** 2 + (powerCrate.y - snake.head.y) ** 2);
+    
+    for (const bot of botSnakes) {
+      const dist = Math.sqrt((powerCrate.x - bot.head.x) ** 2 + (powerCrate.y - bot.head.y) ** 2);
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestSnake = bot;
+      }
+    }
+    
+    // Run away from closest snake at 0.75x their speed
+    const runAwayDistance = 150; // Start running when snake is within 150 pixels
+    if (closestDistance < runAwayDistance) {
+      const snakeSpeed = closestSnake.isBoosting ? 
+        (closestSnake.baseSpeed * closestSnake.boostMultiplier) : 
+        closestSnake.baseSpeed;
+      const crateSpeed = snakeSpeed * 0.75;
+      
+      // Calculate direction away from snake
+      const dx = powerCrate.x - closestSnake.head.x;
+      const dy = powerCrate.y - closestSnake.head.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 0) {
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+        
+        // Move away from snake
+        powerCrate.x += normalizedDx * crateSpeed * deltaTime;
+        powerCrate.y += normalizedDy * crateSpeed * deltaTime;
+        
+        // Keep within map bounds
+        const padding = 100;
+        powerCrate.x = Math.max(MAP_CENTER_X - MAP_RADIUS + padding, 
+                               Math.min(MAP_CENTER_X + MAP_RADIUS - padding, powerCrate.x));
+        powerCrate.y = Math.max(MAP_CENTER_Y - MAP_RADIUS + padding, 
+                               Math.min(MAP_CENTER_Y + MAP_RADIUS - padding, powerCrate.y));
+      }
+    } else {
+      // Random movement when not running away
+      if (Math.random() < 0.02) { // 2% chance to change direction each frame
+        const angle = Math.random() * Math.PI * 2;
+        powerCrate.targetX = powerCrate.x + Math.cos(angle) * 100;
+        powerCrate.targetY = powerCrate.y + Math.sin(angle) * 100;
+      }
+      
+      // Move towards target
+      const dx = powerCrate.targetX - powerCrate.x;
+      const dy = powerCrate.targetY - powerCrate.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 5) {
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+        powerCrate.x += normalizedDx * powerCrate.speed * deltaTime * 60;
+        powerCrate.y += normalizedDy * powerCrate.speed * deltaTime * 60;
+      }
+    }
+    
+    powerCrate.lastMoveTime = now;
+    setPowerCrate({...powerCrate});
+  };
+
   // Background music setup
   useEffect(() => {
     const audio = new Audio();
@@ -662,7 +765,25 @@ export default function GamePage() {
     };
   }, []);
 
+  // Load lightning bolt image for power crates
+  useEffect(() => {
+    const img = new Image();
+    img.src = lightningBoltImageSrc;
+    img.onload = () => {
+      console.log('Lightning bolt image loaded successfully');
+      setLightningBoltImage(img);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load lightning bolt image:', e);
+    };
+  }, []);
 
+  // Initialize power crate when game starts
+  useEffect(() => {
+    if (!powerCrate) {
+      spawnPowerCrate();
+    }
+  }, [powerCrate]);
 
   // Handle volume changes
   useEffect(() => {
@@ -946,6 +1067,9 @@ export default function GamePage() {
         return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
       });
 
+      // Update power crate
+      updatePowerCrate();
+
       // Remove expired money crates (fade out over 10 seconds)
       const MONEY_CRATE_LIFETIME = 10000; // 10 seconds in milliseconds
       setFoods(prevFoods => {
@@ -1193,6 +1317,18 @@ export default function GamePage() {
               snake.totalMass += food.mass || 1; // Add mass (each crate worth 1 mass)
               newFoods.splice(i, 1);
               continue; // Don't spawn replacement food for money
+            } else if (food.type === 'power') {
+              // Power crate pickup - major boost
+              snake.totalMass += 15; // Worth 15 mass
+              snake.superBoost = true; // Enable super boost
+              setSuperBoostActive(true);
+              setSuperBoostEndTime(Date.now() + 10000); // 10 seconds
+              
+              // Apply slight zoom effect
+              setZoom(prevZoom => Math.min(prevZoom * 1.15, 3.5));
+              
+              newFoods.splice(i, 1);
+              continue; // Don't spawn replacement food for power
             } else {
               // Regular food - grow snake
               scoreIncrease += snake.eatFood(food);
@@ -1250,6 +1386,35 @@ export default function GamePage() {
         
         return newFoods;
       });
+
+      // Check power crate collision
+      if (powerCrate) {
+        const dist = Math.sqrt((snake.head.x - powerCrate.x) ** 2 + (snake.head.y - powerCrate.y) ** 2);
+        if (dist < snake.getSegmentRadius() + powerCrate.size / 2) {
+          // Power crate eaten!
+          snake.totalMass += 15; // Worth 15 mass
+          snake.superBoost = true; // Enable super boost
+          setSuperBoostActive(true);
+          setSuperBoostEndTime(Date.now() + 10000); // 10 seconds
+          
+          // Apply slight zoom effect
+          setZoom(prevZoom => Math.min(prevZoom * 1.15, 3.5));
+          
+          // Remove power crate and spawn new one after 30 seconds
+          setPowerCrate(null);
+          setTimeout(() => {
+            spawnPowerCrate();
+          }, 30000);
+        }
+      }
+
+      // Handle super boost expiration
+      if (superBoostActive && Date.now() > superBoostEndTime) {
+        snake.superBoost = false;
+        setSuperBoostActive(false);
+        // Return zoom to normal
+        setZoom(prevZoom => Math.max(prevZoom / 1.15, 0.5));
+      }
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
@@ -1489,6 +1654,31 @@ export default function GamePage() {
       // Reset global alpha
       ctx.globalAlpha = 1.0;
 
+      // Draw power crate if it exists
+      if (powerCrate && lightningBoltImage) {
+        const powerCrateScreenX = (powerCrate.x - viewX) * zoom + canvasSize.width / 2;
+        const powerCrateScreenY = (powerCrate.y - viewY) * zoom + canvasSize.height / 2;
+        
+        // Only draw if on screen
+        if (powerCrateScreenX >= -50 && powerCrateScreenX <= canvasSize.width + 50 && 
+            powerCrateScreenY >= -50 && powerCrateScreenY <= canvasSize.height + 50) {
+          
+          ctx.save();
+          
+          // Add pulsing glow effect
+          const time = Date.now() * 0.003;
+          const glowIntensity = 0.5 + 0.3 * Math.sin(time);
+          ctx.shadowColor = '#ffff00';
+          ctx.shadowBlur = 20 + 10 * glowIntensity;
+          
+          // Draw lightning bolt image
+          const size = powerCrate.size * zoom;
+          ctx.drawImage(lightningBoltImage, powerCrateScreenX - size/2, powerCrateScreenY - size/2, size, size);
+          
+          ctx.restore();
+        }
+      }
+
       // Draw money balance above snake head
       if (snake.visibleSegments.length > 0) {
         const snakeHead = snake.visibleSegments[0];
@@ -1600,6 +1790,11 @@ export default function GamePage() {
     snake.distanceBuffer = 0;
     snake.currentSegmentCount = snake.START_MASS; // Reset animated segment count
     snake.money = 1.00; // Reset money to starting amount
+    snake.superBoost = false; // Reset super boost
+    setSuperBoostActive(false);
+    
+    // Reset zoom from any power crate effects
+    setZoom(2);
     snake.isBoosting = false;
     snake.boostCooldown = 0;
     snake.speed = snake.baseSpeed;
