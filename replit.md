@@ -10,14 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Multiplayer WebSocket System Implementation (Latest)
-- **Regional server selection**: Auto-detects user region (EU/US) using timezone and browser locale
-- **WebSocket game server**: Complete multiplayer infrastructure with room management (5 players max per room)
-- **Real-time synchronization**: Player positions, movements, boosts, deaths, and food collection
-- **Load balancing**: Automatic room assignment to least-full servers in user's region
-- **Region selector UI**: Manual region selection with server status, player counts, and ping indicators
-- **Scalable architecture**: Supports multiple game rooms per region with automatic cleanup
-- **Connection management**: Automatic reconnection with exponential backoff and error handling
+### Simplified Multiplayer System Implementation (Latest)
+- **Integrated WebSocket server**: WebSocket server now runs on the same HTTP server (port 5000) for Replit compatibility
+- **Real-time multiplayer**: Players can see each other's snakes in real-time across multiple browser tabs/windows
+- **Simplified architecture**: Removed complex regional servers and room management for straightforward multiplayer experience
+- **Direct connection**: WebSocket connects directly to the main domain without separate ports
+- **Player synchronization**: Snake positions, movements, and visual data synchronized every 50ms
+- **Automatic cleanup**: Players automatically removed when they disconnect
 
 ### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance
@@ -40,12 +39,10 @@ Preferred communication style: Simple, everyday language.
 - **Minimal interface**: Games now have clean canvas-only display with essential minimap and controls
 
 ### Dual Game System
-- **Public Multiplayer**: Home page "PLAY" button leads to `/multiplayer` with regional WebSocket servers
-- **Private Single-player**: Secret URL `/game8999` with password `secretserveradd119988` for bot-based gameplay
-- **Regional multiplayer**: Auto-detects US/EU regions with manual override option
-- **Room-based gameplay**: Maximum 5 players per room with automatic load balancing
-- **Real-time synchronization**: WebSocket communication for all game events
-- Session-based access control for private game using sessionStorage
+- **Multiplayer Game**: Home page "PLAY" button leads to `/multiplayer` with real-time WebSocket multiplayer
+- **Single-player Game**: Available at `/game` for local gameplay with AI bots
+- **Real-time synchronization**: WebSocket communication for multiplayer snake positions and movements
+- **Simplified routing**: Clean two-game system without complex authentication or region selection
 
 ### Enhanced Bot AI System
 - State-based AI with wander, foodHunt, avoid, and aggro behaviors

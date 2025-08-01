@@ -325,7 +325,7 @@ export default function Home() {
       description: "Loading single-player snake game.",
     });
     
-    // Navigate to local game
+    // Navigate to local game for now
     setLocation('/game');
   };
 
