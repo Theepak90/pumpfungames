@@ -156,10 +156,10 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     const escapeAngle = Math.atan2(bot.head.y - nearestThreat.y, bot.head.x - nearestThreat.x);
     bot.targetAngle = escapeAngle;
     
-    // Boost when escaping
-    if (bot.totalMass > 4 && bot.boostCooldown === 0) {
+    // Boost when escaping (less frequent)
+    if (bot.totalMass > 6 && bot.boostCooldown === 0 && nearestThreat.distance < 25) {
       bot.isBoosting = true;
-      bot.boostCooldown = 20;
+      bot.boostCooldown = 120; // Much longer cooldown
     }
   }
   // PRIORITY 2: Hunt player if advantageous
@@ -175,10 +175,10 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
       // Direct path to player
       bot.targetAngle = Math.atan2(playerSnake.head.y - bot.head.y, playerSnake.head.x - bot.head.x);
       
-      // Boost when close to player
-      if (playerHeadDist < 80 && bot.totalMass > 6 && bot.boostCooldown === 0) {
+      // Boost when close to player (less frequent)
+      if (playerHeadDist < 60 && bot.totalMass > 8 && bot.boostCooldown === 0) {
         bot.isBoosting = true;
-        bot.boostCooldown = 40;
+        bot.boostCooldown = 180; // Much longer cooldown
       }
     }
     // PRIORITY 3: Collect food strategically
@@ -219,54 +219,63 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
         // Direct path to food
         bot.targetAngle = Math.atan2(bot.targetFood.y - bot.head.y, bot.targetFood.x - bot.head.x);
         
-        // Boost toward money crates
+        // Boost toward money crates (rarely)
         const distToFood = Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2);
-        if (bot.targetFood.type === 'money' && distToFood < 100 && bot.totalMass > 5 && bot.boostCooldown === 0) {
+        if (bot.targetFood.type === 'money' && distToFood < 50 && bot.totalMass > 10 && bot.boostCooldown === 0) {
           bot.isBoosting = true;
-          bot.boostCooldown = 50;
+          bot.boostCooldown = 240; // Very long cooldown
         }
       }
-      // PRIORITY 4: Explore with straight-line movement
+      // PRIORITY 4: Explore with consistent straight-line movement
       else {
         if (bot.movementState !== 'exploring' || !bot.straightLineTarget || 
-            Math.sqrt((bot.head.x - bot.straightLineTarget.x) ** 2 + (bot.head.y - bot.straightLineTarget.y) ** 2) < 50) {
+            Math.sqrt((bot.head.x - bot.straightLineTarget.x) ** 2 + (bot.head.y - bot.straightLineTarget.y) ** 2) < 80) {
           
           bot.movementState = 'exploring';
           
-          // Pick a random point within the map to travel to in a straight line
-          const angle = Math.random() * Math.PI * 2;
-          const distance = 200 + Math.random() * 400; // Travel 200-600 pixels
+          // Use a more stable target selection system
+          const currentTime = Date.now();
+          const timeSeed = Math.floor(currentTime / 5000) + bot.id.charCodeAt(0); // Change target every 5 seconds per bot
+          const pseudoRandom = (timeSeed * 1103515245 + 12345) / Math.pow(2, 31);
+          
+          // Create more predictable but varied movement
+          const angle = (pseudoRandom % 1) * Math.PI * 2;
+          const distance = 300 + ((pseudoRandom * 137) % 1) * 300; // 300-600 pixels
           
           let targetX = bot.head.x + Math.cos(angle) * distance;
           let targetY = bot.head.y + Math.sin(angle) * distance;
           
           // Keep target within map bounds
           const distFromCenter = Math.sqrt((targetX - MAP_CENTER_X) ** 2 + (targetY - MAP_CENTER_Y) ** 2);
-          if (distFromCenter > MAP_RADIUS - 100) {
-            // If target is outside map, head toward center instead
-            targetX = MAP_CENTER_X + (Math.random() - 0.5) * 200;
-            targetY = MAP_CENTER_Y + (Math.random() - 0.5) * 200;
+          if (distFromCenter > MAP_RADIUS - 150) {
+            // Pick a point closer to center
+            const centerAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+            const centerDist = 200 + ((pseudoRandom * 73) % 1) * 200;
+            targetX = bot.head.x + Math.cos(centerAngle) * centerDist;
+            targetY = bot.head.y + Math.sin(centerAngle) * centerDist;
           }
           
           bot.straightLineTarget = { x: targetX, y: targetY };
         }
         
-        // Move toward straight line target
+        // Move toward straight line target with stable angle
         if (bot.straightLineTarget) {
-          bot.targetAngle = Math.atan2(bot.straightLineTarget.y - bot.head.y, bot.straightLineTarget.x - bot.head.x);
+          const targetAngle = Math.atan2(bot.straightLineTarget.y - bot.head.y, bot.straightLineTarget.x - bot.head.x);
+          bot.targetAngle = targetAngle;
         }
       }
     }
   }
   
-  // Much more direct angle movement - less smoothing
+  // Balanced angle movement - prevent overshooting
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
   
-  // More responsive turning - less smoothing to prevent circles
-  const turnSpeed = 0.1; // Much more direct turning
-  bot.currentAngle += angleDiff * turnSpeed;
+  // More controlled turning to prevent erratic movement
+  const maxTurnPerFrame = 0.15; // Limit how much the bot can turn per frame
+  const turnAmount = Math.min(Math.abs(angleDiff), maxTurnPerFrame) * Math.sign(angleDiff);
+  bot.currentAngle += turnAmount;
   
   // Keep angle in range
   if (bot.currentAngle > Math.PI) bot.currentAngle -= 2 * Math.PI;
