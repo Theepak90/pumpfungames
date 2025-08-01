@@ -1871,17 +1871,16 @@ export default function GamePage() {
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
       {/* Minimap */}
       <div className="absolute top-4 left-4 z-10">
-        <div className="w-24 h-24 bg-black/60 border border-gray-500 rounded">
-          <svg width="96" height="96" className="w-full h-full">
-            {/* Map boundary circle */}
-            <circle
-              cx="48"
-              cy="48"
-              r="44"
-              fill="none"
-              stroke="#53d392"
-              strokeWidth="1"
-            />
+        <svg width="96" height="96" className="w-full h-full">
+          {/* Map boundary circle */}
+          <circle
+            cx="48"
+            cy="48"
+            r="44"
+            fill="black"
+            stroke="#53d392"
+            strokeWidth="2"
+          />
             
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
@@ -1903,8 +1902,7 @@ export default function GamePage() {
                 fill={bot.color}
               />
             ))}
-          </svg>
-        </div>
+        </svg>
       </div>
 
       {/* Instructions */}
