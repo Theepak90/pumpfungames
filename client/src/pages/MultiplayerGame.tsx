@@ -1190,10 +1190,7 @@ export default function GamePage() {
         }));
       }
 
-      // Update bot snakes
-      setBotSnakes(prevBots => {
-        return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
-      });
+      // No bot snakes in multiplayer - removed
 
       // Update cash-out progress - only if Q is still being held
       if (cashingOut && cashOutStartTime && qKeyPressed) {
@@ -1255,32 +1252,34 @@ export default function GamePage() {
         return;
       }
 
-      // Check collision between player snake eyes and bot snakes
+      // Check collision between player snake eyes and other multiplayer players
       const playerEyePositions = snake.getEyePositions();
-      let hitBot = false;
+      let hitPlayer = false;
       
-      for (const bot of botSnakes) {
-        // Calculate bot's current radius based on mass (caps at 5x width)
-        const botBaseRadius = 8;
-        const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
+      for (const otherPlayer of multiplayerPlayers) {
+        if (otherPlayer.id === playerId) continue; // Skip our own snake
         
-        for (const segment of bot.visibleSegments) {
-          // Check each eye against bot segments
+        // Calculate other player's current radius based on mass (caps at 5x width)
+        const playerBaseRadius = 8;
+        const maxScale = 5;
+        const playerScaleFactor = Math.min(1 + (otherPlayer.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
+        
+        for (const segment of otherPlayer.visibleSegments || []) {
+          // Check each eye against player segments
           for (const eye of playerEyePositions) {
             const dist = Math.sqrt((eye.x - segment.x) ** 2 + (eye.y - segment.y) ** 2);
-            if (dist < eye.size + botRadius) {
-              hitBot = true;
+            if (dist < eye.size + playerRadius) {
+              hitPlayer = true;
               break;
             }
           }
-          if (hitBot) break;
+          if (hitPlayer) break;
         }
-        if (hitBot) break;
+        if (hitPlayer) break;
       }
       
-      if (hitBot) {
+      if (hitPlayer) {
         // Drop food and money crates when snake dies from collision
         dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
         dropMoneyCrates();
@@ -1289,22 +1288,24 @@ export default function GamePage() {
         return;
       }
 
-      // Check for head-on collisions between player and bot snakes
-      for (let i = botSnakes.length - 1; i >= 0; i--) {
-        const bot = botSnakes[i];
+      // Check for head-on collisions between player and other multiplayer players
+      for (let i = 0; i < multiplayerPlayers.length; i++) {
+        const otherPlayer = multiplayerPlayers[i];
+        if (otherPlayer.id === playerId) continue; // Skip our own snake
+        
         const playerEyePositions = snake.getEyePositions();
         
-        // Calculate bot's current radius based on mass
-        const botBaseRadius = 8;
+        // Calculate other player's current radius based on mass
+        const playerBaseRadius = 8;
         const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
+        const playerScaleFactor = Math.min(1 + (otherPlayer.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
         
-        // Check if player's eyes collide with bot's head (head-on collision)
+        // Check if player's eyes collide with other player's head (head-on collision)
         let headOnCollision = false;
         for (const eye of playerEyePositions) {
-          const dist = Math.sqrt((eye.x - bot.head.x) ** 2 + (eye.y - bot.head.y) ** 2);
-          if (dist < eye.size + botRadius) {
+          const dist = Math.sqrt((eye.x - otherPlayer.head.x) ** 2 + (eye.y - otherPlayer.head.y) ** 2);
+          if (dist < eye.size + playerRadius) {
             headOnCollision = true;
             break;
           }
@@ -1317,226 +1318,68 @@ export default function GamePage() {
           dropMoneyCrates();
           snake.money = 0;
           
-          // Bot snake also dies
-          dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
-          
-          // Drop money crates for bot death too
-          const originalSegments = snake.visibleSegments;
-          const originalMoney = snake.money;
-          snake.visibleSegments = bot.visibleSegments;
-          snake.money = bot.money; // Use bot's money value
-          dropMoneyCrates();
-          snake.visibleSegments = originalSegments;
-          snake.money = originalMoney; // Restore player money
-          
-          // Remove the bot
-          setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
-          
-          // Spawn a new bot to replace the killed one
-          setTimeout(() => {
-            setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
-          }, 3000);
+          // Other player also dies (handled by server)
+          dropDeathFood(otherPlayer.head.x, otherPlayer.head.y, otherPlayer.totalMass);
           
           setGameOver(true);
           return;
         }
       }
       
-      // Check if player snake kills any bot snakes (excluding head segment)
-      for (let i = botSnakes.length - 1; i >= 0; i--) {
-        const bot = botSnakes[i];
-        const botBaseRadius = 8;
+      // Check if player snake kills any other multiplayer players (excluding head segment)
+      for (let i = 0; i < multiplayerPlayers.length; i++) {
+        const otherPlayer = multiplayerPlayers[i];
+        if (otherPlayer.id === playerId) continue; // Skip our own snake
+        
+        const playerBaseRadius = 8;
         const maxScale = 5;
-        const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-        const botRadius = botBaseRadius * botScaleFactor;
+        const playerScaleFactor = Math.min(1 + (otherPlayer.totalMass - 10) / 100, maxScale);
+        const playerRadius = playerBaseRadius * playerScaleFactor;
         
         // Check collision with snake body segments (skip first segment/head at index 0)
         for (let j = 1; j < snake.visibleSegments.length; j++) {
           const segment = snake.visibleSegments[j];
-          const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
-          if (dist < snake.getSegmentRadius() + botRadius) {
-            // Player killed a bot - drop food and money squares
-            dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
+          const dist = Math.sqrt((segment.x - otherPlayer.head.x) ** 2 + (segment.y - otherPlayer.head.y) ** 2);
+          if (dist < snake.getSegmentRadius() + playerRadius) {
+            // Player killed another player - drop food and money squares
+            dropDeathFood(otherPlayer.head.x, otherPlayer.head.y, otherPlayer.totalMass);
             
-            // Drop money crates when bot dies - use bot's actual money value
-            // Create temporary function call for bot death
-            const originalSegments = snake.visibleSegments;
-            const originalMoney = snake.money;
-            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
-            snake.money = bot.money; // Use bot's money value
-            dropMoneyCrates();
-            snake.visibleSegments = originalSegments; // Restore player segments
-            snake.money = originalMoney; // Restore player money
-            
-            // Remove the killed bot
-            setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
-            
-            // Spawn a new bot to replace the killed one
-            setTimeout(() => {
-              setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
-            }, 3000); // 3 second delay before respawn
+            // Award the player money for the kill
+            const minReward = 0.50;
+            const percentageReward = otherPlayer.totalMass * 0.05;
+            const reward = Math.max(minReward, percentageReward);
+            snake.money += reward;
             
             break;
           }
         }
       }
 
-      // Let bot snakes eat food
-      setBotSnakes(prevBots => {
-        return prevBots.map(bot => {
-          setFoods(prevFoods => {
-            const newFoods = [...prevFoods];
-            
-            for (let i = newFoods.length - 1; i >= 0; i--) {
-              const food = newFoods[i];
-              const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
-              
-              // Calculate bot's current radius for food collision (caps at 5x width)
-              const botBaseRadius = 8;
-              const maxScale = 5;
-              const botScaleFactor = Math.min(1 + (bot.totalMass - 10) / 100, maxScale);
-              const botRadius = botBaseRadius * botScaleFactor;
-              
-              if (dist < botRadius + food.size) {
-                // Bot eats food (with new growth system: 1 mass = 0.5 segments)
-                const mass = food.mass || 1;
-                bot.totalMass += mass * 0.5;
-                
-                // Remove eaten food and add new one
-                newFoods.splice(i, 1);
-                
-                const foodType = Math.random();
-                let newFood: Food;
-                
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * (MAP_RADIUS - 100);
-                const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-                const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-                
-                if (foodType < 0.05) { // 5% big orange test food
-                  newFood = { x: newX, y: newY, size: 20, mass: 25, color: '#ff8c00', type: 'normal' }; // Big orange test food
-                } else if (foodType < 0.15) { // 10% big food
-                  newFood = { x: newX, y: newY, size: 10, mass: 0.48, color: getRandomFoodColor(), type: 'normal' }; // Was 0.24, now doubled to 0.48
-                } else if (foodType < 0.50) { // 35% medium food
-                  newFood = { x: newX, y: newY, size: 6, mass: 0.16, color: getRandomFoodColor(), type: 'normal' }; // Was 0.08, now doubled to 0.16
-                } else { // 50% small food
-                  newFood = { x: newX, y: newY, size: 4, mass: 0.08, color: getRandomFoodColor(), type: 'normal' }; // Was 0.04, now doubled to 0.08
-                }
-                
-                newFoods.push(newFood);
-                break;
-              }
-            }
-            
-            return newFoods;
-          });
-          
-          return bot;
-        });
-      });
-
-      // Food gravitation toward snake head (50px radius, 2x faster)
-      const suctionRadius = 50;
-      const suctionStrength = 1.6;
-      
-      setFoods(prevFoods => {
-        return prevFoods.map(food => {
-          const dx = snake.head.x - food.x;
-          const dy = snake.head.y - food.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < suctionRadius && dist > 0) {
-            return {
-              ...food,
-              x: food.x + (dx / dist) * suctionStrength,
-              y: food.y + (dy / dist) * suctionStrength
-            };
-          }
-          return food;
-        });
-      });
-
-      // Check for food collision and handle eating
+      // Handle local food collision detection (food comes from server but we need local collision)
       setFoods(prevFoods => {
         const newFoods = [...prevFoods];
-        let scoreIncrease = 0;
         
         for (let i = newFoods.length - 1; i >= 0; i--) {
           const food = newFoods[i];
           const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
           
-          // Use appropriate collision detection based on food type
-          const collisionRadius = food.type === 'money' ? 10 : food.size; // Money squares are 20x20px (10px radius)
-          if (dist < snake.getSegmentRadius() + collisionRadius) {
-            // Handle different food types
+          // Calculate player's current radius for food collision
+          const playerRadius = snake.getSegmentRadius();
+          
+          if (dist < playerRadius + food.size) {
+            // Player eats food
+            const mass = food.mass || 1;
+            snake.totalMass += mass * 0.5;
+            
+            // Handle money crates
             if (food.type === 'money') {
-              // Money pickup - add to snake's money balance and mass
-              snake.money += food.value || 0; // Add money value
-              snake.totalMass += food.mass || 1; // Add mass (each crate worth 1 mass)
-              newFoods.splice(i, 1);
-              continue; // Don't spawn replacement food for money
-            } else {
-              // Regular food - grow snake
-              scoreIncrease += snake.eatFood(food);
+              snake.money += food.value || 0.1;
             }
-            
-            // Remove eaten food and add new one with mass system
+                
+            // Remove eaten food - let server handle respawning
             newFoods.splice(i, 1);
-            
-            const foodType = Math.random();
-            let newFood: Food;
-            
-            // Generate new food within circular boundary
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * (MAP_RADIUS - 100);
-            const newX = MAP_CENTER_X + Math.cos(angle) * radius;
-            const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
-            
-            if (foodType < 0.05) { // 5% big orange test food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 20,
-                mass: 25, // Big test food gives 25 mass
-                color: '#ff8c00', // Orange color
-                type: 'normal'
-              };
-            } else if (foodType < 0.15) { // 10% big food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 10,
-                mass: 0.48, // Was 0.24, now doubled to 0.48
-                color: getRandomFoodColor(),
-                type: 'normal'
-              };
-            } else if (foodType < 0.50) { // 35% medium food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 6,
-                mass: 0.16, // Was 0.08, now doubled to 0.16
-                color: getRandomFoodColor(),
-                type: 'normal'
-              };
-            } else { // 50% small food
-              newFood = {
-                x: newX,
-                y: newY,
-                size: 4,
-                mass: 0.08, // Was 0.04, now doubled to 0.08
-                color: getRandomFoodColor(),
-                type: 'normal'
-              };
-            }
-            
-            newFoods.push(newFood);
-            break; // Only eat one food per frame
+            break;
           }
-        }
-        
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
         }
         
         return newFoods;
@@ -1738,15 +1581,15 @@ export default function GamePage() {
         
         ctx.restore();
         
-        // Draw bot eyes using player's rotated square eye system
-        if (bot.visibleSegments.length > 0) {
-          const head = bot.visibleSegments[0];
+        // Draw player eyes using player's rotated square eye system
+        if (player.visibleSegments.length > 0) {
+          const head = player.visibleSegments[0];
           ctx.globalAlpha = 1.0;
           
-          const movementAngle = bot.currentAngle;
-          const eyeDistance = 5 * botScaleFactor; // Scale with bot size
-          const eyeSize = 3 * botScaleFactor; // Scale eye size
-          const pupilSize = 1.5 * botScaleFactor; // Scale pupil size
+          const movementAngle = player.angle || 0;
+          const eyeDistance = 5 * playerScaleFactor; // Scale with player size
+          const eyeSize = 3 * playerScaleFactor; // Scale eye size
+          const pupilSize = 1.5 * playerScaleFactor; // Scale pupil size
           
           // Eye positions perpendicular to movement direction (like player)
           const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -1792,16 +1635,16 @@ export default function GamePage() {
           ctx.restore();
         }
         
-        // Draw money balance above bot head
-        if (bot.visibleSegments.length > 0) {
-          const head = bot.visibleSegments[0];
-          const moneyText = `$${bot.money.toFixed(2)}`;
+        // Draw money balance above player head
+        if (player.visibleSegments.length > 0) {
+          const head = player.visibleSegments[0];
+          const moneyText = `$${player.money.toFixed(2)}`;
           
           // Calculate text position above head
-          const textY = head.y - botRadius - 25; // Position above the bot
+          const textY = head.y - playerRadius - 25; // Position above the player
           
           // Set text style with retro font and custom outline color
-          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
+          ctx.font = `${Math.max(12, Math.floor(8 * playerScaleFactor))}px 'Press Start 2P', monospace`; // Scale with player size
           ctx.textAlign = 'center';
           ctx.fillStyle = 'white';
           ctx.strokeStyle = '#134242';
