@@ -37,15 +37,19 @@ Preferred communication style: Simple, everyday language.
 - Separate game modes: multiplayer (no bots, real players) vs single-player (AI bots)
 - Session-based access control for private game using sessionStorage
 
-### Enhanced Bot AI System
-- State-based AI with wander, foodHunt, avoid, and aggro behaviors
-- Bots start with exactly $1.00 and only increase money through crate collection
-- Bots avoid big orange test food but actively hunt regular food and money crates
-- Aggressive player hunting when bots are larger than player
-- Strategic boosting for escaping, hunting, and collecting valuable items
-- Reduced dodging sensitivity for more aggressive gameplay
-- Shadows like player snake when not boosting, white outline only when boosting
-- Realistic movement patterns instead of circular wandering
+### Extremely Advanced AI Bot System (Pro Slither.io Level)
+- **Strategic Pathfinding**: Bots constantly scan for mass clusters, threats, and barriers with 32-direction vector analysis
+- **Virtual Radar System**: 400-600px detection range with real-time threat assessment every 100ms
+- **Advanced State Machine**: patrol, foodHunt, avoid, trap, aggro modes with intelligent state transitions
+- **Trap Detection & Avoidance**: Bots recognize and escape coordinated trap attempts by multiple players
+- **Aggressive Trapping**: When larger, bots circle and corner smaller snakes using advanced geometry
+- **Smooth Turning Physics**: Angle velocity system with acceleration for human-like but optimal movement
+- **Realistic Mistakes**: 5-10% mistake rate including wrong directions, hesitation, and delayed reactions
+- **Territory Control**: Each bot patrols assigned zones and switches areas dynamically for personality
+- **Predictive AI**: Bots predict player paths 0.5 seconds ahead and intercept boost attacks
+- **Emergency Systems**: Instant counter-boost when players boost toward bots, map boundary escape protocols
+- **Pro-Level Speed**: 2.0x boost multiplier with optimized mass loss for competitive gameplay
+- **Field Awareness**: Comprehensive collision avoidance with enhanced visual range and threat prioritization
 
 ### Money Balance System
 - Added money balance display above snake head starting at $1.00
