@@ -10,13 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Restored Multiplayer Functionality (Latest)
-- **Re-implemented WebSocket server**: WebSocket server runs on path `/game-ws` to avoid Vite HMR conflicts
-- **Real-time multiplayer**: Friends can play together by clicking PLAY on the same game URL
-- **Player synchronization**: Snake positions, movements, and visual data synchronized every 50ms
-- **Connection status**: Shows connected/disconnected status and player count in-game
-- **Fixed Vite conflicts**: Separated multiplayer WebSocket from development server WebSocket
-- **Cross-tab support**: Multiple players can join from different browser tabs/windows
+### Fixed Multiplayer Snake Rendering (Latest)
+- **Unified snake drawing**: All snakes (local and remote) now use identical rendering code
+- **Consistent visuals**: Remote players' snakes look exactly like local snake with proper segment spacing
+- **Same shadow effects**: All snakes have matching drop shadows when not boosting
+- **Identical segment structure**: Remote snakes follow same segment-following logic as local snake
+- **Fixed polling system**: Replaced WebSocket with stable HTTP polling to avoid Vite conflicts
+- **Eliminated white screen flashing**: Removed conflicting WebSocket server causing Vite HMR issues
 
 ### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance

@@ -269,29 +269,60 @@ const MultiplayerGame: React.FC = () => {
         ctx.fill();
       });
 
-      // Draw other players
-      otherPlayers.forEach(player => {
-        if (player.segments && player.segments.length > 0) {
-          player.segments.forEach((segment, index) => {
-            ctx.fillStyle = player.color;
-            ctx.globalAlpha = segment.opacity || 1;
-            ctx.beginPath();
-            ctx.arc(segment.x, segment.y, index === 0 ? 12 : 8, 0, Math.PI * 2);
-            ctx.fill();
-          });
-          ctx.globalAlpha = 1;
+      // Unified snake drawing function
+      const drawSnake = (snakeData: any, isLocal = false) => {
+        if (!snakeData.segments || snakeData.segments.length === 0) return;
+        
+        const segments = snakeData.segments;
+        const segmentCount = isLocal ? snake.currentSegmentCount : segments.length;
+        
+        // Draw shadow when not boosting (like local snake)
+        if (!snake.boosting && isLocal) {
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
         }
-      });
 
-      // Draw player snake
-      snake.segments.forEach((segment, index) => {
-        if (index < snake.currentSegmentCount) {
-          ctx.fillStyle = snake.color;
+        // Draw segments with same logic as local snake
+        for (let i = 0; i < Math.min(segmentCount, segments.length); i++) {
+          const segment = segments[i];
+          if (!segment) continue;
+          
+          ctx.fillStyle = snakeData.color;
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, index === 0 ? 12 : 8, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, i === 0 ? 12 : 8, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Draw boost glow when boosting (only for local player)
+        if (isLocal && snake.boosting) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.lineWidth = 3;
+          for (let i = 0; i < Math.min(segmentCount, segments.length); i++) {
+            const segment = segments[i];
+            if (!segment) continue;
+            
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, i === 0 ? 12 : 8, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      };
+
+      // Draw other players using same function as local snake
+      otherPlayers.forEach(player => {
+        drawSnake(player, false);
       });
+
+      // Draw local player snake
+      drawSnake(snake, true);
 
       // Draw money display
       ctx.fillStyle = '#fff';
