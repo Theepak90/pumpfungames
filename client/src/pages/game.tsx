@@ -652,6 +652,7 @@ export default function GamePage() {
   const [cashingOut, setCashingOut] = useState(false);
   const [cashOutProgress, setCashOutProgress] = useState(0);
   const [cashOutStartTime, setCashOutStartTime] = useState<number | null>(null);
+  const [qKeyPressed, setQKeyPressed] = useState(false);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -979,14 +980,20 @@ export default function GamePage() {
   // Boost controls and cash-out
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent key repeat events
+      if (e.repeat) return;
+      
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(true);
         snake.setBoost(true);
-      } else if (e.key.toLowerCase() === 'q' && !cashingOut) {
-        // Start cash-out process only if Q is pressed
-        setCashingOut(true);
-        setCashOutStartTime(Date.now());
-        setCashOutProgress(0);
+      } else if (e.key.toLowerCase() === 'q') {
+        setQKeyPressed(true);
+        if (!cashingOut) {
+          // Start cash-out process only if Q is pressed
+          setCashingOut(true);
+          setCashOutStartTime(Date.now());
+          setCashOutProgress(0);
+        }
       }
     };
 
@@ -995,7 +1002,8 @@ export default function GamePage() {
         setIsBoosting(false);
         snake.setBoost(false);
       } else if (e.key.toLowerCase() === 'q') {
-        // Cancel cash-out process when Q is released (must hold continuously)
+        setQKeyPressed(false);
+        // Cancel cash-out process when Q is released
         setCashingOut(false);
         setCashOutProgress(0);
         setCashOutStartTime(null);
@@ -1107,8 +1115,8 @@ export default function GamePage() {
         return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
       });
 
-      // Update cash-out progress
-      if (cashingOut && cashOutStartTime) {
+      // Update cash-out progress - only if Q is still being held
+      if (cashingOut && cashOutStartTime && qKeyPressed) {
         const elapsed = currentTime - cashOutStartTime;
         const progress = Math.min(elapsed / 3000, 1); // 3 seconds = 100%
         setCashOutProgress(progress);
@@ -1120,7 +1128,13 @@ export default function GamePage() {
           setCashingOut(false);
           setCashOutProgress(0);
           setCashOutStartTime(null);
+          setQKeyPressed(false);
         }
+      } else if (cashingOut && !qKeyPressed) {
+        // Q was released, cancel cash-out
+        setCashingOut(false);
+        setCashOutProgress(0);
+        setCashOutStartTime(null);
       }
 
       // Remove expired money crates (fade out over 10 seconds)
