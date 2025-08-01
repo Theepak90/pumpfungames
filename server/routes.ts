@@ -301,12 +301,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broadcast game state every 100ms
   setInterval(() => {
     if (wss.clients.size > 0) {
-      const playerList = Array.from(activePlayers.values());
-      const playerMessage = JSON.stringify({
-        type: 'players',
-        players: playerList
-      });
-      
       // Update bot positions (simple movement simulation)
       gameWorld.bots.forEach(bot => {
         bot.x += (Math.random() - 0.5) * 20;
@@ -321,10 +315,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         players: Array.from(gameWorld.players.values())
       });
       
+      console.log(`Broadcasting to ${wss.clients.size} clients: ${gameWorld.players.size} players`);
+      
       wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
           try {
-            client.send(playerMessage);
             client.send(worldMessage);
           } catch (error) {
             console.error('Broadcast error:', error);

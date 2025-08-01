@@ -914,10 +914,15 @@ export default function GamePage() {
 
   // Send player data to server
   useEffect(() => {
-    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log(`Not sending updates: gameStarted=${gameStarted}, wsRef=${!!wsRef.current}, readyState=${wsRef.current?.readyState}`);
+      return;
+    }
 
+    console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
+    
     const sendInterval = setInterval(() => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
         const updateData = {
           type: 'update',
           segments: snake.visibleSegments.map(seg => ({ x: seg.x, y: seg.y })),
@@ -926,11 +931,16 @@ export default function GamePage() {
         };
         console.log(`Sending update with ${updateData.segments.length} segments to server`);
         wsRef.current.send(JSON.stringify(updateData));
+      } else {
+        console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
     }, 100); // Send updates every 100ms
 
-    return () => clearInterval(sendInterval);
-  }, [gameStarted, snake]);
+    return () => {
+      console.log('Clearing position update interval');
+      clearInterval(sendInterval);
+    };
+  }, [gameStarted, wsRef.current?.readyState]);
 
   // Mouse tracking
   useEffect(() => {
