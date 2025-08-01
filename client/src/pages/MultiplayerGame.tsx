@@ -6,12 +6,12 @@ import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 import LoadingScreen from '@/components/LoadingScreen';
 import MultiplayerLayer from '@/components/MultiplayerLayer';
 
-// Game constants - MULTIPLAYER VERSION (NO BOTS)
+// Game constants - MULTIPLAYER VERSION (WITH BOTS)
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 300; // Doubled from 150
-const BOT_COUNT = 0; // NO BOTS IN MULTIPLAYER
+const BOT_COUNT = 8; // 8 BOTS IN MULTIPLAYER
 
 interface Position {
   x: number;
@@ -31,6 +31,7 @@ interface Food {
 
 interface BotSnake {
   id: string;
+  name: string; // Bot's display name
   head: Position;
   visibleSegments: Array<{ x: number; y: number; opacity: number }>;
   segmentTrail: Position[];
@@ -62,6 +63,29 @@ function getRandomFoodColor(): string {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
+// Bot name generation function
+function generateBotName(): string {
+  const adjectives = [
+    'Quick', 'Silent', 'Deadly', 'Swift', 'Pro', 'Elite', 'Mega', 'Super', 'Dark', 'Red',
+    'Blue', 'Gold', 'Fire', 'Ice', 'Storm', 'Shadow', 'Night', 'Speed', 'Power', 'Cyber',
+    'Neon', 'Wild', 'Epic', 'Rage', 'Steel', 'Venom', 'Ghost', 'Blade', 'Frost', 'Flame'
+  ];
+  
+  const nouns = [
+    'Hunter', 'Slayer', 'Master', 'Legend', 'King', 'Warrior', 'Ninja', 'Dragon', 'Wolf', 'Eagle',
+    'Viper', 'Falcon', 'Tiger', 'Shark', 'Phoenix', 'Reaper', 'Destroyer', 'Champion', 'Beast', 'Demon',
+    'Angel', 'Knight', 'Wizard', 'Samurai', 'Assassin', 'Sniper', 'Pilot', 'Racer', 'Gamer', 'Player'
+  ];
+  
+  const suffixes = ['47', '88', '99', '21', '777', '420', '69', '13', '666', '123', 'X', 'XX', 'Pro', 'YT', 'TTV'];
+  
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+  
+  return `${adjective}${noun}${suffix}`;
+}
+
 // Bot snake utility functions
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
@@ -75,6 +99,7 @@ function createBotSnake(id: string): BotSnake {
   
   return {
     id,
+    name: generateBotName(), // Add realistic bot name
     head: { x, y },
     visibleSegments: [{ x, y, opacity: 1.0 }],
     segmentTrail: [{ x, y }],
@@ -737,6 +762,39 @@ export default function GamePage() {
         color: '#00ff00', // Green color for money crates
         type: 'money',
         value: moneyPerCrate, // Money divided evenly among all segments
+        spawnTime: currentTime
+      });
+    }
+    
+    setFoods(prevFoods => [...prevFoods, ...newCrates]);
+  };
+
+  // Function to drop money crates when bots die (exactly 20 crates worth $0.05 each)
+  const dropBotMoneyCrates = (bot: BotSnake) => {
+    const currentTime = Date.now();
+    const newCrates: Food[] = [];
+    const cratesCount = 20; // Always drop exactly 20 crates
+    const moneyPerCrate = 0.05; // Each crate worth $0.05
+    
+    // Spread crates around bot's death location
+    for (let i = 0; i < cratesCount; i++) {
+      const angle = (i / cratesCount) * Math.PI * 2 + Math.random() * 0.3; // Slight randomness
+      const radius = 20 + Math.random() * 60; // Random radius from 20-80 pixels
+      const x = bot.head.x + Math.cos(angle) * radius;
+      const y = bot.head.y + Math.sin(angle) * radius;
+      
+      // Make sure crates stay within map bounds
+      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
+      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
+      
+      newCrates.push({
+        x: clampedX,
+        y: clampedY,
+        size: 20, // 20x20 crate size
+        mass: 1, // Each crate worth 1 mass
+        color: '#00ff00', // Green color for money crates
+        type: 'money',
+        value: moneyPerCrate, // Each crate worth $0.05
         spawnTime: currentTime
       });
     }
