@@ -1569,31 +1569,61 @@ export default function GamePage() {
       serverPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          serverPlayer.segments.forEach((segment: any, index: number) => {
+          // Create full snake body trail by interpolating between segments
+          const fullSnakeBody = [];
+          const segmentSpacing = 8; // Same spacing as local snake
+          
+          // Start with the received segments
+          for (let i = 0; i < serverPlayer.segments.length; i++) {
+            fullSnakeBody.push(serverPlayer.segments[i]);
+            
+            // Add interpolated segments between received segments for smooth snake body
+            if (i < serverPlayer.segments.length - 1) {
+              const current = serverPlayer.segments[i];
+              const next = serverPlayer.segments[i + 1];
+              const dx = next.x - current.x;
+              const dy = next.y - current.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const steps = Math.floor(distance / segmentSpacing);
+              
+              for (let step = 1; step < steps; step++) {
+                const t = step / steps;
+                fullSnakeBody.push({
+                  x: current.x + dx * t,
+                  y: current.y + dy * t
+                });
+              }
+            }
+          }
+          
+          // Draw the complete snake body
+          fullSnakeBody.forEach((segment: any, index: number) => {
             ctx.save();
             
-            // Different color for each player - make it more visible
-            ctx.fillStyle = serverPlayer.color || '#ff0000'; // Fallback to bright red
+            // Different color for each player
+            ctx.fillStyle = serverPlayer.color || '#ff0000';
             ctx.beginPath();
-            const radius = (index === 0 ? 15 : 10); // Larger for visibility
+            const radius = (index === 0 ? 12 : 8); // Head is larger
             ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
             ctx.fill();
             
             // Add stroke for better visibility
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1;
             ctx.stroke();
-            
-            // Draw player money above head
-            if (index === 0) {
-              ctx.fillStyle = '#fff';
-              ctx.font = `14px Arial`;
-              ctx.textAlign = 'center';
-              ctx.fillText(`Player: $${serverPlayer.money?.toFixed(2) || '1.00'}`, segment.x, segment.y - 30);
-            }
             
             ctx.restore();
           });
+          
+          // Draw player money above head
+          if (fullSnakeBody.length > 0) {
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.font = `12px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`$${serverPlayer.money?.toFixed(2) || '1.00'}`, fullSnakeBody[0].x, fullSnakeBody[0].y - 25);
+            ctx.restore();
+          }
         }
       });
 

@@ -17,6 +17,8 @@ Preferred communication style: Simple, everyday language.
 - **WebSocket communication**: Real-time updates every 100ms with player position broadcasting
 - **Multiple player support**: Each tab connects as unique player with different colors
 - **Shared game session**: No more separate lobbies - all players join the same world instance
+- **Full snake body rendering**: Players see complete snakes with interpolated segments for smooth trails
+- **Position synchronization**: Each player's 6 segments are broadcast and rendered as full snake bodies
 
 ### Fixed White Screen Flashing Issue
 - **Removed WebSocket conflicts**: Eliminated WebSocket server that was interfering with Vite HMR
