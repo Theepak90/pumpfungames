@@ -40,6 +40,8 @@ interface BotSnake {
   lastDirectionChange: number;
   targetFood: Food | null;
   money: number; // Bot's money balance
+  isBoosting: boolean;
+  boostCooldown: number;
 }
 
 // Utility function to generate random food colors
@@ -76,35 +78,35 @@ function createBotSnake(id: string): BotSnake {
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
     targetFood: null,
-    money: 1.00 + Math.random() * 2.00 // Start with $1-3 money
+    money: 1.00, // All bots start with exactly $1.00
+    isBoosting: false,
+    boostCooldown: 0
   };
 }
 
 function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): BotSnake {
-  // Enhanced AI Decision making with realistic behavior
+  // Enhanced AI Decision making with aggressive behavior
   const SEGMENT_SPACING = 10;
   const SEGMENT_RADIUS = 10;
   const currentTime = Date.now();
   
-  // Check for nearby threats (player snake body segments and other bots)
+  // Update boost cooldown
+  if (bot.boostCooldown > 0) {
+    bot.boostCooldown--;
+  }
+  
+  // Check for nearby threats (less sensitive for more aggressive play)
   let nearestThreat: { x: number, y: number, distance: number } | null = null;
   let threatDistance = Infinity;
   
-  // Check player snake segments for collision avoidance (more aggressive avoidance)
+  // Check player snake segments for collision avoidance (reduced sensitivity)
   for (let i = 1; i < playerSnake.visibleSegments.length; i++) { // Skip head (index 0)
     const segment = playerSnake.visibleSegments[i];
     const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-    if (dist < 120 && dist < threatDistance) { // Increased danger zone to 120 pixels for more avoidance
+    if (dist < 60 && dist < threatDistance) { // Reduced danger zone for more aggressive play
       threatDistance = dist;
       nearestThreat = { x: segment.x, y: segment.y, distance: dist };
     }
-  }
-  
-  // Also avoid player head more aggressively
-  const playerHeadDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
-  if (playerHeadDist < 100 && playerHeadDist < threatDistance) {
-    threatDistance = playerHeadDist;
-    nearestThreat = { x: playerSnake.head.x, y: playerSnake.head.y, distance: playerHeadDist };
   }
   
   // Check other bot snakes for collision avoidance
@@ -112,32 +114,67 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     if (otherBot.id === bot.id) continue;
     for (const segment of otherBot.visibleSegments) {
       const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-      if (dist < 60 && dist < threatDistance) { // Smaller danger zone for other bots
+      if (dist < 40 && dist < threatDistance) { // Smaller danger zone for other bots
         threatDistance = dist;
         nearestThreat = { x: segment.x, y: segment.y, distance: dist };
       }
     }
   }
   
-  // Threat avoidance takes priority (more sensitive)
-  if (nearestThreat && nearestThreat.distance < 80) { // Increased avoidance threshold
+  // Aggressive player hunting behavior
+  const playerHeadDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
+  let shouldHuntPlayer = false;
+  
+  // Hunt player if bot is bigger or player is close and vulnerable
+  if (bot.totalMass > playerSnake.totalMass * 0.8 && playerHeadDist < 200) {
+    shouldHuntPlayer = true;
+  }
+  
+  // Threat avoidance (less sensitive)
+  if (nearestThreat && nearestThreat.distance < 40) { // Reduced avoidance threshold
     // Calculate escape angle (away from threat)
     const threatAngle = Math.atan2(nearestThreat.y - bot.head.y, nearestThreat.x - bot.head.x);
     bot.targetAngle = threatAngle + Math.PI; // Opposite direction
-    bot.lastDirectionChange = currentTime; // Reset direction change timer
+    bot.lastDirectionChange = currentTime;
+    
+    // Boost when escaping danger
+    if (bot.totalMass > 4 && bot.boostCooldown === 0) {
+      bot.isBoosting = true;
+      bot.boostCooldown = 30; // Cooldown frames
+    }
+  } else if (shouldHuntPlayer) {
+    // Hunt the player aggressively
+    bot.targetAngle = Math.atan2(playerSnake.head.y - bot.head.y, playerSnake.head.x - bot.head.x);
+    bot.lastDirectionChange = currentTime;
+    
+    // Boost when hunting if close enough
+    if (playerHeadDist < 100 && bot.totalMass > 6 && bot.boostCooldown === 0) {
+      bot.isBoosting = true;
+      bot.boostCooldown = 45; // Longer cooldown for hunting
+    }
   } else {
-    // Find nearest food with preference for valuable food
-    if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 200) {
+    // Find food strategically (avoid big test food, prefer money crates)
+    if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 150) {
       let bestFood: Food | null = null;
       let bestScore = -1;
       
       foods.forEach(food => {
-        const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
-        // Score based on food value and proximity (closer + more valuable = better)
-        const foodValue = food.type === 'money' ? (food.value || 0) * 10 : (food.mass || 1);
-        const score = foodValue / (dist + 1); // +1 to avoid division by zero
+        // Skip big test food (size 20, mass 25)
+        if (food.mass === 25) return;
         
-        if (score > bestScore && dist < 300) { // Only consider food within reasonable range
+        const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+        
+        // Prioritize money crates highly, then regular food
+        let foodValue = 1;
+        if (food.type === 'money') {
+          foodValue = (food.value || 0) * 15; // High priority for money
+        } else {
+          foodValue = food.mass || 1;
+        }
+        
+        const score = foodValue / (dist + 1);
+        
+        if (score > bestScore && dist < 250) {
           bestScore = score;
           bestFood = food;
         }
@@ -146,22 +183,28 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
       bot.targetFood = bestFood;
     }
     
-    // Movement toward food or exploration
+    // Movement toward food
     if (bot.targetFood) {
       const dx = bot.targetFood.x - bot.head.x;
       const dy = bot.targetFood.y - bot.head.y;
       bot.targetAngle = Math.atan2(dy, dx);
+      
+      // Boost toward valuable food
+      const distToFood = Math.sqrt(dx * dx + dy * dy);
+      if (bot.targetFood.type === 'money' && distToFood < 120 && bot.totalMass > 5 && bot.boostCooldown === 0) {
+        bot.isBoosting = true;
+        bot.boostCooldown = 60;
+      }
     } else {
-      // More realistic exploration - change direction periodically
-      if (currentTime - bot.lastDirectionChange > 1500 + Math.random() * 2000) {
-        // Add some randomness but bias toward center if near edges
+      // Less circular movement - more direct exploration
+      if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
         const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-        if (distFromCenter > MAP_RADIUS * 0.7) {
-          // Bias toward center when near edges
+        if (distFromCenter > MAP_RADIUS * 0.6) {
+          // Move toward center when near edges
           const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-          bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.5; // ±45 degrees from center
+          bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
         } else {
-          // Random exploration in center area
+          // Random but more purposeful movement
           bot.targetAngle = Math.random() * Math.PI * 2;
         }
         bot.lastDirectionChange = currentTime;
@@ -169,30 +212,30 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     }
   }
   
-  // Smooth angle interpolation with more realistic turning
+  // Smooth angle interpolation
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
   
-  // Variable turn speed based on urgency
-  const urgency = nearestThreat ? Math.max(0.1, 1 - (nearestThreat.distance / 100)) : 0.3;
-  const turnSpeed = 0.02 + (urgency * 0.08); // Faster turning when in danger
-  
+  // Faster turning for more responsive movement
+  const turnSpeed = bot.isBoosting ? 0.06 : 0.04; // Faster turning when boosting
   bot.currentAngle += angleDiff * turnSpeed;
   
   // Keep angle in range
   if (bot.currentAngle > Math.PI) bot.currentAngle -= 2 * Math.PI;
   if (bot.currentAngle < -Math.PI) bot.currentAngle += 2 * Math.PI;
   
-  // Variable speed based on situation
+  // Calculate speed with boosting
   let currentSpeed = bot.speed;
-  if (nearestThreat && nearestThreat.distance < 40) {
-    currentSpeed *= 1.3; // Speed up when in immediate danger
-  } else if (bot.targetFood) {
-    const distToFood = Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2);
-    if (distToFood > 150) {
-      currentSpeed *= 1.1; // Speed up when far from food
+  if (bot.isBoosting && bot.totalMass > 4) {
+    currentSpeed *= 1.8; // Boost multiplier
+    // Lose mass when boosting (like player)
+    bot.totalMass -= 0.03;
+    if (bot.totalMass < 4) {
+      bot.isBoosting = false; // Stop boosting if too small
     }
+  } else {
+    bot.isBoosting = false; // Stop boosting
   }
   
   // Move bot
@@ -202,13 +245,11 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   bot.head.x += dx;
   bot.head.y += dy;
   
-  // Keep bot within circular map bounds with smoother boundary handling
+  // Keep bot within circular map bounds
   const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 100) {
-    // Gradually turn toward center as approaching boundary
+  if (distFromCenter > MAP_RADIUS - 50) {
     const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-    const boundaryUrgency = (distFromCenter - (MAP_RADIUS - 100)) / 100;
-    bot.targetAngle = bot.currentAngle + angleDiff * (1 - boundaryUrgency) + angleToCenter * boundaryUrgency;
+    bot.targetAngle = angleToCenter;
   }
   
   // Update trail
@@ -1513,17 +1554,35 @@ export default function GamePage() {
         const botRadius = botBaseRadius * botScaleFactor;
         const botOutlineThickness = 2 * botScaleFactor;
         
-        // Bot outline
-        ctx.fillStyle = "white";
-        for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
-          const segment = bot.visibleSegments[i];
-          ctx.globalAlpha = segment.opacity;
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
-          ctx.fill();
+        // Bot outline only when boosting
+        if (bot.isBoosting) {
+          ctx.fillStyle = "white";
+          for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
+            const segment = bot.visibleSegments[i];
+            ctx.globalAlpha = segment.opacity;
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, botRadius + botOutlineThickness, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
         
-        // Bot body
+        // Bot body with shadow (like player snake)
+        ctx.save();
+        
+        if (!bot.isBoosting) {
+          // Add subtle drop shadow when not boosting
+          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+        } else {
+          // No shadow when boosting (outline effect already applied)
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        }
+        
         ctx.fillStyle = bot.color;
         for (let i = bot.visibleSegments.length - 1; i >= 0; i--) {
           const segment = bot.visibleSegments[i];
@@ -1532,6 +1591,8 @@ export default function GamePage() {
           ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
         }
+        
+        ctx.restore();
         
         // Draw bot eyes using player's rotated square eye system
         if (bot.visibleSegments.length > 0) {
