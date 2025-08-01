@@ -1665,12 +1665,12 @@ export default function GamePage() {
           // Calculate text position above head
           const textY = head.y - botRadius - 25; // Position above the bot
           
-          // Set text style
-          ctx.font = `${Math.max(12, 8 * botScaleFactor)}px Arial`; // Scale with bot size
+          // Set text style with retro font and custom outline color
+          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Courier New', monospace`; // Scale with bot size
           ctx.textAlign = 'center';
           ctx.fillStyle = 'white';
-          ctx.strokeStyle = 'black';
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#134242';
+          ctx.lineWidth = 3;
           
           // Draw text with outline for visibility
           ctx.strokeText(moneyText, head.x, textY);
@@ -1746,10 +1746,10 @@ export default function GamePage() {
         const snakeHead = snake.visibleSegments[0];
         const scaleFactor = snake.getScaleFactor();
         
-        ctx.font = `${14 * scaleFactor}px Arial, sans-serif`;
+        ctx.font = `${Math.floor(14 * scaleFactor)}px 'Courier New', monospace`;
         ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 2 * scaleFactor;
+        ctx.strokeStyle = "#134242";
+        ctx.lineWidth = 3 * scaleFactor;
         ctx.textAlign = "center";
         
         const moneyText = `$${snake.money.toFixed(2)}`;
