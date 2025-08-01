@@ -180,29 +180,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`Player ${playerId} joined multiplayer. Active: ${wss.clients.size}`);
     
     ws.playerId = playerId;
+    
+    // Assign different colors to different players
+    const colors = ['#d55400', '#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+    const playerColor = colors[wss.clients.size % colors.length];
+    
     activePlayers.set(playerId, {
       id: playerId,
       segments: [],
-      color: '#d55400',
+      color: playerColor,
       money: 1.00,
       lastUpdate: Date.now()
     });
 
-    // Send current players to new player
+    // Send welcome message with player ID
     ws.send(JSON.stringify({
-      type: 'players',
-      players: Array.from(activePlayers.values())
+      type: 'welcome',
+      playerId: playerId
     }));
+
+    // Send current players to new player
+    setTimeout(() => {
+      ws.send(JSON.stringify({
+        type: 'players',
+        players: Array.from(activePlayers.values())
+      }));
+    }, 100);
 
     ws.on("message", function incoming(message: any) {
       try {
         const data = JSON.parse(message.toString());
         if (data.type === 'update') {
-          // Update player data
+          // Update player data, preserving assigned color
+          const existingPlayer = activePlayers.get(playerId);
           activePlayers.set(playerId, {
             id: playerId,
             segments: data.segments || [],
-            color: data.color || '#d55400',
+            color: existingPlayer?.color || '#d55400',
             money: data.money || 1.00,
             lastUpdate: Date.now()
           });

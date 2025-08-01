@@ -653,6 +653,7 @@ export default function GamePage() {
     money: number;
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
@@ -917,7 +918,14 @@ export default function GamePage() {
         const data = JSON.parse(event.data);
         if (data.type === 'players') {
           // Filter out our own player data and update others
-          setOtherPlayers(data.players.filter((p: any) => p.segments.length > 0));
+          const filteredPlayers = data.players.filter((p: any) => 
+            p.id !== myPlayerId && p.segments.length > 0
+          );
+          setOtherPlayers(filteredPlayers);
+          console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+        } else if (data.type === 'welcome') {
+          setMyPlayerId(data.playerId);
+          console.log(`My player ID: ${data.playerId}`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
