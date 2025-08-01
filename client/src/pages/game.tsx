@@ -565,32 +565,31 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newFoods]);
   };
 
-  // Function to drop money crates when snake dies (20 crates worth $0.05 each)
+  // Function to drop money crates when snake dies (spread along entire snake body)
   const dropMoneyCrates = () => {
-    const moneyCrateCount = 20;
-    const crateValue = 0.05;
     const segments = snake.visibleSegments;
     const segmentCount = segments.length;
     const currentTime = Date.now();
     
-    // Limit spread zone to first 40 segments or fewer
-    const spreadLength = Math.min(segmentCount, 40);
+    // Each crate is worth 1 mass and money is divided evenly among segments
+    const totalMoney = snake.money;
+    const moneyPerCrate = segmentCount > 0 ? totalMoney / segmentCount : 0;
     const newCrates: Food[] = [];
     
-    for (let i = 0; i < moneyCrateCount; i++) {
+    // Create one money crate per segment
+    for (let i = 0; i < segmentCount; i++) {
       let x, y;
       
       if (segments.length > 0) {
-        // Spread over the first 40 segments (or all if fewer)
-        const segIndex = Math.floor((i / moneyCrateCount) * spreadLength);
-        const segment = segments[segIndex];
+        // Place crate at each segment position
+        const segment = segments[i];
         
         // Add randomness around segment position
-        x = segment.x + (Math.random() - 0.5) * 10;
-        y = segment.y + (Math.random() - 0.5) * 10;
+        x = segment.x + (Math.random() - 0.5) * 15;
+        y = segment.y + (Math.random() - 0.5) * 15;
       } else {
         // Fallback to snake head position with spread
-        const angle = (i / moneyCrateCount) * Math.PI * 2;
+        const angle = (i / segmentCount) * Math.PI * 2;
         const radius = Math.random() * 40 + 20;
         x = snake.head.x + Math.cos(angle) * radius;
         y = snake.head.y + Math.sin(angle) * radius;
@@ -604,10 +603,10 @@ export default function GamePage() {
         x: clampedX,
         y: clampedY,
         size: 20, // 20x20 crate size
-        mass: 0,
+        mass: 1, // Each crate worth 1 mass
         color: '#00ff00', // Green color for money crates
         type: 'money',
-        value: crateValue,
+        value: moneyPerCrate, // Money divided evenly among all segments
         spawnTime: currentTime
       });
     }
@@ -1189,8 +1188,9 @@ export default function GamePage() {
           if (dist < snake.getSegmentRadius() + collisionRadius) {
             // Handle different food types
             if (food.type === 'money') {
-              // Money pickup - add to snake's money balance
-              snake.money += food.value || 0.05; // Default to $0.05 per crate
+              // Money pickup - add to snake's money balance and mass
+              snake.money += food.value || 0; // Add money value
+              snake.totalMass += food.mass || 1; // Add mass (each crate worth 1 mass)
               newFoods.splice(i, 1);
               continue; // Don't spawn replacement food for money
             } else {
