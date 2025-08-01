@@ -859,6 +859,7 @@ export default function GamePage() {
 
     socket.onopen = () => {
       console.log("Connected to multiplayer server!");
+      console.log("WebSocket readyState:", socket.readyState);
       setConnectionStatus('Connected');
     };
 
@@ -886,8 +887,9 @@ export default function GamePage() {
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       console.log("Disconnected from multiplayer server");
+      console.log("Close event:", event.code, event.reason);
       setConnectionStatus('Disconnected');
       wsRef.current = null;
     };
@@ -898,7 +900,8 @@ export default function GamePage() {
     };
 
     return () => {
-      if (socket) {
+      console.log("Cleaning up WebSocket connection...");
+      if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
       }
     };

@@ -10,7 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Fixed White Screen Flashing Issue (Latest)
+### Implemented Server-Authoritative Multiplayer (Latest)
+- **Real-time multiplayer functionality**: Players can see each other simultaneously on `/game`
+- **Server-controlled game state**: All bots, food, and player positions managed centrally by server
+- **Synchronized game world**: Every player sees identical bots and food in same locations
+- **WebSocket communication**: Real-time updates every 100ms with player position broadcasting
+- **Multiple player support**: Each tab connects as unique player with different colors
+- **Shared game session**: No more separate lobbies - all players join the same world instance
+
+### Fixed White Screen Flashing Issue
 - **Removed WebSocket conflicts**: Eliminated WebSocket server that was interfering with Vite HMR
 - **Stabilized Vite connection**: Fixed persistent connection lost/restart loop causing white flashing
 - **Reverted to stable single-player**: Game now loads reliably without connection issues

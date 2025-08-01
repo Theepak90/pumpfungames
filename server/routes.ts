@@ -219,6 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   wss.on("connection", function connection(ws: any) {
     const playerId = `player_${Date.now()}_${Math.random()}`;
     console.log(`Player ${playerId} joined multiplayer. Active: ${wss.clients.size}`);
+    console.log(`WebSocket readyState: ${ws.readyState}`);
     
     ws.playerId = playerId;
     
@@ -226,13 +227,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const colors = ['#d55400', '#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
     const playerColor = colors[wss.clients.size % colors.length];
     
-    activePlayers.set(playerId, {
+    const player = {
       id: playerId,
       segments: [],
       color: playerColor,
       money: 1.00,
       lastUpdate: Date.now()
-    });
+    };
+    
+    activePlayers.set(playerId, player);
+    gameWorld.players.set(playerId, player); // Also add to shared game world
 
     // Send welcome message with player ID
     ws.send(JSON.stringify({
@@ -280,15 +284,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
-    ws.on("close", () => {
-      console.log(`Player ${playerId} left multiplayer. Remaining: ${wss.clients.size - 1}`);
+    ws.on("close", (code: number, reason: Buffer) => {
+      console.log(`Player ${playerId} left multiplayer. Code: ${code}, Reason: ${reason.toString()}, Remaining: ${wss.clients.size - 1}`);
       activePlayers.delete(playerId);
       gameWorld.players.delete(playerId);
     });
 
     ws.on("error", (error: any) => {
-      console.error("WebSocket error:", error);
+      console.error(`WebSocket error for player ${playerId}:`, error);
       activePlayers.delete(playerId);
+      gameWorld.players.delete(playerId);
     });
   });
 
