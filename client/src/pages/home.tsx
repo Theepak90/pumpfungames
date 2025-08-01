@@ -25,35 +25,50 @@ import logoImage from "@assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png_17539122
 
 // Decorative snake for background animation
 class DecorativeSnake {
-  x: number;
-  y: number;
-  angle: number;
-  segments: Array<{ x: number; y: number }>;
+  head: { x: number; y: number };
+  currentAngle: number;
+  segmentTrail: Array<{ x: number; y: number }>;
   speed: number;
   turnSpeed: number;
   targetAngle: number;
   nextTurnTime: number;
+  visibleSegments: Array<{ x: number; y: number }>;
   
   constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-    this.angle = Math.random() * Math.PI * 2;
-    this.segments = [{ x, y }];
-    this.speed = 1;
+    this.head = { x, y };
+    this.currentAngle = Math.random() * Math.PI * 2;
+    this.segmentTrail = [{ x, y }];
+    this.speed = 1.5;
     this.turnSpeed = 0.02;
-    this.targetAngle = this.angle;
+    this.targetAngle = this.currentAngle;
     this.nextTurnTime = Date.now() + 2000;
+    this.visibleSegments = [];
     
-    // Create initial segments
-    for (let i = 1; i < 8; i++) {
-      this.segments.push({
-        x: x - Math.cos(this.angle) * i * 12,
-        y: y - Math.sin(this.angle) * i * 12
+    // Create initial trail points for smooth following
+    for (let i = 0; i < 100; i++) {
+      this.segmentTrail.push({
+        x: x - Math.cos(this.currentAngle) * i * 2,
+        y: y - Math.sin(this.currentAngle) * i * 2
       });
+    }
+    
+    this.updateVisibleSegments();
+  }
+  
+  updateVisibleSegments() {
+    this.visibleSegments = [];
+    const segmentCount = 12;
+    const segmentSpacing = 16;
+    
+    for (let i = 0; i < segmentCount; i++) {
+      const trailIndex = Math.floor(i * segmentSpacing);
+      if (trailIndex < this.segmentTrail.length) {
+        this.visibleSegments.push(this.segmentTrail[trailIndex]);
+      }
     }
   }
   
-  update(canvasWidth: number, canvasHeight: number, foods: Array<{ x: number; y: number }>) {
+  update(canvasWidth: number, canvasHeight: number, foods: Array<{ x: number; y: number; wobbleX: number; wobbleY: number }>) {
     const currentTime = Date.now();
     
     // Random direction changes
@@ -64,105 +79,101 @@ class DecorativeSnake {
     
     // Look for nearby food
     const nearbyFood = foods.find(food => {
-      const distance = Math.sqrt((food.x - this.x) ** 2 + (food.y - this.y) ** 2);
+      const distance = Math.sqrt((food.x - this.head.x) ** 2 + (food.y - this.head.y) ** 2);
       return distance < 100;
     });
     
     if (nearbyFood) {
-      this.targetAngle = Math.atan2(nearbyFood.y - this.y, nearbyFood.x - this.x);
+      this.targetAngle = Math.atan2(nearbyFood.y - this.head.y, nearbyFood.x - this.head.x);
     }
     
     // Smooth angle interpolation
-    let angleDiff = this.targetAngle - this.angle;
+    let angleDiff = this.targetAngle - this.currentAngle;
     if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    this.angle += angleDiff * this.turnSpeed;
+    this.currentAngle += angleDiff * this.turnSpeed;
     
     // Move forward
-    this.x += Math.cos(this.angle) * this.speed;
-    this.y += Math.sin(this.angle) * this.speed;
+    this.head.x += Math.cos(this.currentAngle) * this.speed;
+    this.head.y += Math.sin(this.currentAngle) * this.speed;
     
     // Wrap around screen edges
-    if (this.x < 0) this.x = canvasWidth;
-    if (this.x > canvasWidth) this.x = 0;
-    if (this.y < 0) this.y = canvasHeight;
-    if (this.y > canvasHeight) this.y = 0;
+    if (this.head.x < 0) this.head.x = canvasWidth;
+    if (this.head.x > canvasWidth) this.head.x = 0;
+    if (this.head.y < 0) this.head.y = canvasHeight;
+    if (this.head.y > canvasHeight) this.head.y = 0;
     
-    // Update segments to follow head
-    this.segments[0] = { x: this.x, y: this.y };
-    for (let i = 1; i < this.segments.length; i++) {
-      const prevSegment = this.segments[i - 1];
-      const currentSegment = this.segments[i];
-      const distance = Math.sqrt(
-        (prevSegment.x - currentSegment.x) ** 2 + 
-        (prevSegment.y - currentSegment.y) ** 2
-      );
-      
-      if (distance > 12) {
-        const angle = Math.atan2(prevSegment.y - currentSegment.y, prevSegment.x - currentSegment.x);
-        this.segments[i] = {
-          x: prevSegment.x - Math.cos(angle) * 12,
-          y: prevSegment.y - Math.sin(angle) * 12
-        };
-      }
+    // Add new trail point
+    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+    
+    // Keep trail length manageable
+    if (this.segmentTrail.length > 300) {
+      this.segmentTrail.pop();
     }
+    
+    this.updateVisibleSegments();
   }
   
   draw(ctx: CanvasRenderingContext2D) {
-    // Draw snake segments like in the game
-    for (let i = this.segments.length - 1; i >= 0; i--) {
-      const segment = this.segments[i];
-      const radius = i === 0 ? 12 : 10; // Head slightly larger
+    // Draw snake segments with overlapping style like the game
+    for (let i = this.visibleSegments.length - 1; i >= 0; i--) {
+      const segment = this.visibleSegments[i];
+      const isHead = i === 0;
+      const radius = isHead ? 12 : 10;
       
       // Create gradient for sphere effect
       const gradient = ctx.createRadialGradient(
         segment.x - radius * 0.3, segment.y - radius * 0.3, 0,
         segment.x, segment.y, radius
       );
-      gradient.addColorStop(0, '#ff6b35'); // Lighter orange center
-      gradient.addColorStop(1, '#d55400'); // Darker orange edge
+      gradient.addColorStop(0, '#ff6b35');
+      gradient.addColorStop(1, '#d55400');
       
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+    
+    // Draw eyes on head
+    if (this.visibleSegments.length > 0) {
+      const head = this.visibleSegments[0];
+      ctx.fillStyle = 'white';
+      const eyeDistance = 6;
+      const eyeSize = 3;
+      const eye1X = head.x + Math.cos(this.currentAngle + 0.5) * eyeDistance;
+      const eye1Y = head.y + Math.sin(this.currentAngle + 0.5) * eyeDistance;
+      const eye2X = head.x + Math.cos(this.currentAngle - 0.5) * eyeDistance;
+      const eye2Y = head.y + Math.sin(this.currentAngle - 0.5) * eyeDistance;
       
-      // Draw white eyes on head like in the game
-      if (i === 0) {
-        ctx.fillStyle = 'white';
-        const eyeDistance = 6;
-        const eyeSize = 3;
-        const eye1X = segment.x + Math.cos(this.angle + 0.5) * eyeDistance;
-        const eye1Y = segment.y + Math.sin(this.angle + 0.5) * eyeDistance;
-        const eye2X = segment.x + Math.cos(this.angle - 0.5) * eyeDistance;
-        const eye2Y = segment.y + Math.sin(this.angle - 0.5) * eyeDistance;
-        
-        ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add black pupils
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(eye1X, eye1Y, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(eye2X, eye2Y, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.beginPath();
+      ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Add black pupils
+      ctx.fillStyle = 'black';
+      ctx.beginPath();
+      ctx.arc(eye1X, eye1Y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(eye2X, eye2Y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   
-  eatFood(foods: Array<{ x: number; y: number }>) {
+  eatFood(foods: Array<{ x: number; y: number; wobbleX: number; wobbleY: number }>) {
     return foods.filter(food => {
-      const distance = Math.sqrt((food.x - this.x) ** 2 + (food.y - this.y) ** 2);
+      const distance = Math.sqrt((food.x - this.head.x) ** 2 + (food.y - this.head.y) ** 2);
       if (distance < 15) {
-        // Grow snake by adding segment
-        const lastSegment = this.segments[this.segments.length - 1];
-        this.segments.push({ x: lastSegment.x, y: lastSegment.y });
+        // Grow snake by extending trail
+        for (let i = 0; i < 20; i++) {
+          const lastSegment = this.segmentTrail[this.segmentTrail.length - 1];
+          this.segmentTrail.push({ x: lastSegment.x, y: lastSegment.y });
+        }
+        this.updateVisibleSegments();
         return false; // Remove this food
       }
       return true; // Keep this food
@@ -420,12 +431,14 @@ export default function Home() {
     );
     setDecorativeSnake(snake);
     
-    // Create initial food
+    // Create initial food with wobble properties
     let currentFoods = [];
     for (let i = 0; i < 20; i++) {
       currentFoods.push({
         x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height
+        y: Math.random() * canvas.height,
+        wobbleX: Math.random() * Math.PI * 2,
+        wobbleY: Math.random() * Math.PI * 2
       });
     }
     setFoods(currentFoods);
@@ -444,34 +457,62 @@ export default function Home() {
       // Check for food consumption
       currentFoods = snake.eatFood(currentFoods);
       
+      // Update food wobble and attraction
+      const time = Date.now() * 0.003;
+      currentFoods.forEach(food => {
+        // Update wobble
+        food.wobbleX += 0.05;
+        food.wobbleY += 0.03;
+        
+        // Check distance to snake
+        const distanceToSnake = Math.sqrt((food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2);
+        
+        // Move towards snake if close
+        if (distanceToSnake < 80) {
+          const attraction = 0.3;
+          const angle = Math.atan2(snake.head.y - food.y, snake.head.x - food.x);
+          food.x += Math.cos(angle) * attraction;
+          food.y += Math.sin(angle) * attraction;
+        }
+      });
+      
       // Add new food if some were eaten
       while (currentFoods.length < 20) {
         currentFoods.push({
           x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height
+          y: Math.random() * canvas.height,
+          wobbleX: Math.random() * Math.PI * 2,
+          wobbleY: Math.random() * Math.PI * 2
         });
       }
       
-      // Draw food with glow effect
+      // Draw food with wobble and glow effect
       currentFoods.forEach(food => {
-        // Create glow effect
+        // Calculate wobble position
+        const wobbleStrength = 2;
+        const wobbleX = Math.sin(food.wobbleX) * wobbleStrength;
+        const wobbleY = Math.cos(food.wobbleY) * wobbleStrength;
+        const displayX = food.x + wobbleX;
+        const displayY = food.y + wobbleY;
+        
+        // Create subtle glow effect
         const glowGradient = ctx.createRadialGradient(
-          food.x, food.y, 0,
-          food.x, food.y, 12
+          displayX, displayY, 0,
+          displayX, displayY, 8
         );
         glowGradient.addColorStop(0, '#53d493');
-        glowGradient.addColorStop(0.3, 'rgba(83, 212, 147, 0.8)');
+        glowGradient.addColorStop(0.5, 'rgba(83, 212, 147, 0.4)');
         glowGradient.addColorStop(1, 'rgba(83, 212, 147, 0)');
         
         ctx.fillStyle = glowGradient;
         ctx.beginPath();
-        ctx.arc(food.x, food.y, 12, 0, Math.PI * 2);
+        ctx.arc(displayX, displayY, 8, 0, Math.PI * 2);
         ctx.fill();
         
         // Draw solid food center
         ctx.fillStyle = '#53d493';
         ctx.beginPath();
-        ctx.arc(food.x, food.y, 4, 0, Math.PI * 2);
+        ctx.arc(displayX, displayY, 4, 0, Math.PI * 2);
         ctx.fill();
       });
       
