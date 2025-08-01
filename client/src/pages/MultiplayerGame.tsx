@@ -623,19 +623,7 @@ export default function GamePage() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
-  const [backgroundMusic, setBackgroundMusic] = useState<HTMLAudioElement | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    const saved = localStorage.getItem('soundEnabled');
-    return saved ? JSON.parse(saved) : true;
-  });
-  const [volume, setVolume] = useState(() => {
-    const saved = localStorage.getItem('volume');
-    return saved ? parseFloat(saved) : 0.25;
-  });
-  const [previousVolume, setPreviousVolume] = useState(() => {
-    const saved = localStorage.getItem('previousVolume');
-    return saved ? parseFloat(saved) : 0.25;
-  });
+
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
@@ -752,27 +740,7 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newCrates]);
   };
 
-  // Background music setup
-  useEffect(() => {
-    const audio = new Audio();
-    audio.src = '/audio/background-music.mp3';
-    audio.preload = 'auto';
-    audio.loop = true;
-    audio.volume = volume;
-    setBackgroundMusic(audio);
-    
-    // Start playing music when game loads if sound is enabled
-    if (soundEnabled) {
-      audio.play().catch(console.error);
-    }
 
-    return () => {
-      if (audio) {
-        audio.pause();
-        audio.src = '';
-      }
-    };
-  }, []);
 
   // Load background image
   useEffect(() => {
@@ -802,46 +770,9 @@ export default function GamePage() {
 
 
 
-  // Handle volume changes
-  useEffect(() => {
-    if (backgroundMusic) {
-      backgroundMusic.volume = volume;
-      if (soundEnabled) {
-        backgroundMusic.play().catch(console.error);
-      } else {
-        backgroundMusic.pause();
-      }
-    }
-  }, [backgroundMusic, volume, soundEnabled]);
 
-  // Toggle sound function
-  const toggleSound = () => {
-    const newSoundState = !soundEnabled;
-    setSoundEnabled(newSoundState);
-    localStorage.setItem('soundEnabled', JSON.stringify(newSoundState));
-    
-    if (newSoundState) {
-      // Turning sound ON - restore previous volume
-      setVolume(previousVolume);
-      localStorage.setItem('volume', previousVolume.toString());
-    } else {
-      // Turning sound OFF - save current volume and set to 0
-      setPreviousVolume(volume);
-      localStorage.setItem('previousVolume', volume.toString());
-      setVolume(0);
-      localStorage.setItem('volume', '0');
-    }
-  };
 
-  // Handle volume change
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
-    localStorage.setItem('volume', newVolume.toString());
-    if (soundEnabled && newVolume > 0) {
-      setPreviousVolume(newVolume);
-      localStorage.setItem('previousVolume', newVolume.toString());
-    }
-  };
+
 
   // Handle canvas resize for fullscreen
   useEffect(() => {
@@ -1943,65 +1874,7 @@ export default function GamePage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-      {/* Exit Button */}
-      <div className="absolute top-4 left-4 z-10">
-        <Button
-          onClick={exitGame}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
-        >
-          <X className="w-4 h-4" />
-          Exit Game
-        </Button>
-      </div>
 
-      {/* Volume Controls */}
-      <div className="absolute top-4 left-40 z-10 flex items-center gap-2 bg-gray-700/80 backdrop-blur-sm px-3 py-2 border border-gray-600 rounded">
-        <button 
-          onClick={toggleSound}
-          className="text-white text-sm hover:bg-gray-600 font-retro flex items-center gap-1"
-        >
-          <Volume2 className={`w-4 h-4 ${soundEnabled ? 'text-green-400' : 'text-red-400'}`} />
-          {soundEnabled ? 'ON' : 'OFF'}
-        </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.1"
-          value={volume}
-          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-          className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, #53d493 0%, #53d493 ${volume * 100}%, #4b5563 ${volume * 100}%, #4b5563 100%)`
-          }}
-        />
-        <span className="text-white text-xs font-retro w-8 text-center">{Math.round(volume * 100)}%</span>
-      </div>
-      
-      {/* Score Display */}
-      <div className="absolute top-4 right-4 z-10">
-        <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
-          <div className="text-neon-yellow text-xl font-bold">Score: {score.toFixed(1)}</div>
-          <div className="text-white text-sm">Online Players: 1</div>
-          <div className="text-blue-400 text-xs">Total Mass: {snake.totalMass.toFixed(1)}</div>
-          <div className="text-gray-400 text-xs">Multiplayer Mode</div>
-          {isBoosting && (
-            <div className="text-orange-400 text-xs font-bold animate-pulse">BOOST!</div>
-          )}
-          {snake.totalMass <= snake.MIN_MASS_TO_BOOST && (
-            <div className="text-red-400 text-xs">Cannot boost - too small!</div>
-          )}
-        </div>
-      </div>
-      
-      {/* Controls Instructions */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
-          <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
-          <div className="text-gray-400 text-xs">Hold Q (no control) to Cash Out</div>
-          <div className="text-blue-400 text-xs">Collect food and money crates</div>
-        </div>
-      </div>
       
       {gameOver && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
