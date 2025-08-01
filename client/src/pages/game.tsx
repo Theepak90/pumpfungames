@@ -79,55 +79,128 @@ function createBotSnake(id: string): BotSnake {
 }
 
 function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, otherBots: BotSnake[]): BotSnake {
-  // AI Decision making
+  // Enhanced AI Decision making with realistic behavior
   const SEGMENT_SPACING = 10;
   const SEGMENT_RADIUS = 10;
+  const currentTime = Date.now();
   
-  // Find nearest food if no target or target is too far
-  if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 300) {
-    let nearestFood: Food | null = null;
-    let nearestDist = Infinity;
-    
-    foods.forEach(food => {
-      const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestFood = food;
-      }
-    });
-    
-    bot.targetFood = nearestFood;
-  }
+  // Check for nearby threats (player snake body segments and other bots)
+  let nearestThreat: { x: number, y: number, distance: number } | null = null;
+  let threatDistance = Infinity;
   
-  // Calculate target angle based on AI behavior
-  if (bot.targetFood) {
-    bot.targetAngle = Math.atan2(bot.targetFood.y - bot.head.y, bot.targetFood.x - bot.head.x);
-  } else {
-    // Wander randomly if no food target
-    bot.lastDirectionChange++;
-    if (bot.lastDirectionChange > 60) {
-      bot.targetAngle = Math.random() * Math.PI * 2;
-      bot.lastDirectionChange = 0;
+  // Check player snake segments for collision avoidance
+  for (let i = 1; i < playerSnake.visibleSegments.length; i++) { // Skip head (index 0)
+    const segment = playerSnake.visibleSegments[i];
+    const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+    if (dist < 80 && dist < threatDistance) { // Danger zone of 80 pixels
+      threatDistance = dist;
+      nearestThreat = { x: segment.x, y: segment.y, distance: dist };
     }
   }
   
-  // Avoid going too close to map edge
-  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 300) {
-    bot.targetAngle = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+  // Check other bot snakes for collision avoidance
+  for (const otherBot of otherBots) {
+    if (otherBot.id === bot.id) continue;
+    for (const segment of otherBot.visibleSegments) {
+      const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
+      if (dist < 60 && dist < threatDistance) { // Smaller danger zone for other bots
+        threatDistance = dist;
+        nearestThreat = { x: segment.x, y: segment.y, distance: dist };
+      }
+    }
   }
   
-  // Smooth angle interpolation
+  // Threat avoidance takes priority
+  if (nearestThreat && nearestThreat.distance < 50) {
+    // Calculate escape angle (away from threat)
+    const threatAngle = Math.atan2(nearestThreat.y - bot.head.y, nearestThreat.x - bot.head.x);
+    bot.targetAngle = threatAngle + Math.PI; // Opposite direction
+    bot.lastDirectionChange = currentTime; // Reset direction change timer
+  } else {
+    // Find nearest food with preference for valuable food
+    if (!bot.targetFood || Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2) > 200) {
+      let bestFood: Food | null = null;
+      let bestScore = -1;
+      
+      foods.forEach(food => {
+        const dist = Math.sqrt((bot.head.x - food.x) ** 2 + (bot.head.y - food.y) ** 2);
+        // Score based on food value and proximity (closer + more valuable = better)
+        const foodValue = food.type === 'money' ? (food.value || 0) * 10 : (food.mass || 1);
+        const score = foodValue / (dist + 1); // +1 to avoid division by zero
+        
+        if (score > bestScore && dist < 300) { // Only consider food within reasonable range
+          bestScore = score;
+          bestFood = food;
+        }
+      });
+      
+      bot.targetFood = bestFood;
+    }
+    
+    // Movement toward food or exploration
+    if (bot.targetFood) {
+      const dx = bot.targetFood.x - bot.head.x;
+      const dy = bot.targetFood.y - bot.head.y;
+      bot.targetAngle = Math.atan2(dy, dx);
+    } else {
+      // More realistic exploration - change direction periodically
+      if (currentTime - bot.lastDirectionChange > 1500 + Math.random() * 2000) {
+        // Add some randomness but bias toward center if near edges
+        const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
+        if (distFromCenter > MAP_RADIUS * 0.7) {
+          // Bias toward center when near edges
+          const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+          bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.5; // ±45 degrees from center
+        } else {
+          // Random exploration in center area
+          bot.targetAngle = Math.random() * Math.PI * 2;
+        }
+        bot.lastDirectionChange = currentTime;
+      }
+    }
+  }
+  
+  // Smooth angle interpolation with more realistic turning
   let angleDiff = bot.targetAngle - bot.currentAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-  bot.currentAngle += angleDiff * 0.024; // 20% slower turning (0.03 * 0.8), maintaining slower than player
   
-  // Move bot head
-  const dx = Math.cos(bot.currentAngle) * bot.speed;
-  const dy = Math.sin(bot.currentAngle) * bot.speed;
+  // Variable turn speed based on urgency
+  const urgency = nearestThreat ? Math.max(0.1, 1 - (nearestThreat.distance / 100)) : 0.3;
+  const turnSpeed = 0.02 + (urgency * 0.08); // Faster turning when in danger
+  
+  bot.currentAngle += angleDiff * turnSpeed;
+  
+  // Keep angle in range
+  if (bot.currentAngle > Math.PI) bot.currentAngle -= 2 * Math.PI;
+  if (bot.currentAngle < -Math.PI) bot.currentAngle += 2 * Math.PI;
+  
+  // Variable speed based on situation
+  let currentSpeed = bot.speed;
+  if (nearestThreat && nearestThreat.distance < 40) {
+    currentSpeed *= 1.3; // Speed up when in immediate danger
+  } else if (bot.targetFood) {
+    const distToFood = Math.sqrt((bot.head.x - bot.targetFood.x) ** 2 + (bot.head.y - bot.targetFood.y) ** 2);
+    if (distToFood > 150) {
+      currentSpeed *= 1.1; // Speed up when far from food
+    }
+  }
+  
+  // Move bot
+  const dx = Math.cos(bot.currentAngle) * currentSpeed;
+  const dy = Math.sin(bot.currentAngle) * currentSpeed;
+  
   bot.head.x += dx;
   bot.head.y += dy;
+  
+  // Keep bot within circular map bounds with smoother boundary handling
+  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
+  if (distFromCenter > MAP_RADIUS - 100) {
+    // Gradually turn toward center as approaching boundary
+    const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+    const boundaryUrgency = (distFromCenter - (MAP_RADIUS - 100)) / 100;
+    bot.targetAngle = bot.currentAngle + angleDiff * (1 - boundaryUrgency) + angleToCenter * boundaryUrgency;
+  }
   
   // Update trail
   bot.segmentTrail.unshift({ x: bot.head.x, y: bot.head.y });
@@ -1423,6 +1496,41 @@ export default function GamePage() {
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, botRadius, 0, Math.PI * 2);
           ctx.fill();
+        }
+        
+        // Draw square eyes on bot head (first segment only)
+        if (bot.visibleSegments.length > 0) {
+          const head = bot.visibleSegments[0];
+          ctx.globalAlpha = 1.0;
+          
+          // Calculate eye positions based on bot's direction
+          const eyeDistance = botRadius * 0.6;
+          const eyeSize = Math.max(3, botRadius * 0.25); // Scale with bot size
+          
+          // Eye positions relative to head center, based on movement angle
+          const leftEyeX = head.x + Math.cos(bot.currentAngle - 0.4) * eyeDistance;
+          const leftEyeY = head.y + Math.sin(bot.currentAngle - 0.4) * eyeDistance;
+          const rightEyeX = head.x + Math.cos(bot.currentAngle + 0.4) * eyeDistance;
+          const rightEyeY = head.y + Math.sin(bot.currentAngle + 0.4) * eyeDistance;
+          
+          // Draw square eyes (white background, black centers)
+          ctx.fillStyle = 'white';
+          
+          // Left eye
+          ctx.fillRect(leftEyeX - eyeSize, leftEyeY - eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Right eye  
+          ctx.fillRect(rightEyeX - eyeSize, rightEyeY - eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Black eye centers
+          ctx.fillStyle = 'black';
+          const pupilSize = eyeSize * 0.6;
+          
+          // Left pupil
+          ctx.fillRect(leftEyeX - pupilSize, leftEyeY - pupilSize, pupilSize * 2, pupilSize * 2);
+          
+          // Right pupil
+          ctx.fillRect(rightEyeX - pupilSize, rightEyeY - pupilSize, pupilSize * 2, pupilSize * 2);
         }
       });
       
