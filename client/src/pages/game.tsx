@@ -409,7 +409,7 @@ class SmoothSnake {
           y: dropY,
           size: 3.5,
           color: '#f55400',
-          mass: 0.25 // Each piece worth 0.25, dropped every 10 frames instead of 20
+          mass: 0.5 // Worth 0.5 mass so when eaten (0.5 * 0.5 = 0.25) it equals the 0.25 mass lost
         });
         
         this.totalMass -= 0.25; // Reduce mass loss per drop to maintain same rate
