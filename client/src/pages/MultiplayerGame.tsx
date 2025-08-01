@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
 import LoadingScreen from '@/components/LoadingScreen';
-import MultiplayerLayer from '@/components/MultiplayerLayer';
 
 // Game constants - MULTIPLAYER VERSION (NO BOTS)
 const MAP_CENTER_X = 2000;
@@ -823,8 +822,10 @@ export default function GamePage() {
 
 
 
-  // Initialize food with mass system
+  // Initialize food with mass system - only after loading is complete
   useEffect(() => {
+    if (!gameStarted) return; // Don't initialize until loading is complete
+    
     const initialFoods: Food[] = [];
     for (let i = 0; i < FOOD_COUNT; i++) {
       // Generate food within circular boundary
@@ -884,7 +885,7 @@ export default function GamePage() {
       initialBots.push(createBotSnake(`bot_${i}`));
     }
     setBotSnakes(initialBots);
-  }, []);
+  }, [gameStarted]);
 
   // Mouse tracking
   useEffect(() => {
@@ -972,7 +973,7 @@ export default function GamePage() {
 
   // Game loop
   useEffect(() => {
-    if (gameOver) return;
+    if (gameOver || !gameStarted) return; // Don't start game loop until loading is complete
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1843,7 +1844,7 @@ export default function GamePage() {
       cancelAnimationFrame(animationId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt]);
+  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt, gameStarted]);
 
   const resetGame = () => {
     setGameOver(false);
@@ -1877,12 +1878,11 @@ export default function GamePage() {
   };
 
   return (
-    <MultiplayerLayer enableMultiplayer={true}>
-      <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
-        {/* Loading Screen */}
-        {isLoading && <LoadingScreen onLoadingComplete={handleLoadingComplete} />}
-        
-        {/* Minimap */}
+    <div className="relative w-screen h-screen overflow-hidden bg-dark-bg">
+      {/* Loading Screen */}
+      {isLoading && <LoadingScreen onLoadingComplete={handleLoadingComplete} />}
+      
+      {/* Minimap */}
       <div className="absolute top-4 left-4 z-10">
         <svg width="96" height="96" className="w-full h-full">
           {/* Map boundary circle */}
@@ -2013,14 +2013,13 @@ export default function GamePage() {
         </div>
       )}
       
-        <canvas
-          ref={canvasRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
-          className="cursor-default block"
-          style={{ background: '#15161b' }}
-        />
-      </div>
-    </MultiplayerLayer>
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        className="cursor-default block"
+        style={{ background: '#15161b' }}
+      />
+    </div>
   );
 }

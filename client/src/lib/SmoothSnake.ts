@@ -1,0 +1,220 @@
+interface Position {
+  x: number;
+  y: number;
+}
+
+export class SmoothSnake {
+  head: Position;
+  currentAngle: number;
+  turnSpeed: number;
+  speed: number;
+  baseSpeed: number;
+  boostMultiplier: number;
+  isBoosting: boolean;
+  boostCooldown: number;
+  
+  // Trail and segment system
+  segmentTrail: Position[];
+  visibleSegments: Array<{ x: number; y: number; opacity: number }>; // Segments with opacity for fading
+  totalMass: number;
+  growthRemaining: number;
+  partialGrowth: number; // For faster mass-to-segment conversion
+  distanceBuffer: number;
+  currentSegmentCount: number; // Smoothly animated segment count
+  
+  // Constants
+  START_MASS: number;
+  MASS_PER_SEGMENT: number;
+  SEGMENT_SPACING: number;
+  SEGMENT_RADIUS: number;
+  MIN_MASS_TO_BOOST: number;
+  
+  // Money system
+  money: number;
+  
+  constructor(x: number, y: number) {
+    // Movement properties
+    this.head = { x, y };
+    this.currentAngle = 0;
+    this.turnSpeed = 0.032; // Reduced by 20% (0.04 * 0.8) for smoother turning
+    this.baseSpeed = 2.4;
+    this.boostMultiplier = 2.0;
+    this.speed = this.baseSpeed;
+    this.isBoosting = false;
+    this.boostCooldown = 0;
+    
+    // Snake system constants
+    this.START_MASS = 6; // Start with just 6 segments instead of 30
+    this.MASS_PER_SEGMENT = 1;
+    this.SEGMENT_SPACING = 10; // Heavy overlap (radius=10, so 10px overlap for maximum density)
+    this.SEGMENT_RADIUS = 10;
+    this.MIN_MASS_TO_BOOST = 4;
+    
+    // Initialize trail and segments
+    this.segmentTrail = [{ x, y }];
+    this.visibleSegments = [];
+    this.totalMass = this.START_MASS;
+    this.growthRemaining = 0;
+    this.partialGrowth = 0; // Initialize partialGrowth for faster mass conversion
+    this.distanceBuffer = 0;
+    this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    
+    // Initialize money
+    this.money = 1.00;
+    
+    this.updateVisibleSegments();
+  }
+  
+  updateVisibleSegments() {
+    // Calculate target segment count based on mass
+    const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    
+    // Smoothly animate currentSegmentCount toward target
+    const transitionSpeed = 0.08; // Slightly slower for more stability
+    if (this.currentSegmentCount < targetSegmentCount) {
+      this.currentSegmentCount += transitionSpeed;
+    } else if (this.currentSegmentCount > targetSegmentCount) {
+      this.currentSegmentCount -= transitionSpeed;
+    }
+    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    
+    // Use floor for solid segments, check if we need a fading segment
+    const solidSegmentCount = Math.floor(this.currentSegmentCount);
+    const fadeAmount = this.currentSegmentCount - solidSegmentCount;
+    
+    this.visibleSegments = [];
+    let distanceSoFar = 0;
+    let segmentIndex = 0;
+    let totalSegmentsToPlace = Math.ceil(this.currentSegmentCount); // Include potential fading segment
+    
+    // Process all segments in one pass to avoid distance calculation issues
+    for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < totalSegmentsToPlace; i++) {
+      const a = this.segmentTrail[i - 1];
+      const b = this.segmentTrail[i];
+      
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentDist = Math.sqrt(dx * dx + dy * dy);
+      
+      // Check if we need to place segments in this trail section
+      while (distanceSoFar + this.SEGMENT_SPACING <= (distanceSoFar + segmentDist) && 
+             this.visibleSegments.length < totalSegmentsToPlace) {
+        
+        const progress = distanceSoFar / (distanceSoFar + segmentDist);
+        const segmentX = a.x + (b.x - a.x) * progress;
+        const segmentY = a.y + (b.y - a.y) * progress;
+        
+        // Determine opacity for this segment
+        let opacity = 1.0;
+        if (segmentIndex >= solidSegmentCount) {
+          // This is the fading segment
+          opacity = fadeAmount;
+        }
+        
+        this.visibleSegments.push({ x: segmentX, y: segmentY, opacity });
+        
+        distanceSoFar += this.SEGMENT_SPACING;
+        segmentIndex++;
+      }
+      
+      distanceSoFar += segmentDist;
+    }
+  }
+  
+  move(directionX: number, directionY: number, onCollectFood: (index: number) => void) {
+    // Handle turn multiplier when boosting
+    const dynamicTurnSpeed = this.isBoosting ? this.turnSpeed * 2 : this.turnSpeed;
+    
+    // Calculate target angle towards mouse direction
+    const targetAngle = Math.atan2(directionY, directionX);
+    
+    // Smoothly interpolate current angle towards target
+    let angleDiff = targetAngle - this.currentAngle;
+    
+    // Normalize angle difference to [-π, π]
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    
+    // Apply turning
+    this.currentAngle += angleDiff * dynamicTurnSpeed;
+    
+    // Normalize current angle
+    while (this.currentAngle > Math.PI) this.currentAngle -= 2 * Math.PI;
+    while (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
+    
+    // Handle boosting mechanics
+    if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST && this.boostCooldown <= 0) {
+      this.speed = this.baseSpeed * this.boostMultiplier;
+      
+      // Lose mass when boosting
+      this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.08);
+    } else {
+      this.speed = this.baseSpeed;
+      this.isBoosting = false; // Stop boosting if not enough mass
+    }
+    
+    // Update boost cooldown
+    if (this.boostCooldown > 0) {
+      this.boostCooldown--;
+    }
+    
+    // Calculate new head position
+    this.head.x += Math.cos(this.currentAngle) * this.speed;
+    this.head.y += Math.sin(this.currentAngle) * this.speed;
+    
+    // Add new trail point
+    this.segmentTrail.unshift({ x: this.head.x, y: this.head.y });
+    
+    // Keep trail at reasonable length (increased for longer trails)
+    if (this.segmentTrail.length > 2000) {
+      this.segmentTrail = this.segmentTrail.slice(0, 1500);
+    }
+    
+    this.updateVisibleSegments();
+  }
+  
+  setBoost(boosting: boolean) {
+    if (boosting && this.totalMass > this.MIN_MASS_TO_BOOST && this.boostCooldown <= 0) {
+      this.isBoosting = true;
+    } else {
+      this.isBoosting = false;
+    }
+  }
+  
+  grow(mass: number) {
+    this.totalMass += mass;
+    this.growthRemaining += mass;
+  }
+  
+  getScaleFactor(): number {
+    return Math.min(1 + (this.totalMass - this.START_MASS) / 100, 3);
+  }
+
+  getSegmentRadius(): number {
+    const baseRadius = 8;
+    const maxScale = 5;
+    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
+    return baseRadius * scaleFactor;
+  }
+  
+  addMoney(amount: number) {
+    this.money += amount;
+  }
+  
+  reset(x: number, y: number) {
+    this.head = { x, y };
+    this.currentAngle = 0;
+    this.speed = this.baseSpeed;
+    this.isBoosting = false;
+    this.boostCooldown = 0;
+    this.segmentTrail = [{ x, y }];
+    this.visibleSegments = [];
+    this.totalMass = this.START_MASS;
+    this.growthRemaining = 0;
+    this.partialGrowth = 0;
+    this.distanceBuffer = 0;
+    this.currentSegmentCount = this.START_MASS;
+    this.money = 1.00;
+    this.updateVisibleSegments();
+  }
+}
