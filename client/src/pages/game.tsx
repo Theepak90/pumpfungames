@@ -39,6 +39,7 @@ interface BotSnake {
   targetAngle: number;
   lastDirectionChange: number;
   targetFood: Food | null;
+  money: number; // Bot's money balance
 }
 
 // Utility function to generate random food colors
@@ -74,7 +75,8 @@ function createBotSnake(id: string): BotSnake {
     color: colors[Math.floor(Math.random() * colors.length)],
     targetAngle: Math.random() * Math.PI * 2,
     lastDirectionChange: 0,
-    targetFood: null
+    targetFood: null,
+    money: 1.00 + Math.random() * 2.00 // Start with $1-3 money
   };
 }
 
@@ -88,14 +90,21 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
   let nearestThreat: { x: number, y: number, distance: number } | null = null;
   let threatDistance = Infinity;
   
-  // Check player snake segments for collision avoidance
+  // Check player snake segments for collision avoidance (more aggressive avoidance)
   for (let i = 1; i < playerSnake.visibleSegments.length; i++) { // Skip head (index 0)
     const segment = playerSnake.visibleSegments[i];
     const dist = Math.sqrt((bot.head.x - segment.x) ** 2 + (bot.head.y - segment.y) ** 2);
-    if (dist < 80 && dist < threatDistance) { // Danger zone of 80 pixels
+    if (dist < 120 && dist < threatDistance) { // Increased danger zone to 120 pixels for more avoidance
       threatDistance = dist;
       nearestThreat = { x: segment.x, y: segment.y, distance: dist };
     }
+  }
+  
+  // Also avoid player head more aggressively
+  const playerHeadDist = Math.sqrt((bot.head.x - playerSnake.head.x) ** 2 + (bot.head.y - playerSnake.head.y) ** 2);
+  if (playerHeadDist < 100 && playerHeadDist < threatDistance) {
+    threatDistance = playerHeadDist;
+    nearestThreat = { x: playerSnake.head.x, y: playerSnake.head.y, distance: playerHeadDist };
   }
   
   // Check other bot snakes for collision avoidance
@@ -110,8 +119,8 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     }
   }
   
-  // Threat avoidance takes priority
-  if (nearestThreat && nearestThreat.distance < 50) {
+  // Threat avoidance takes priority (more sensitive)
+  if (nearestThreat && nearestThreat.distance < 80) { // Increased avoidance threshold
     // Calculate escape angle (away from threat)
     const threatAngle = Math.atan2(nearestThreat.y - bot.head.y, nearestThreat.x - bot.head.x);
     bot.targetAngle = threatAngle + Math.PI; // Opposite direction
@@ -1121,9 +1130,12 @@ export default function GamePage() {
           
           // Drop money crates for bot death too
           const originalSegments = snake.visibleSegments;
+          const originalMoney = snake.money;
           snake.visibleSegments = bot.visibleSegments;
+          snake.money = bot.money; // Use bot's money value
           dropMoneyCrates();
           snake.visibleSegments = originalSegments;
+          snake.money = originalMoney; // Restore player money
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1154,12 +1166,15 @@ export default function GamePage() {
             // Player killed a bot - drop food and money squares
             dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
             
-            // Drop money crates when bot dies (20 crates worth $0.05 each = $1.00 total)
+            // Drop money crates when bot dies - use bot's actual money value
             // Create temporary function call for bot death
             const originalSegments = snake.visibleSegments;
+            const originalMoney = snake.money;
             snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
+            snake.money = bot.money; // Use bot's money value
             dropMoneyCrates();
             snake.visibleSegments = originalSegments; // Restore player segments
+            snake.money = originalMoney; // Restore player money
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1498,39 +1513,59 @@ export default function GamePage() {
           ctx.fill();
         }
         
-        // Draw square eyes on bot head (first segment only)
+        // Draw bot eyes using player's eye system (perpendicular to movement direction)
         if (bot.visibleSegments.length > 0) {
           const head = bot.visibleSegments[0];
           ctx.globalAlpha = 1.0;
           
-          // Calculate eye positions based on bot's direction
-          const eyeDistance = botRadius * 0.6;
-          const eyeSize = Math.max(3, botRadius * 0.25); // Scale with bot size
+          // Calculate eye positions like player - perpendicular to movement direction
+          const eyeDistance = 5 * botScaleFactor; // Scale with bot size
+          const eyeSize = 3 * botScaleFactor; // Scale with bot size
           
-          // Eye positions relative to head center, based on movement angle
-          const leftEyeX = head.x + Math.cos(bot.currentAngle - 0.4) * eyeDistance;
-          const leftEyeY = head.y + Math.sin(bot.currentAngle - 0.4) * eyeDistance;
-          const rightEyeX = head.x + Math.cos(bot.currentAngle + 0.4) * eyeDistance;
-          const rightEyeY = head.y + Math.sin(bot.currentAngle + 0.4) * eyeDistance;
+          // Eye positions perpendicular to movement direction (like player)
+          const eye1X = head.x + Math.cos(bot.currentAngle + Math.PI/2) * eyeDistance;
+          const eye1Y = head.y + Math.sin(bot.currentAngle + Math.PI/2) * eyeDistance;
+          const eye2X = head.x + Math.cos(bot.currentAngle - Math.PI/2) * eyeDistance;
+          const eye2Y = head.y + Math.sin(bot.currentAngle - Math.PI/2) * eyeDistance;
           
           // Draw square eyes (white background, black centers)
           ctx.fillStyle = 'white';
           
-          // Left eye
-          ctx.fillRect(leftEyeX - eyeSize, leftEyeY - eyeSize, eyeSize * 2, eyeSize * 2);
+          // Eye 1
+          ctx.fillRect(eye1X - eyeSize, eye1Y - eyeSize, eyeSize * 2, eyeSize * 2);
           
-          // Right eye  
-          ctx.fillRect(rightEyeX - eyeSize, rightEyeY - eyeSize, eyeSize * 2, eyeSize * 2);
+          // Eye 2  
+          ctx.fillRect(eye2X - eyeSize, eye2Y - eyeSize, eyeSize * 2, eyeSize * 2);
           
-          // Black eye centers
+          // Black eye centers (pupils)
           ctx.fillStyle = 'black';
           const pupilSize = eyeSize * 0.6;
           
-          // Left pupil
-          ctx.fillRect(leftEyeX - pupilSize, leftEyeY - pupilSize, pupilSize * 2, pupilSize * 2);
+          // Pupil 1
+          ctx.fillRect(eye1X - pupilSize, eye1Y - pupilSize, pupilSize * 2, pupilSize * 2);
           
-          // Right pupil
-          ctx.fillRect(rightEyeX - pupilSize, rightEyeY - pupilSize, pupilSize * 2, pupilSize * 2);
+          // Pupil 2
+          ctx.fillRect(eye2X - pupilSize, eye2Y - pupilSize, pupilSize * 2, pupilSize * 2);
+        }
+        
+        // Draw money balance above bot head
+        if (bot.visibleSegments.length > 0) {
+          const head = bot.visibleSegments[0];
+          const moneyText = `$${bot.money.toFixed(2)}`;
+          
+          // Calculate text position above head
+          const textY = head.y - botRadius - 25; // Position above the bot
+          
+          // Set text style
+          ctx.font = `${Math.max(12, 8 * botScaleFactor)}px Arial`; // Scale with bot size
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = 'black';
+          ctx.lineWidth = 2;
+          
+          // Draw text with outline for visibility
+          ctx.strokeText(moneyText, head.x, textY);
+          ctx.fillText(moneyText, head.x, textY);
         }
       });
       
