@@ -616,7 +616,7 @@ export default function GamePage() {
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
-    // Snake constructor now creates 6 segments with 30 mass and proper spacing
+    console.log(`NEW SNAKE CREATED: mass=${newSnake.totalMass}, visibleSegments=${newSnake.visibleSegments.length}, trail=${newSnake.segmentTrail.length}`);
     return newSnake;
   });
   const [foods, setFoods] = useState<Food[]>([]);
@@ -929,7 +929,7 @@ export default function GamePage() {
           color: '#d55400',
           money: snake.money
         };
-        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)})`);
+        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
         wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
@@ -1600,31 +1600,85 @@ export default function GamePage() {
           // Use all segments as-is since we're now sending many more segments
           // No need for tail extension - just use the received segments with interpolation
           
-          // Draw the complete snake body with proper sizing and overlap
-          fullSnakeBody.forEach((segment: any, index: number) => {
-            ctx.save();
+          // Draw snake body with EXACT same styling as local snake
+          ctx.save();
+          
+          // Add drop shadow when not boosting (like local snake)
+          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          
+          // Draw all segments with shadow
+          for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
+            const segment = fullSnakeBody[i];
+            const segmentRadius = 10; // Same as local snake
             
-            // Different color for each player
             ctx.fillStyle = serverPlayer.color || '#ff0000';
-            
-            // Create proper size gradient like the local snake
-            const baseRadius = 8;
-            const headBonus = Math.max(0, (10 - index) * 0.5); // Head gets bigger
-            const radius = baseRadius + headBonus;
-            
             ctx.beginPath();
-            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+            ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
             ctx.fill();
+          }
+          
+          ctx.restore();
+          
+          // Draw rotated square eyes exactly like local snake
+          if (fullSnakeBody.length > 0) {
+            const head = fullSnakeBody[0];
             
-            // Add subtle outline
-            if (index === 0) {
-              ctx.strokeStyle = '#fff';
-              ctx.lineWidth = 2;
-              ctx.stroke();
+            // Calculate movement direction from first two segments
+            let movementAngle = 0;
+            if (fullSnakeBody.length > 1) {
+              const dx = head.x - fullSnakeBody[1].x;
+              const dy = head.y - fullSnakeBody[1].y;
+              movementAngle = Math.atan2(dy, dx);
             }
             
+            const eyeDistance = 5;
+            const eyeSize = 3;
+            const pupilSize = 1.5;
+            
+            // Eye positions perpendicular to movement direction
+            const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+            const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+            const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+            const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+            
+            // Draw first eye with rotation
+            ctx.save();
+            ctx.translate(eye1X, eye1Y);
+            ctx.rotate(movementAngle);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+            
+            // Draw first pupil looking forward
+            const pupilOffset = 1.2;
+            ctx.fillStyle = 'black';
+            ctx.fillRect(
+              pupilOffset - pupilSize,
+              0 - pupilSize,
+              pupilSize * 2, 
+              pupilSize * 2
+            );
             ctx.restore();
-          });
+            
+            // Draw second eye with rotation
+            ctx.save();
+            ctx.translate(eye2X, eye2Y);
+            ctx.rotate(movementAngle);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+            
+            // Draw second pupil looking forward
+            ctx.fillStyle = 'black';
+            ctx.fillRect(
+              pupilOffset - pupilSize,
+              0 - pupilSize,
+              pupilSize * 2, 
+              pupilSize * 2
+            );
+            ctx.restore();
+          }
           
           // Draw player money above head
           if (fullSnakeBody.length > 0) {
