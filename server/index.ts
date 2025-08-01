@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { WebSocketServer, WebSocket } from "ws";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -63,74 +62,18 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  // Set up WebSocket server for multiplayer
-  const wss = new WebSocketServer({ 
-    server,
-    path: '/game-ws'
-  });
-
+  // Simple in-memory storage for multiplayer
   const players = new Map();
-
-  // Broadcast to all connected clients
-  function broadcastToAll(data: any) {
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        try {
-          client.send(JSON.stringify(data));
-        } catch (error) {
-          console.error('Error sending WebSocket message:', error);
-        }
-      }
-    });
-  }
-
-  wss.on("connection", function connection(ws: any) {
-    const playerId = Date.now() + Math.random();
-    log(`Player ${playerId} connected. Total players: ${wss.clients.size}`);
-    
-    // Initialize player
-    players.set(playerId, { 
-      id: playerId,
-      segments: [], 
-      color: '#d55400',
-      money: 1.00 
-    });
-
-    ws.playerId = playerId;
-
-    ws.on("message", function incoming(message: any) {
-      try {
-        const data = JSON.parse(message.toString());
-        // Update player's snake data
-        players.set(playerId, {
-          id: playerId,
-          segments: data.segments || [],
-          color: data.color || '#d55400',
-          money: data.money || 1.00
-        });
-      } catch (error) {
-        console.error("Error parsing message:", error);
-      }
-    });
-
-    ws.on("close", () => {
-      log(`Player ${playerId} disconnected. Remaining players: ${wss.clients.size - 1}`);
-      players.delete(playerId);
-    });
-
-    ws.on("error", (error: any) => {
-      console.error("WebSocket error:", error);
-      players.delete(playerId);
-    });
-  });
-
-  // Broadcast game state to all players every 50ms
+  
+  // Clean up old players every 10 seconds
   setInterval(() => {
-    if (wss.clients.size > 0) {
-      const allPlayers = Array.from(players.values());
-      broadcastToAll({ type: "players", players: allPlayers });
+    const now = Date.now();
+    for (const [id, player] of players.entries()) {
+      if (now - player.lastUpdate > 10000) { // 10 seconds timeout
+        players.delete(id);
+      }
     }
-  }, 50);
+  }, 10000);
 
   server.listen({
     port,
@@ -138,6 +81,5 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    log(`Multiplayer WebSocket ready at /game-ws`);
   });
 })();

@@ -35,8 +35,7 @@ const MultiplayerGame: React.FC = () => {
     isVisible: true,
     lastVisibilityTime: 0,
     segmentTrail: [] as Array<{ x: number; y: number; time: number }>,
-    animationId: null as number | null,
-    ws: null as WebSocket | null
+    animationId: null as number | null
   });
 
   // Initialize loading sequence
@@ -57,64 +56,47 @@ const MultiplayerGame: React.FC = () => {
     return () => clearInterval(progressInterval);
   }, []);
 
-  // WebSocket connection
+  // Generate unique player ID
+  const playerIdRef = useRef<string>(`player_${Date.now()}_${Math.random()}`);
+
+  // Multiplayer polling
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Connecting to multiplayer server...");
+    setConnectionStatus('Connected');
     
-    // Connect to WebSocket server
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/game-ws`);
-    
-    socket.onopen = () => {
-      console.log("Connected to multiplayer server!");
-      setConnectionStatus('Connected');
-      gameStateRef.current.ws = socket;
-    };
-
-    socket.onmessage = (event) => {
+    // Poll for other players every 100ms
+    const pollInterval = setInterval(async () => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'players') {
-          // Filter out our own player data
-          const others = data.players.filter((p: Player) => p.id !== socket);
-          setOtherPlayers(others);
-        }
+        const response = await fetch('/api/multiplayer/players');
+        const data = await response.json();
+        // Filter out our own player
+        const others = data.players.filter((p: Player) => p.id !== playerIdRef.current);
+        setOtherPlayers(others);
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error('Error fetching players:', error);
+        setConnectionStatus('Connection Error');
       }
-    };
-
-    socket.onclose = () => {
-      console.log("Disconnected from multiplayer server");
-      setConnectionStatus('Disconnected');
-      gameStateRef.current.ws = null;
-    };
-
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setConnectionStatus('Connection Error');
-    };
+    }, 100);
 
     return () => {
-      if (socket) {
-        socket.close();
-      }
+      clearInterval(pollInterval);
     };
   }, [gameStarted]);
 
   // Send player data to server
   const sendPlayerData = useCallback(() => {
-    const { ws, snake, money } = gameStateRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
+    const { snake, money } = gameStateRef.current;
+    fetch('/api/multiplayer/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerId: playerIdRef.current,
         segments: snake.segments,
         color: snake.color,
         money: money
-      }));
-    }
+      })
+    }).catch(error => console.error('Error sending player data:', error));
   }, []);
 
   // Initialize game
