@@ -10,13 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Simplified Multiplayer System Implementation (Latest)
-- **Integrated WebSocket server**: WebSocket server now runs on the same HTTP server (port 5000) for Replit compatibility
-- **Real-time multiplayer**: Players can see each other's snakes in real-time across multiple browser tabs/windows
-- **Simplified architecture**: Removed complex regional servers and room management for straightforward multiplayer experience
-- **Direct connection**: WebSocket connects directly to the main domain without separate ports
+### Restored Multiplayer Functionality (Latest)
+- **Re-implemented WebSocket server**: WebSocket server runs on path `/game-ws` to avoid Vite HMR conflicts
+- **Real-time multiplayer**: Friends can play together by clicking PLAY on the same game URL
 - **Player synchronization**: Snake positions, movements, and visual data synchronized every 50ms
-- **Automatic cleanup**: Players automatically removed when they disconnect
+- **Connection status**: Shows connected/disconnected status and player count in-game
+- **Fixed Vite conflicts**: Separated multiplayer WebSocket from development server WebSocket
+- **Cross-tab support**: Multiple players can join from different browser tabs/windows
 
 ### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance

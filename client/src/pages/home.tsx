@@ -321,12 +321,12 @@ export default function Home() {
   // Start game handler
   const handleStartGame = async () => {
     toast({
-      title: "Starting Game!",
-      description: "Loading single-player snake game.",
+      title: "Joining Multiplayer!",
+      description: "Connecting to multiplayer server.",
     });
     
-    // Navigate to local game for now
-    setLocation('/game');
+    // Navigate to multiplayer game
+    setLocation('/multiplayer');
   };
 
   // Handle daily crate claim
