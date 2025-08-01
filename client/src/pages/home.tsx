@@ -418,9 +418,9 @@ export default function Home() {
         // Check distance to snake
         const distanceToSnake = Math.sqrt((food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2);
         
-        // Move towards snake if close (3x stronger gravitational pull)
+        // Move towards snake if close (6x stronger gravitational pull)
         if (distanceToSnake < 80) {
-          const attraction = 0.9; // Increased from 0.3 to 0.9 (3x stronger)
+          const attraction = 1.8; // Increased from 0.9 to 1.8 (2x stronger than before, 6x stronger than original)
           const angle = Math.atan2(snake.head.y - food.y, snake.head.x - food.x);
           food.x += Math.cos(angle) * attraction;
           food.y += Math.sin(angle) * attraction;
