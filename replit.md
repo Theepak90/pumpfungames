@@ -18,9 +18,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Loading Screen System
 - **Retro loading screen**: Dark background (#15161b) with "SNAKE ARENA" title in Press Start 2P font
-- **Progressive loading**: Shows loading steps (initializing, assets, spawning snakes, preparing arena)
-- **Visual progress bar**: Green gradient progress bar with percentage indicator
-- **Game initialization**: Loading screen appears when entering game, then starts gameplay
+- **Fixed progress bar**: Now properly reaches 100% with defined stages (20%, 40%, 70%, 90%, 100%)
+- **Proper initialization**: Game elements (food, bots, game loop) only spawn after loading completes
+- **Smooth progression**: Eliminates jittering between 40-60% with stable step progression
 - **Applied to both modes**: Both single-player (/game8999) and multiplayer (/multiplayer) versions
 
 ### Clean UI Overhaul

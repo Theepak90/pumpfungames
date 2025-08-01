@@ -10,11 +10,12 @@ export default function LoadingScreen({ onLoadingComplete }: LoadingScreenProps)
 
   useEffect(() => {
     const loadingSteps = [
-      { text: 'INITIALIZING GAME...', delay: 500 },
-      { text: 'LOADING ASSETS...', delay: 800 },
-      { text: 'SPAWNING SNAKES...', delay: 600 },
-      { text: 'PREPARING ARENA...', delay: 700 },
-      { text: 'READY TO PLAY!', delay: 400 }
+      { text: 'INITIALIZING GAME...', delay: 600, progress: 20 },
+      { text: 'LOADING ASSETS...', delay: 800, progress: 40 },
+      { text: 'SPAWNING SNAKES...', delay: 700, progress: 70 },
+      { text: 'PREPARING ARENA...', delay: 600, progress: 90 },
+      { text: 'FINALIZING...', delay: 400, progress: 100 },
+      { text: 'READY TO PLAY!', delay: 500, progress: 100 }
     ];
 
     let currentStep = 0;
@@ -23,17 +24,17 @@ export default function LoadingScreen({ onLoadingComplete }: LoadingScreenProps)
     const runLoadingStep = () => {
       if (currentStep < totalSteps) {
         setLoadingText(loadingSteps[currentStep].text);
-        setLoadingProgress(((currentStep + 1) / totalSteps) * 100);
+        setLoadingProgress(loadingSteps[currentStep].progress);
         
         setTimeout(() => {
           currentStep++;
           if (currentStep < totalSteps) {
             runLoadingStep();
           } else {
-            // All loading complete
+            // All loading complete - wait a moment at 100% before starting
             setTimeout(() => {
               onLoadingComplete();
-            }, 500);
+            }, 300);
           }
         }, loadingSteps[currentStep].delay);
       }
