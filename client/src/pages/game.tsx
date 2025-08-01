@@ -196,17 +196,67 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
         bot.boostCooldown = 60;
       }
     } else {
-      // Less circular movement - more direct exploration
-      if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
+      // Anti-circular movement system
+      const timeSinceLastChange = currentTime - bot.lastDirectionChange;
+      
+      if (timeSinceLastChange > 600 + Math.random() * 800) {
         const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-        if (distFromCenter > MAP_RADIUS * 0.6) {
-          // Move toward center when near edges
-          const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
-          bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
+        
+        // Check if bot has been moving in roughly the same direction (circular detection)
+        const recentAngleChanges = [];
+        for (let i = Math.max(0, bot.segmentTrail.length - 20); i < bot.segmentTrail.length - 1; i++) {
+          const p1 = bot.segmentTrail[i];
+          const p2 = bot.segmentTrail[i + 1];
+          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          recentAngleChanges.push(angle);
+        }
+        
+        // Detect circular movement by checking angle variance
+        if (recentAngleChanges.length > 10) {
+          let totalAngleChange = 0;
+          for (let i = 1; i < recentAngleChanges.length; i++) {
+            let diff = recentAngleChanges[i] - recentAngleChanges[i-1];
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            while (diff < -Math.PI) diff += 2 * Math.PI;
+            totalAngleChange += Math.abs(diff);
+          }
+          
+          const avgAngleChange = totalAngleChange / (recentAngleChanges.length - 1);
+          const isCircling = avgAngleChange > 0.15; // Threshold for circular movement
+          
+          if (isCircling) {
+            // Break out of circular pattern with more dramatic direction change
+            if (distFromCenter > MAP_RADIUS * 0.6) {
+              // Head toward center if near edge
+              const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+              bot.targetAngle = angleToCenter;
+            } else {
+              // Pick a completely different direction
+              bot.targetAngle = bot.currentAngle + Math.PI * (0.5 + Math.random() * 0.5);
+            }
+          } else {
+            // Normal exploration
+            if (distFromCenter > MAP_RADIUS * 0.7) {
+              // Move toward center when near edges
+              const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+              bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.4;
+            } else {
+              // Explore in straight lines more often
+              const shouldGoStraight = Math.random() < 0.6;
+              if (shouldGoStraight) {
+                // Continue roughly in current direction with slight variation
+                bot.targetAngle = bot.currentAngle + (Math.random() - 0.5) * Math.PI * 0.2;
+              } else {
+                // New random direction
+                bot.targetAngle = Math.random() * Math.PI * 2;
+              }
+            }
+          }
         } else {
-          // Random but more purposeful movement
+          // Default behavior when not enough data
           bot.targetAngle = Math.random() * Math.PI * 2;
         }
+        
         bot.lastDirectionChange = currentTime;
       }
     }
@@ -259,11 +309,11 @@ function updateBotSnake(bot: BotSnake, foods: Food[], playerSnake: SmoothSnake, 
     bot.segmentTrail.length = maxTrailLength;
   }
   
-  // Update visible segments
+  // Update visible segments (capped at 250)
   bot.visibleSegments = [];
   let distanceSoFar = 0;
   let segmentIndex = 0;
-  const targetSegmentCount = Math.floor(bot.totalMass / 1);
+  const targetSegmentCount = Math.min(250, Math.floor(bot.totalMass / 1));
   
   for (let i = 1; i < bot.segmentTrail.length && bot.visibleSegments.length < targetSegmentCount; i++) {
     const a = bot.segmentTrail[i - 1];
@@ -354,8 +404,8 @@ class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    // Calculate target segment count based on mass
-    const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    // Calculate target segment count based on mass (capped at 250)
+    const targetSegmentCount = Math.min(250, Math.floor(this.totalMass / this.MASS_PER_SEGMENT));
     
     // Smoothly animate currentSegmentCount toward target
     const transitionSpeed = 0.08; // Slightly slower for more stability
@@ -364,7 +414,7 @@ class SmoothSnake {
     } else if (this.currentSegmentCount > targetSegmentCount) {
       this.currentSegmentCount -= transitionSpeed;
     }
-    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    this.currentSegmentCount = Math.max(1, Math.min(250, this.currentSegmentCount));
     
     // Use floor for solid segments, check if we need a fading segment
     const solidSegmentCount = Math.floor(this.currentSegmentCount);
