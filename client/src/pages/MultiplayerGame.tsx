@@ -1666,7 +1666,7 @@ export default function GamePage() {
           const textY = head.y - botRadius - 25; // Position above the bot
           
           // Set text style with retro font and custom outline color
-          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Courier New', monospace`; // Scale with bot size
+          ctx.font = `${Math.max(12, Math.floor(8 * botScaleFactor))}px 'Press Start 2P', monospace`; // Scale with bot size
           ctx.textAlign = 'center';
           ctx.fillStyle = 'white';
           ctx.strokeStyle = '#134242';
@@ -1746,7 +1746,7 @@ export default function GamePage() {
         const snakeHead = snake.visibleSegments[0];
         const scaleFactor = snake.getScaleFactor();
         
-        ctx.font = `${Math.floor(14 * scaleFactor)}px 'Courier New', monospace`;
+        ctx.font = `${Math.floor(14 * scaleFactor)}px 'Press Start 2P', monospace`;
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#134242";
         ctx.lineWidth = 3 * scaleFactor;
