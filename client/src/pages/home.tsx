@@ -211,18 +211,7 @@ export default function Home() {
     }
   };
 
-  // Start game handler
-  const handleStartGame = async () => {
-    const betAmount = selectedBetAmount;
-    
-    toast({
-      title: "Game Started!",
-      description: `Starting snake game with $${betAmount} bet.`,
-    });
-    
-    // Navigate to fullscreen game
-    setLocation('/game');
-  };
+  // Start game handler - removed direct access
 
   // Handle daily crate claim
   const handleClaimDailyCrate = async () => {
@@ -398,16 +387,10 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Play Button */}
-              <button 
-                onClick={handleStartGame}
-                className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
-                style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
-                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
-                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
-              >
-                PLAY
-              </button>
+              {/* Game access removed for security */}
+              <div className="text-center py-3 mb-3 text-gray-500 text-sm font-retro border-2 border-gray-600">
+                Game access restricted
+              </div>
               
               {/* Region and Friends buttons */}
               <div className="grid grid-cols-2 gap-1 mb-3">

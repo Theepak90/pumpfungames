@@ -10,7 +10,24 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Money Balance System (Latest)
+### Secret Access System (Latest)
+- Implemented secure game access via secret URL `/game8999`
+- Password protection with `secretserveradd119988` as access key
+- Removed direct game access from home page for security
+- Session-based access control using sessionStorage
+- Game now only accessible through protected route system
+
+### Enhanced Bot AI System
+- State-based AI with wander, foodHunt, avoid, and aggro behaviors
+- Bots start with exactly $1.00 and only increase money through crate collection
+- Bots avoid big orange test food but actively hunt regular food and money crates
+- Aggressive player hunting when bots are larger than player
+- Strategic boosting for escaping, hunting, and collecting valuable items
+- Reduced dodging sensitivity for more aggressive gameplay
+- Shadows like player snake when not boosting, white outline only when boosting
+- Realistic movement patterns instead of circular wandering
+
+### Money Balance System
 - Added money balance display above snake head starting at $1.00
 - Money only increases when killing other snakes (minimum $0.50 or 5% of bot's mass)
 - Money resets to $1.00 when game restarts
@@ -44,7 +61,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
-- **Routing**: Wouter (lightweight React router)
+- **Routing**: Wouter (lightweight React router) with protected routes
+- **Security**: Secret URL access (`/game8999`) with password protection
 - **Styling**: Tailwind CSS with shadcn/ui component library
 - **State Management**: React Context API for global state (auth, game)
 - **Data Fetching**: TanStack Query (React Query) for server state management
