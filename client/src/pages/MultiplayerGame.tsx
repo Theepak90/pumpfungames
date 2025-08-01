@@ -983,7 +983,7 @@ export default function GamePage() {
         setIsBoosting(true);
         snake.setBoost(true);
       } else if (e.key.toLowerCase() === 'q' && !cashingOut) {
-        // Start cash-out process
+        // Start cash-out process only if Q is pressed
         setCashingOut(true);
         setCashOutStartTime(Date.now());
         setCashOutProgress(0);
@@ -994,8 +994,8 @@ export default function GamePage() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(false);
         snake.setBoost(false);
-      } else if (e.key.toLowerCase() === 'q' && cashingOut) {
-        // Cancel cash-out process
+      } else if (e.key.toLowerCase() === 'q') {
+        // Cancel cash-out process when Q is released (must hold continuously)
         setCashingOut(false);
         setCashOutProgress(0);
         setCashOutStartTime(null);
@@ -1089,11 +1089,18 @@ export default function GamePage() {
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
-      // Move snake normally - this ensures visibility and game mechanics work
-      snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
-        // Add dropped food from boosting to the food array
-        setFoods(prevFoods => [...prevFoods, droppedFood]);
-      });
+      // Move snake - disable control when cashing out
+      if (cashingOut) {
+        // Snake moves in straight line when cashing out (no player control)
+        snake.move(Math.cos(snake.currentAngle), Math.sin(snake.currentAngle), (droppedFood: Food) => {
+          setFoods(prevFoods => [...prevFoods, droppedFood]);
+        });
+      } else {
+        // Normal mouse control
+        snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
+          setFoods(prevFoods => [...prevFoods, droppedFood]);
+        });
+      }
 
       // Update bot snakes
       setBotSnakes(prevBots => {
@@ -1971,7 +1978,7 @@ export default function GamePage() {
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
-          <div className="text-gray-400 text-xs">Hold Q for 3sec to Cash Out</div>
+          <div className="text-gray-400 text-xs">Hold Q (no control) to Cash Out</div>
           <div className="text-blue-400 text-xs">Collect food and money crates</div>
         </div>
       </div>
