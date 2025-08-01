@@ -166,30 +166,4 @@ export interface Player {
   color: string;
 }
 
-export interface Snake {
-  segments: Point[];
-  direction: Direction;
-  angle: number; // For smooth slither.io-style direction in radians
-  speed: number; // Base movement speed
-  growing: boolean;
-}
 
-export interface Point {
-  x: number;
-  y: number;
-}
-
-export interface Food {
-  position: Point;
-  value: number;
-}
-
-export type Direction = 'up' | 'down' | 'left' | 'right';
-
-// WebSocket message types
-export interface WebSocketMessage {
-  type: string;
-  payload?: any;
-  gameId?: string;
-  playerId?: string;
-}

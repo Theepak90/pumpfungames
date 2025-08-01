@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
 import { useGame } from "@/contexts/game-context";
-import { useWebSocket } from "@/hooks/use-websocket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -210,14 +209,8 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { 
     selectedBetAmount, 
-    setSelectedBetAmount, 
-    selectedRegion, 
-    setSelectedRegion,
-    playersInGame,
-    globalWinnings,
-    currentGame
+    setSelectedBetAmount
   } = useGame();
-  const { isConnected, gameState, joinGame, move, leaveGame } = useWebSocket(user?.id || null);
   const { toast } = useToast();
 
   // Decorative snake animation state
@@ -327,15 +320,13 @@ export default function Home() {
 
   // Start game handler
   const handleStartGame = async () => {
-    const betAmount = selectedBetAmount;
-    
     toast({
-      title: "Joining Multiplayer!",
-      description: `Joining multiplayer server with $${betAmount} bet.`,
+      title: "Starting Game!",
+      description: "Loading single-player snake game.",
     });
     
-    // Navigate to multiplayer game
-    setLocation('/multiplayer');
+    // Navigate to local game
+    setLocation('/game');
   };
 
   // Handle daily crate claim
@@ -628,24 +619,7 @@ export default function Home() {
                 PLAY
               </button>
               
-              {/* Region and Friends buttons */}
-              <div className="grid grid-cols-2 gap-1 mb-3">
-                <button 
-                  onClick={() => setSelectedRegion(selectedRegion === "EU" ? "US" : "EU")}
-                  className={`py-1 px-3 text-sm border-2 font-retro ${
-                    selectedRegion === "EU" 
-                      ? 'bg-blue-600 text-white border-blue-500' 
-                      : selectedRegion === "US"
-                      ? 'bg-red-600 text-white border-red-500'
-                      : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
-                  } transition-colors`}
-                >
-                  {selectedRegion}
-                </button>
-                <button className="bg-gray-700 text-white py-1 px-3 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro">
-                  Friends
-                </button>
-              </div>
+
               
               {/* Stats at bottom */}
               <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-600 pt-2">

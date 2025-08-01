@@ -1,32 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { MultiplayerGameServer } from "./multiplayer";
-import { MultiplayerGameServer as NewGameServer } from "./gameServer";
-import { RegionManager } from "./regionManager";
 import {
   insertUserSchema,
   insertGameSchema,
-  type GameState,
-  type Player,
-  type WebSocketMessage,
 } from "@shared/schema";
 import { z } from "zod";
 
-interface AuthenticatedWebSocket extends WebSocket {
-  userId?: string;
-  gameId?: string;
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
-  
-  // Initialize new regional multiplayer game server
-  const currentRegion = RegionManager.getCurrentRegion();
-  const newGameServer = new NewGameServer(httpServer, currentRegion);
-  
-  console.log(`Initialized ${currentRegion.toUpperCase()} region game server`);
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
