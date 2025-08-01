@@ -649,6 +649,9 @@ export default function GamePage() {
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [gameIsVisible, setGameIsVisible] = useState(!document.hidden);
   const [hiddenAt, setHiddenAt] = useState<number | null>(null);
+  const [cashingOut, setCashingOut] = useState(false);
+  const [cashOutProgress, setCashOutProgress] = useState(0);
+  const [cashOutStartTime, setCashOutStartTime] = useState<number | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
   const dropDeathFood = (deathX: number, deathY: number, snakeMass: number) => {
@@ -973,12 +976,17 @@ export default function GamePage() {
     return () => canvas.removeEventListener('mousemove', handleMouseMove);
   }, [canvasSize]);
 
-  // Boost controls
+  // Boost controls and cash-out
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(true);
         snake.setBoost(true);
+      } else if (e.key.toLowerCase() === 'q' && !cashingOut) {
+        // Start cash-out process
+        setCashingOut(true);
+        setCashOutStartTime(Date.now());
+        setCashOutProgress(0);
       }
     };
 
@@ -986,6 +994,11 @@ export default function GamePage() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(false);
         snake.setBoost(false);
+      } else if (e.key.toLowerCase() === 'q' && cashingOut) {
+        // Cancel cash-out process
+        setCashingOut(false);
+        setCashOutProgress(0);
+        setCashOutStartTime(null);
       }
     };
 
@@ -1086,6 +1099,22 @@ export default function GamePage() {
       setBotSnakes(prevBots => {
         return prevBots.map(bot => updateBotSnake(bot, foods, snake, prevBots));
       });
+
+      // Update cash-out progress
+      if (cashingOut && cashOutStartTime) {
+        const elapsed = currentTime - cashOutStartTime;
+        const progress = Math.min(elapsed / 3000, 1); // 3 seconds = 100%
+        setCashOutProgress(progress);
+        
+        // Complete cash-out after 3 seconds
+        if (progress >= 1) {
+          console.log(`Cashed out $${snake.money.toFixed(2)}!`);
+          snake.money = 1.00; // Reset to starting money
+          setCashingOut(false);
+          setCashOutProgress(0);
+          setCashOutStartTime(null);
+        }
+      }
 
       // Remove expired money crates (fade out over 10 seconds)
       const MONEY_CRATE_LIFETIME = 10000; // 10 seconds in milliseconds
@@ -1758,6 +1787,27 @@ export default function GamePage() {
         // Draw text outline for better visibility
         ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
         ctx.fillText(moneyText, snakeHead.x, snakeHead.y - offsetY);
+        
+        // Draw cash-out progress bar under money counter
+        if (cashingOut) {
+          const barWidth = 60 * scaleFactor;
+          const barHeight = 4 * scaleFactor;
+          const barX = snakeHead.x - barWidth / 2;
+          const barY = snakeHead.y - offsetY + 20;
+          
+          // Background bar
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(barX, barY, barWidth, barHeight);
+          
+          // Progress bar
+          ctx.fillStyle = '#53d493'; // Green progress
+          ctx.fillRect(barX, barY, barWidth * cashOutProgress, barHeight);
+          
+          // Border
+          ctx.strokeStyle = '#134242';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(barX, barY, barWidth, barHeight);
+        }
       }
 
       // Draw eyes that track the cursor smoothly (after head is drawn)
@@ -1921,7 +1971,7 @@ export default function GamePage() {
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-dark-card/80 backdrop-blur-sm border border-dark-border rounded-lg px-4 py-2">
           <div className="text-white text-sm">Hold Shift or Mouse to Boost</div>
-          <div className="text-gray-400 text-xs">Multiplayer Mode - Real Players</div>
+          <div className="text-gray-400 text-xs">Hold Q for 3sec to Cash Out</div>
           <div className="text-blue-400 text-xs">Collect food and money crates</div>
         </div>
       </div>
