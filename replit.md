@@ -10,7 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Loading Screen System (Latest)
+### Home Screen Snake Improvements (Latest)
+- **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance
+- **Enhanced food attraction**: Increased gravitational pull from 0.3 to 0.9 (3x stronger) for more dynamic interaction
+- **Consistent visuals**: Home screen snake now identical to in-game snake with proper segment spacing
+- **Improved animation**: Food moves toward snake much more aggressively creating better visual effects
+
+### Loading Screen System
 - **Retro loading screen**: Dark background (#15161b) with "SNAKE ARENA" title in Press Start 2P font
 - **Progressive loading**: Shows loading steps (initializing, assets, spawning snakes, preparing arena)
 - **Visual progress bar**: Green gradient progress bar with percentage indicator

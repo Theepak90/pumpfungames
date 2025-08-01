@@ -58,7 +58,7 @@ class DecorativeSnake {
   updateVisibleSegments() {
     this.visibleSegments = [];
     const segmentCount = 12;
-    const segmentSpacing = 16;
+    const segmentSpacing = 8; // Reduced from 16 to 8 for closer segments like multiplayer
     
     for (let i = 0; i < segmentCount; i++) {
       const trailIndex = Math.floor(i * segmentSpacing);
@@ -418,9 +418,9 @@ export default function Home() {
         // Check distance to snake
         const distanceToSnake = Math.sqrt((food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2);
         
-        // Move towards snake if close
+        // Move towards snake if close (3x stronger gravitational pull)
         if (distanceToSnake < 80) {
-          const attraction = 0.3;
+          const attraction = 0.9; // Increased from 0.3 to 0.9 (3x stronger)
           const angle = Math.atan2(snake.head.y - food.y, snake.head.x - food.x);
           food.x += Math.cos(angle) * attraction;
           food.y += Math.sin(angle) * attraction;
