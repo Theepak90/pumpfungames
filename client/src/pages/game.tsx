@@ -845,7 +845,16 @@ export default function GamePage() {
       const foodType = Math.random();
       let food: Food;
       
-      if (foodType < 0.10) { // 10% big food (was 10% at 0.15, removed testing food)
+      if (foodType < 0.05) { // 5% big orange test food
+        food = {
+          x: x,
+          y: y,
+          size: 20,
+          mass: 25, // Big test food gives 25 mass
+          color: '#ff8c00', // Orange color
+          type: 'normal'
+        };
+      } else if (foodType < 0.15) { // 10% big food (reduced from 10% to make room for test food)
         food = {
           x: x,
           y: y,
@@ -854,7 +863,7 @@ export default function GamePage() {
           color: getRandomFoodColor(),
           type: 'normal'
         };
-      } else if (foodType < 0.45) { // 35% medium food
+      } else if (foodType < 0.50) { // 35% medium food
         food = {
           x: x,
           y: y,
@@ -863,7 +872,7 @@ export default function GamePage() {
           color: getRandomFoodColor(),
           type: 'normal'
         };
-      } else { // 55% small food
+      } else { // 50% small food
         food = {
           x: x,
           y: y,
@@ -1221,11 +1230,13 @@ export default function GamePage() {
                 const newX = MAP_CENTER_X + Math.cos(angle) * radius;
                 const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
                 
-                if (foodType < 0.10) { // 10% big food (removed testing food)
+                if (foodType < 0.05) { // 5% big orange test food
+                  newFood = { x: newX, y: newY, size: 20, mass: 25, color: '#ff8c00', type: 'normal' }; // Big orange test food
+                } else if (foodType < 0.15) { // 10% big food
                   newFood = { x: newX, y: newY, size: 10, mass: 0.48, color: getRandomFoodColor(), type: 'normal' }; // Was 0.24, now doubled to 0.48
-                } else if (foodType < 0.45) { // 35% medium food
+                } else if (foodType < 0.50) { // 35% medium food
                   newFood = { x: newX, y: newY, size: 6, mass: 0.16, color: getRandomFoodColor(), type: 'normal' }; // Was 0.08, now doubled to 0.16
-                } else { // 55% small food
+                } else { // 50% small food
                   newFood = { x: newX, y: newY, size: 4, mass: 0.08, color: getRandomFoodColor(), type: 'normal' }; // Was 0.04, now doubled to 0.08
                 }
                 
@@ -1298,7 +1309,16 @@ export default function GamePage() {
             const newX = MAP_CENTER_X + Math.cos(angle) * radius;
             const newY = MAP_CENTER_Y + Math.sin(angle) * radius;
             
-            if (foodType < 0.10) { // 10% big food (removed testing food)
+            if (foodType < 0.05) { // 5% big orange test food
+              newFood = {
+                x: newX,
+                y: newY,
+                size: 20,
+                mass: 25, // Big test food gives 25 mass
+                color: '#ff8c00', // Orange color
+                type: 'normal'
+              };
+            } else if (foodType < 0.15) { // 10% big food
               newFood = {
                 x: newX,
                 y: newY,
@@ -1307,7 +1327,7 @@ export default function GamePage() {
                 color: getRandomFoodColor(),
                 type: 'normal'
               };
-            } else if (foodType < 0.45) { // 35% medium food
+            } else if (foodType < 0.50) { // 35% medium food
               newFood = {
                 x: newX,
                 y: newY,
@@ -1316,7 +1336,7 @@ export default function GamePage() {
                 color: getRandomFoodColor(),
                 type: 'normal'
               };
-            } else { // 55% small food
+            } else { // 50% small food
               newFood = {
                 x: newX,
                 y: newY,
