@@ -174,6 +174,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const activePlayers = new Map();
+  
+  // Shared game world state
+  const gameWorld = {
+    bots: [] as any[],
+    food: [] as any[],
+    initialized: false
+  };
+
+  // Initialize shared game world
+  function initializeGameWorld() {
+    if (gameWorld.initialized) return;
+    
+    // Create shared bots
+    for (let i = 0; i < 8; i++) {
+      gameWorld.bots.push({
+        id: `bot_${i}`,
+        x: Math.random() * 4000 - 2000,
+        y: Math.random() * 4000 - 2000,
+        segments: [
+          { x: Math.random() * 4000 - 2000, y: Math.random() * 4000 - 2000 }
+        ],
+        color: ['#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4'][i % 4],
+        money: 1.50 + Math.random() * 2
+      });
+    }
+    
+    // Create shared food
+    for (let i = 0; i < 200; i++) {
+      gameWorld.food.push({
+        id: `food_${i}`,
+        x: Math.random() * 4000 - 2000,
+        y: Math.random() * 4000 - 2000,
+        size: 4 + Math.random() * 6,
+        color: ['#ff4444', '#44ff44', '#4444ff', '#ffff44'][Math.floor(Math.random() * 4)]
+      });
+    }
+    
+    gameWorld.initialized = true;
+    console.log('Shared game world initialized');
+  }
 
   wss.on("connection", function connection(ws: any) {
     const playerId = `player_${Date.now()}_${Math.random()}`;
@@ -199,11 +239,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       playerId: playerId
     }));
 
+    // Initialize game world if needed
+    initializeGameWorld();
+    
     // Send current players to new player
     setTimeout(() => {
       ws.send(JSON.stringify({
         type: 'players',
         players: Array.from(activePlayers.values())
+      }));
+      
+      // Send shared game world state
+      ws.send(JSON.stringify({
+        type: 'gameWorld',
+        bots: gameWorld.bots,
+        food: gameWorld.food
       }));
     }, 100);
 
@@ -241,15 +291,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setInterval(() => {
     if (wss.clients.size > 0) {
       const playerList = Array.from(activePlayers.values());
-      const message = JSON.stringify({
+      const playerMessage = JSON.stringify({
         type: 'players',
         players: playerList
+      });
+      
+      // Update bot positions (simple movement simulation)
+      gameWorld.bots.forEach(bot => {
+        bot.x += (Math.random() - 0.5) * 20;
+        bot.y += (Math.random() - 0.5) * 20;
+        bot.segments[0] = { x: bot.x, y: bot.y };
+      });
+      
+      const worldMessage = JSON.stringify({
+        type: 'gameWorld',
+        bots: gameWorld.bots,
+        food: gameWorld.food
       });
       
       wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
           try {
-            client.send(message);
+            client.send(playerMessage);
+            client.send(worldMessage);
           } catch (error) {
             console.error('Broadcast error:', error);
           }

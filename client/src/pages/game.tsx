@@ -621,6 +621,8 @@ export default function GamePage() {
   });
   const [foods, setFoods] = useState<Food[]>([]);
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
+  const [serverBots, setServerBots] = useState<any[]>([]);
+  const [serverFood, setServerFood] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
@@ -926,6 +928,10 @@ export default function GamePage() {
         } else if (data.type === 'welcome') {
           setMyPlayerId(data.playerId);
           console.log(`My player ID: ${data.playerId}`);
+        } else if (data.type === 'gameWorld') {
+          setServerBots(data.bots || []);
+          setServerFood(data.food || []);
+          console.log(`Received shared world: ${data.bots?.length} bots, ${data.food?.length} food`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1547,6 +1553,16 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Draw server food first (shared across all players)
+      serverFood.forEach(food => {
+        ctx.save();
+        ctx.fillStyle = food.color;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
       // Draw food items
       foods.forEach((food, index) => {
         if (food.type === 'money') {
@@ -1656,7 +1672,32 @@ export default function GamePage() {
         }
       });
 
-      // Draw bot snakes first (behind player)
+      // Draw server bots first (shared across all players)
+      serverBots.forEach(bot => {
+        if (bot.segments && bot.segments.length > 0) {
+          bot.segments.forEach((segment: any, index: number) => {
+            ctx.save();
+            
+            ctx.fillStyle = bot.color || '#4ecdc4';
+            ctx.beginPath();
+            const radius = (index === 0 ? 12 : 8);
+            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw bot money above head
+            if (index === 0) {
+              ctx.fillStyle = '#fff';
+              ctx.font = `10px Arial`;
+              ctx.textAlign = 'center';
+              ctx.fillText(`$${bot.money.toFixed(2)}`, segment.x, segment.y - 25);
+            }
+            
+            ctx.restore();
+          });
+        }
+      });
+
+      // Draw local bot snakes (fallback)
       botSnakes.forEach(bot => {
         // Bot dynamic scaling based on mass (caps at 5x width)
         const botBaseRadius = 8;
