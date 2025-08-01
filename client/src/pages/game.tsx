@@ -1564,10 +1564,11 @@ export default function GamePage() {
         }
       });
 
-      // Draw all server players (including yourself and others)
-      console.log(`Drawing ${serverPlayers.length} server players`);
-      serverPlayers.forEach((serverPlayer, playerIndex) => {
-        console.log(`Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
+      // Draw only OTHER server players (exclude yourself)
+      const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
+      console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
+      otherServerPlayers.forEach((serverPlayer, playerIndex) => {
+        console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
           // Create full snake body trail by interpolating between segments
           const fullSnakeBody = [];
@@ -1656,7 +1657,45 @@ export default function GamePage() {
         }
       });
 
-      // Draw other players first (behind everything) - fallback
+      // Draw your own snake locally (with full detail and proper rendering)
+      if (gameStarted && snake.visibleSegments.length > 0) {
+        snake.visibleSegments.forEach((segment, index) => {
+          ctx.save();
+          
+          // Your snake color
+          ctx.fillStyle = '#d55400';
+          
+          // Proper size gradient for your snake
+          const baseRadius = 8;
+          const headBonus = Math.max(0, (10 - index) * 0.5);
+          const radius = baseRadius + headBonus;
+          
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // White outline for head
+          if (index === 0) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+          
+          ctx.restore();
+        });
+        
+        // Draw your money above your head
+        if (snake.visibleSegments.length > 0) {
+          ctx.save();
+          ctx.fillStyle = '#fff';
+          ctx.font = `12px Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 25);
+          ctx.restore();
+        }
+      }
+
+      // Draw other players first (behind everything) - fallback (this should now be empty)
       otherPlayers.forEach(player => {
         if (player.segments && player.segments.length > 0) {
           player.segments.forEach((segment, index) => {
