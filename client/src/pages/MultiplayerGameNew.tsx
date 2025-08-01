@@ -25,6 +25,12 @@ interface Food {
   spawnTime?: number;
 }
 
+interface OtherPlayer {
+  x: number;
+  y: number;
+  angle: number;
+}
+
 export default function MultiplayerGameNew() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
@@ -37,6 +43,11 @@ export default function MultiplayerGameNew() {
   const [snake] = useState(() => new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y));
   const [isBoosting, setIsBoosting] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  
+  // Multiplayer state
+  const [otherPlayers, setOtherPlayers] = useState<OtherPlayer[]>([]);
+  const [isMultiplayerActive, setIsMultiplayerActive] = useState(false);
+  const socketRef = useRef<WebSocket | null>(null);
   
   // Images
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
@@ -284,7 +295,7 @@ export default function MultiplayerGameNew() {
 
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, [gameStarted, gameOver, mouseDirection, snake, zoom, foods, getRandomFoodColor]);
+  }, [gameStarted, gameOver, mouseDirection, snake, zoom, foods, getRandomFoodColor, isMultiplayerActive, otherPlayers]);
 
   const renderGame = (ctx: CanvasRenderingContext2D) => {
     // Clear canvas
@@ -404,6 +415,46 @@ export default function MultiplayerGameNew() {
       ctx.fillText(moneyText, head.x, textY);
     }
 
+    // Draw other players' snakes
+    if (isMultiplayerActive && otherPlayers.length > 0) {
+      otherPlayers.forEach((player, index) => {
+        // Draw a simple snake for other players
+        ctx.save();
+        
+        // Different colors for each player
+        const playerColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6ab04c'];
+        ctx.fillStyle = playerColors[index % playerColors.length];
+        
+        // Draw other player's head (simple circle)
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw simple eyes for other players
+        const eyeDistance = 8;
+        const eyeSize = 3;
+        
+        const eye1X = player.x + Math.cos(player.angle - 0.4) * eyeDistance;
+        const eye1Y = player.y + Math.sin(player.angle - 0.4) * eyeDistance;
+        const eye2X = player.x + Math.cos(player.angle + 0.4) * eyeDistance;
+        const eye2Y = player.y + Math.sin(player.angle + 0.4) * eyeDistance;
+        
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, eyeSize / 2, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, eyeSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      });
+    }
+
     // Draw player eyes
     if (snake.visibleSegments.length > 0) {
       const head = snake.visibleSegments[0];
@@ -461,6 +512,73 @@ export default function MultiplayerGameNew() {
     ctx.restore();
   };
 
+  // WebSocket connection setup
+  useEffect(() => {
+    if (!gameStarted) return;
+
+    console.log("Multiplayer layer inactive - running in local mode");
+    
+    // Try to connect to WebSocket server (will be used when available)
+    try {
+      const wsUrl = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const socket = new WebSocket(`${wsUrl}//${window.location.host}/ws`);
+      
+      socket.onopen = () => {
+        console.log("WebSocket connected - multiplayer active");
+        setIsMultiplayerActive(true);
+        socketRef.current = socket;
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "players") {
+            // Render other players' snakes
+            setOtherPlayers(data.players);
+          }
+        } catch (error) {
+          console.error("WebSocket message error:", error);
+        }
+      };
+
+      socket.onclose = () => {
+        console.log("WebSocket disconnected - running in local mode");
+        setIsMultiplayerActive(false);
+        socketRef.current = null;
+      };
+
+      socket.onerror = () => {
+        console.warn("Multiplayer hooks not available, running in local mode");
+        setIsMultiplayerActive(false);
+      };
+
+    } catch (error) {
+      console.warn("Multiplayer hooks not available, running in local mode");
+      setIsMultiplayerActive(false);
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [gameStarted]);
+
+  // Send player position to other players
+  useEffect(() => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      const sendInterval = setInterval(() => {
+        socketRef.current?.send(JSON.stringify({
+          x: snake.headX,
+          y: snake.headY,
+          angle: snake.angle,
+        }));
+      }, 50);
+
+      return () => clearInterval(sendInterval);
+    }
+  }, [snake, isMultiplayerActive]);
+
   const handleLoadingComplete = useCallback(() => {
     setIsLoading(false);
     setGameStarted(true);
@@ -474,7 +592,7 @@ export default function MultiplayerGameNew() {
   }, [snake, generateFood]);
 
   if (isLoading) {
-    return <LoadingScreen onComplete={handleLoadingComplete} />;
+    return <LoadingScreen onLoadingComplete={handleLoadingComplete} />;
   }
 
   return (
@@ -489,8 +607,8 @@ export default function MultiplayerGameNew() {
 
       {/* Minimal UI */}
       <div className="absolute top-4 left-4 text-white font-mono text-sm space-y-1">
-        <div>Players: 1 (Offline)</div>
-        <div>Status: LOCAL</div>
+        <div>Players: {isMultiplayerActive ? otherPlayers.length + 1 : 1} {isMultiplayerActive ? '(Online)' : '(Offline)'}</div>
+        <div>Status: {isMultiplayerActive ? 'MULTIPLAYER' : 'LOCAL'}</div>
       </div>
 
       {/* Simple restart when game over */}

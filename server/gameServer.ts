@@ -281,7 +281,7 @@ export class MultiplayerGameServer {
   }
 
   private findAvailableRoom(): GameRoom | null {
-    for (const room of this.rooms.values()) {
+    for (const [, room] of this.rooms) {
       if (room.players.size < room.maxPlayers) {
         return room;
       }
