@@ -659,25 +659,33 @@ export default function GamePage() {
     console.log("Game started - waiting for server world data");
   }, [gameStarted]);
 
-  // WebSocket connection for real multiplayer
+  // WebSocket connection with server selection for scaling
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Connecting to multiplayer server...");
+    console.log("Getting available server...");
+    setConnectionStatus('Connecting');
     
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
-    
-    wsRef.current = socket;
+    // First, get an available server
+    fetch('/api/server/available')
+      .then(res => res.json())
+      .then(data => {
+        const serverId = data.serverId;
+        console.log(`Connecting to server ${serverId}`);
+        
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws/${serverId}`);
+        
+        wsRef.current = socket;
 
-    socket.onopen = () => {
-      console.log("Connected to multiplayer server!");
-      console.log("WebSocket readyState:", socket.readyState);
-      setConnectionStatus('Connected');
-    };
+        socket.onopen = () => {
+          console.log(`Connected to multiplayer server ${serverId}!`);
+          console.log("WebSocket readyState:", socket.readyState);
+          setConnectionStatus('Connected');
+        };
 
-    socket.onmessage = (event) => {
+        socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'players') {
@@ -691,6 +699,15 @@ export default function GamePage() {
         } else if (data.type === 'welcome') {
           setMyPlayerId(data.playerId);
           console.log(`My player ID: ${data.playerId}`);
+          
+          // Handle initial state if provided
+          if (data.initialState) {
+            const { players, bots, gameWorld } = data.initialState;
+            setOtherPlayers((players || []).filter((p: any) => p.id !== data.playerId && p.segments.length > 0));
+            setServerBots(bots || []);
+            setServerPlayers(gameWorld || []);
+            console.log(`Received initial state: ${players?.length || 0} players, ${bots?.length || 0} bots`);
+          }
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
@@ -720,52 +737,64 @@ export default function GamePage() {
           gameOverRef.current = true;
           console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
         }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+        };
 
-    socket.onclose = (event) => {
-      console.log("Disconnected from multiplayer server");
-      console.log("Close event:", event.code, event.reason);
-      setConnectionStatus('Disconnected');
-      wsRef.current = null;
-      
-      // Auto-reconnect after 2 seconds if not a normal closure
-      if (event.code !== 1000 && gameStarted) {
-        console.log("Attempting auto-reconnect in 2 seconds...");
-        setConnectionStatus('Reconnecting');
-        setTimeout(() => {
-          if (gameStarted && !wsRef.current) {
-            console.log("Auto-reconnecting to multiplayer server...");
-            // Create new WebSocket connection
-            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
-            wsRef.current = newSocket;
-            
-            // Set up handlers for new connection
-            newSocket.onopen = () => {
-              console.log("Reconnected to multiplayer server!");
-              setConnectionStatus('Connected');
-            };
-            newSocket.onmessage = socket.onmessage;
-            newSocket.onclose = socket.onclose;
-            newSocket.onerror = socket.onerror;
+        socket.onclose = (event) => {
+          console.log(`Disconnected from server ${serverId}`);
+          console.log("Close event:", event.code, event.reason);
+          setConnectionStatus('Disconnected');
+          wsRef.current = null;
+          
+          // Auto-reconnect after 2 seconds if not a normal closure
+          if (event.code !== 1000 && gameStarted) {
+            console.log("Attempting auto-reconnect in 2 seconds...");
+            setConnectionStatus('Reconnecting');
+            setTimeout(() => {
+              if (gameStarted && !wsRef.current) {
+                console.log("Auto-reconnecting to multiplayer server...");
+                // Get a new available server and reconnect
+                fetch('/api/server/available')
+                  .then(res => res.json())
+                  .then(reconnectData => {
+                    const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws/${reconnectData.serverId}`);
+                    wsRef.current = newSocket;
+                    
+                    newSocket.onopen = () => {
+                      console.log(`Reconnected to server ${reconnectData.serverId}!`);
+                      setConnectionStatus('Connected');
+                    };
+                    newSocket.onmessage = socket.onmessage;
+                    newSocket.onclose = socket.onclose;
+                    newSocket.onerror = socket.onerror;
+                  })
+                  .catch(err => {
+                    console.error('Failed to get server for reconnect:', err);
+                    setConnectionStatus('Connection Error');
+                  });
+              }
+            }, 2000);
           }
-        }, 2000);
-      }
-    };
+        };
 
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setConnectionStatus('Connection Error');
-    };
+        socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setConnectionStatus('Connection Error');
+        };
 
-    return () => {
-      console.log("Cleaning up WebSocket connection...");
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close();
-      }
-    };
+        return () => {
+          console.log("Cleaning up WebSocket connection...");
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+          }
+        };
+      })
+      .catch(error => {
+        console.error('Failed to get available server:', error);
+        setConnectionStatus('Connection Error');
+      });
   }, [gameStarted]);
 
   // Send player data to server

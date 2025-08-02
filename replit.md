@@ -34,6 +34,7 @@ Preferred communication style: Simple, everyday language.
 ### Core System Features
 - **Authentication**: Username/password based, user profile management.
 - **Game Engine**: Real-time multiplayer, WebSocket-based communication, server-controlled game state. Snake growth completely capped at exactly 100 segments and 100 mass - no growth in size or strength beyond this limit. Dynamic segment spacing system where small snakes have tight segments (12px) that gradually spread out to 18px for larger snakes, creating natural elongated appearance. Money counter with consistent styling and positioning. Snake death results in full disappearance. Performance optimized for large snakes. Mass counter in top-right corner shows progress to 100 max. **Food system completely removed** per user request - pure multiplayer snake competition without any food mechanics.
+- **Multi-Server Architecture**: Automatic server creation after 8 players to enable scaling. Load balancing distributes players across multiple server instances with WebSocket paths `/ws/0`, `/ws/1`, etc. Client requests available server via `/api/server/available` endpoint before connecting.
 - **Social Features**: Friend system, global leaderboard, user statistics tracking.
 - **Virtual Economy**: Dual currency (game currency and SOL), daily crate rewards, betting mechanics, wallet management.
 - **Bot AI**: State-based AI (wander, avoid, aggro) with food targeting removed, strategic boosting, realistic movement patterns.
