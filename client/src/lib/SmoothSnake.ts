@@ -256,14 +256,14 @@ export class SmoothSnake {
   }
   
   getScaleFactor(): number {
-    return Math.min(1 + (this.totalMass - this.START_MASS) / 100, 3);
+    // Keep constant scale - no width scaling with mass
+    return 1;
   }
 
   getSegmentRadius(): number {
+    // Keep constant width - no scaling with mass
     const baseRadius = 8;
-    const maxScale = 5;
-    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
-    return baseRadius * scaleFactor;
+    return baseRadius;
   }
   
   addMoney(amount: number) {
