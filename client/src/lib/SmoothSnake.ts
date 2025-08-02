@@ -262,7 +262,10 @@ export class SmoothSnake {
   getSegmentRadius(): number {
     const baseRadius = 8;
     const maxScale = 5;
-    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
+    // Cap width scaling at 100 segments, not mass
+    const MAX_SEGMENTS = 100;
+    const currentSegments = Math.min(this.visibleSegments.length, MAX_SEGMENTS);
+    const scaleFactor = Math.min(1 + (currentSegments - 10) / 100, maxScale);
     return baseRadius * scaleFactor;
   }
   

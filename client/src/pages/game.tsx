@@ -448,9 +448,11 @@ class SmoothSnake {
   }
   
   getSegmentRadius() {
-    // Dynamic scaling based on mass (baseline at mass=10, caps at 5x width)
+    // Cap width scaling at 100 segments, not mass
     const maxScale = 5;
-    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
+    const MAX_SEGMENTS = 100;
+    const currentSegments = Math.min(this.visibleSegments.length, MAX_SEGMENTS);
+    const scaleFactor = Math.min(1 + (currentSegments - 10) / 100, maxScale);
     return this.SEGMENT_RADIUS * scaleFactor;
   }
 
@@ -1937,11 +1939,39 @@ export default function GamePage() {
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Use server segments directly to avoid position mismatch
+          // Apply dynamic spacing to other players' segments for consistency
           const fullSnakeBody = serverPlayer.segments;
           
-          // Use all segments as-is since we're now sending many more segments
-          // No need for tail extension - just use the received segments with interpolation
+          // Calculate dynamic spacing for this player based on their segment count
+          const MAX_SEGMENTS = 100;
+          const segmentProgress = Math.min(fullSnakeBody.length / MAX_SEGMENTS, 1.0);
+          const dynamicSpacing = 12 + (segmentProgress * 6); // 12 to 18 spacing, same as local snake
+          
+          // Apply spacing to segments for natural appearance
+          const spacedSegments = [];
+          if (fullSnakeBody.length > 0) {
+            spacedSegments.push(fullSnakeBody[0]); // Always include head
+            
+            let lastIncludedIndex = 0;
+            let distanceAccumulator = 0;
+            
+            for (let i = 1; i < fullSnakeBody.length && spacedSegments.length < MAX_SEGMENTS; i++) {
+              const prevSeg = fullSnakeBody[lastIncludedIndex];
+              const currSeg = fullSnakeBody[i];
+              
+              const dx = currSeg.x - prevSeg.x;
+              const dy = currSeg.y - prevSeg.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              distanceAccumulator += dist;
+              
+              if (distanceAccumulator >= dynamicSpacing) {
+                spacedSegments.push(currSeg);
+                lastIncludedIndex = i;
+                distanceAccumulator = 0;
+              }
+            }
+          }
           
           // Draw snake body with EXACT same styling as local snake
           ctx.save();
@@ -1952,13 +1982,12 @@ export default function GamePage() {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
-          // Cap rendering at exactly 100 segments to match game limits
-          const maxRenderSegments = 100; // Hard cap at 100 segments max
-          const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
+          // Use spaced segments for natural appearance
+          const segmentsToRender = spacedSegments.length;
           
           // Draw segments from tail to head for proper layering
           for (let i = segmentsToRender - 1; i >= 0; i--) {
-            const segment = fullSnakeBody[i];
+            const segment = spacedSegments[i];
             const segmentRadius = serverPlayer.segmentRadius || 10;
             
             ctx.fillStyle = serverPlayer.color || '#ff0000';
@@ -1967,19 +1996,19 @@ export default function GamePage() {
             ctx.fill();
           }
           
-          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} round ball segments`);
+          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} dynamically spaced segments`);
           
           ctx.restore();
           
           // Draw rotated square eyes exactly like local snake
-          if (fullSnakeBody.length > 0) {
-            const head = fullSnakeBody[0];
+          if (spacedSegments.length > 0) {
+            const head = spacedSegments[0];
             
             // Calculate movement direction from first two segments
             let movementAngle = 0;
-            if (fullSnakeBody.length > 1) {
-              const dx = head.x - fullSnakeBody[1].x;
-              const dy = head.y - fullSnakeBody[1].y;
+            if (spacedSegments.length > 1) {
+              const dx = head.x - spacedSegments[1].x;
+              const dy = head.y - spacedSegments[1].y;
               movementAngle = Math.atan2(dy, dx);
             }
             
