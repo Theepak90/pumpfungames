@@ -1802,38 +1802,99 @@ export default function GamePage() {
         }
       });
 
-      // Draw your own snake locally (with full detail and proper rendering)
+      // Draw your own snake locally using EXACT same rendering as remote players
       if (gameStarted && snake.visibleSegments.length > 0) {
-        snake.visibleSegments.forEach((segment, index) => {
-          ctx.save();
+        const fullSnakeBody = snake.visibleSegments;
+        
+        // Draw snake body with EXACT same styling as remote players
+        ctx.save();
+        
+        // Add drop shadow when not boosting (like remote snakes)
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        // Draw each segment as a distinct round ball (same as remote snakes)
+        fullSnakeBody.forEach((segment: any, segIndex: number) => {
+          // Use the actual segment radius (same calculation as server data)
+          const segmentRadius = snake.getSegmentRadius();
           
-          // Your snake color
-          ctx.fillStyle = '#d55400';
-          
-          // Use the same radius as what we send to the server
-          const radius = snake.getSegmentRadius();
-          
+          ctx.fillStyle = '#d55400'; // Your snake color
           ctx.beginPath();
-          ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+          ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
           ctx.fill();
-          
-          // White outline for head
-          if (index === 0) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
-          
-          ctx.restore();
         });
         
-        // Draw your money above your head
-        if (snake.visibleSegments.length > 0) {
+        ctx.restore();
+        
+        // Draw rotated square eyes exactly like remote snakes
+        if (fullSnakeBody.length > 0) {
+          const head = fullSnakeBody[0];
+          
+          // Calculate movement direction from first two segments
+          let movementAngle = 0;
+          if (fullSnakeBody.length > 1) {
+            const dx = head.x - fullSnakeBody[1].x;
+            const dy = head.y - fullSnakeBody[1].y;
+            movementAngle = Math.atan2(dy, dx);
+          }
+          
+          // Scale eyes with snake size (exact same as remote snakes)
+          const segmentRadius = snake.getSegmentRadius();
+          const eyeDistance = segmentRadius * 0.5; // Scale eye distance with snake size
+          const eyeSize = segmentRadius * 0.3; // Scale eye size with snake size
+          const pupilSize = segmentRadius * 0.15; // Scale pupil with snake size
+          
+          // Eye positions perpendicular to movement direction
+          const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+          const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+          const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+          const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+          
+          // Draw first eye with rotation
+          ctx.save();
+          ctx.translate(eye1X, eye1Y);
+          ctx.rotate(movementAngle);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Draw first pupil looking forward
+          const pupilOffset = eyeSize * 0.4; // Scale pupil offset with eye size
+          ctx.fillStyle = 'black';
+          ctx.fillRect(
+            pupilOffset - pupilSize,
+            0 - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
+          
+          // Draw second eye with rotation
+          ctx.save();
+          ctx.translate(eye2X, eye2Y);
+          ctx.rotate(movementAngle);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Draw second pupil looking forward
+          ctx.fillStyle = 'black';
+          ctx.fillRect(
+            pupilOffset - pupilSize,
+            0 - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
+        }
+        
+        // Draw your money above your head (same as remote snakes)
+        if (fullSnakeBody.length > 0) {
           ctx.save();
           ctx.fillStyle = '#fff';
           ctx.font = `12px Arial`;
           ctx.textAlign = 'center';
-          ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 25);
+          ctx.fillText(`$${snake.money.toFixed(2)}`, fullSnakeBody[0].x, fullSnakeBody[0].y - 25);
           ctx.restore();
         }
       }
