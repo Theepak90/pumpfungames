@@ -8,7 +8,9 @@ import LoadingScreen from '@/components/LoadingScreen';
 // Game constants
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
-const MAP_RADIUS = 1800; // Circular map radius
+const BASE_MAP_RADIUS = 1800; // Base circular map radius
+const EXPANSION_THRESHOLD = 5; // Players needed to trigger expansion
+const EXPANSION_RATE = 0.25; // 25% expansion rate
 // Food system removed
 const BOT_COUNT = 5;
 
@@ -56,7 +58,7 @@ function getRandomFoodColor(): string {
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 200);
+  const radius = Math.random() * (BASE_MAP_RADIUS - 200);
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
@@ -154,7 +156,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
     // Random wandering behavior (food targeting removed)
     if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
       const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-      if (distFromCenter > MAP_RADIUS * 0.6) {
+      if (distFromCenter > BASE_MAP_RADIUS * 0.6) {
         // Move toward center when near edges
         const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
         bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
@@ -204,7 +206,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
   
   // Keep bot within circular map bounds
   const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 50) {
+  if (distFromCenter > BASE_MAP_RADIUS - 50) {
     const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
     bot.targetAngle = angleToCenter;
   }
@@ -993,6 +995,19 @@ export default function GamePage() {
 
       // Food system removed
 
+      // Calculate dynamic map radius based on player count
+      const currentPlayerCount = otherPlayers.length + 1; // +1 for local player
+      const shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
+      const targetRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
+      
+      // Log expansion status
+      if (currentPlayerCount > EXPANSION_THRESHOLD) {
+        console.log(`🔵 BARRIER EXPANDING: ${currentPlayerCount} players online, radius: ${BASE_MAP_RADIUS} → ${targetRadius}`);
+      }
+      
+      // Use current radius for immediate expansion (will be smoothed later)
+      const activeRadius = targetRadius;
+      
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
@@ -1001,7 +1016,7 @@ export default function GamePage() {
         const distanceFromCenter = Math.sqrt(
           (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
         );
-        if (distanceFromCenter > MAP_RADIUS) {
+        if (distanceFromCenter > activeRadius) {
           hitBoundary = true;
           break;
         }
@@ -1226,7 +1241,7 @@ export default function GamePage() {
 
       // Draw background image across the full map area if loaded
       if (backgroundImage) {
-        const mapSize = MAP_RADIUS * 2.5;
+        const mapSize = BASE_MAP_RADIUS * 2.5;
         // Draw background image tiled across the entire game area
         const pattern = ctx.createPattern(backgroundImage, 'repeat');
         if (pattern) {
@@ -1239,10 +1254,10 @@ export default function GamePage() {
       ctx.save();
       
       // Create a clipping path for the area outside the safe zone
-      const mapSize = MAP_RADIUS * 2.5;
+      const mapSize = BASE_MAP_RADIUS * 2.5;
       ctx.beginPath();
       ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2, true); // Subtract safe zone (clockwise) - using dynamic radius
       ctx.clip();
       
       // Fill only the clipped area (outside the circle) with green overlay
@@ -1251,11 +1266,11 @@ export default function GamePage() {
       
       ctx.restore();
 
-      // Draw thin death barrier line
+      // Draw thin death barrier line - using dynamic radius
       ctx.strokeStyle = '#53d392';
       ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // All food rendering removed
@@ -1756,8 +1771,8 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((snake.head.x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
+                cy={48 + ((snake.head.y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
                 r="2"
                 fill="#ff4444"
               />
@@ -1767,8 +1782,8 @@ export default function GamePage() {
             {botSnakes.map(bot => (
               <circle
                 key={bot.id}
-                cx={48 + ((bot.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((bot.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((bot.head.x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
+                cy={48 + ((bot.head.y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
                 r="1.5"
                 fill={bot.color}
               />
