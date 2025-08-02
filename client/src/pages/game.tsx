@@ -722,7 +722,7 @@ export default function GamePage() {
 
   // Send player data to server via HTTP
   useEffect(() => {
-    if (!gameStarted || !myPlayerId || !currentRoomId) {
+    if (!gameStarted || !myPlayerId || currentRoomId === 0) {
       console.log(`Not sending HTTP updates: gameStarted=${gameStarted}, playerId=${!!myPlayerId}, roomId=${currentRoomId}`);
       return;
     }
@@ -736,27 +736,33 @@ export default function GamePage() {
         return;
       }
       
-      if (snake.visibleSegments.length > 0) {
-        const updateData = {
-          roomId: currentRoomId,
-          playerId: myPlayerId,
-          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
-          color: '#d55400',
-          money: snake.money,
-          totalMass: snake.totalMass,
-          segmentRadius: snake.getSegmentRadius(),
-          visibleSegmentCount: snake.visibleSegments.length
-        };
-        
-        // Send update via HTTP POST
-        fetch('/api/multiplayer/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        }).catch(err => {
-          console.error('Failed to send player update:', err);
-        });
-      }
+      // Always send updates, even if no segments (for initial positioning)
+      const updateData = {
+        roomId: currentRoomId,
+        playerId: myPlayerId,
+        segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
+        color: '#d55400',
+        money: snake.money || 1.00,
+        totalMass: snake.totalMass || 6,
+        segmentRadius: snake.getSegmentRadius ? snake.getSegmentRadius() : 8,
+        visibleSegmentCount: snake.visibleSegments.length
+      };
+      
+      console.log(`📤 HTTP UPDATE: Sending player data - segments=${updateData.segments.length}, mass=${updateData.totalMass}, room=${currentRoomId}`);
+      
+      // Send update via HTTP POST
+      fetch('/api/multiplayer/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log(`✅ HTTP UPDATE SUCCESS:`, data);
+      })
+      .catch(err => {
+        console.error('❌ Failed to send player update:', err);
+      });
     }, 100); // Send updates every 100ms for HTTP polling
 
     return () => {
