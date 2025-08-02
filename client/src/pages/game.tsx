@@ -1983,18 +1983,18 @@ export default function GamePage() {
               movementAngle = Math.atan2(dy, dx);
             }
             
-            // Cap eye scaling at 100 segments for multiplayer snakes
+            // Cap eye scaling at 100 segments for multiplayer snakes with smaller proportions
             const MAX_SEGMENTS = 100;
             const currentSegments = Math.min(fullSnakeBody.length, MAX_SEGMENTS);
             const segmentProgress = currentSegments / MAX_SEGMENTS;
-            const maxEyeScale = 3.0; // Cap at 3x size like segment scaling
+            const maxEyeScale = 1.8; // Much smaller scaling to fit on head
             const baseEyeScale = 1 + (segmentProgress * (maxEyeScale - 1));
             
             const baseRadius = 10;
             const cappedRadius = baseRadius * baseEyeScale;
-            const eyeDistance = cappedRadius * 0.5; // Scale eye distance with capped size
-            const eyeSize = cappedRadius * 0.3; // Scale eye size with capped size
-            const pupilSize = cappedRadius * 0.15; // Scale pupil with capped size
+            const eyeDistance = cappedRadius * 0.35; // Closer to center
+            const eyeSize = cappedRadius * 0.22; // Smaller relative to head
+            const pupilSize = cappedRadius * 0.10; // Smaller pupil
             
             // Eye positions perpendicular to movement direction
             const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -2280,15 +2280,15 @@ export default function GamePage() {
         if (snake.visibleSegments.length > 0) {
           const snakeHead = snake.visibleSegments[0];
           const movementAngle = snake.currentAngle;
-          // Cap eye scaling at 100 segments
+          // Cap eye scaling at 100 segments with smaller proportions
           const MAX_SEGMENTS = 100;
           const currentSegments = Math.min(snake.visibleSegments.length, MAX_SEGMENTS);
           const segmentProgress = currentSegments / MAX_SEGMENTS;
-          const maxEyeScale = 3.0; // Cap at 3x size like segment scaling
+          const maxEyeScale = 1.8; // Much smaller scaling to fit on head
           const scaleFactor = 1 + (segmentProgress * (maxEyeScale - 1));
-          const eyeDistance = 5 * scaleFactor; // Scale distance from center
-          const eyeSize = 3 * scaleFactor; // Scale eye size
-          const pupilSize = 1.5 * scaleFactor; // Scale pupil size
+          const eyeDistance = 3.5 * scaleFactor; // Closer to center
+          const eyeSize = 2.2 * scaleFactor; // Smaller eye size
+          const pupilSize = 1.0 * scaleFactor; // Smaller pupil size
           
           // Calculate cursor direction using mouse direction vector
           const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
