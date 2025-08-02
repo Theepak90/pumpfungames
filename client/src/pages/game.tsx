@@ -1935,8 +1935,8 @@ export default function GamePage() {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
-          // Optimize rendering for large snakes - limit visible segments for performance
-          const maxRenderSegments = 150; // Cap rendering at 150 segments for performance
+          // Cap rendering at exactly 100 segments to match game limits
+          const maxRenderSegments = 100; // Hard cap at 100 segments max
           const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
           
           // Draw segments from tail to head for proper layering
@@ -2056,8 +2056,8 @@ export default function GamePage() {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
-        // Optimize rendering for large snakes - limit visible segments for performance
-        const maxRenderSegments = 150; // Cap rendering at 150 segments for performance
+        // Cap rendering at exactly 100 segments to match game limits
+        const maxRenderSegments = 100; // Hard cap at 100 segments max
         const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
         
         // Draw segments from tail to head for proper layering
