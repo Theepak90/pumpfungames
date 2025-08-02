@@ -625,6 +625,12 @@ export default function GamePage() {
   const [serverFood, setServerFood] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
+  const gameOverRef = useRef(false);
+
+  // Sync ref with state
+  useEffect(() => {
+    gameOverRef.current = gameOver;
+  }, [gameOver]);
   const [score, setScore] = useState(0);
   const [isBoosting, setIsBoosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -1630,6 +1636,7 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
+            gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
             // FORCE immediate re-render by clearing canvas
@@ -1659,6 +1666,7 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into server player ${serverPlayer.id}!`);
+            gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
             // Drop death food and money crates along snake body
@@ -2232,8 +2240,8 @@ export default function GamePage() {
       
       ctx.globalAlpha = 1.0;
 
-      // Only render snake if game is not over
-      if (!gameOver) {
+      // Only render snake if game is not over (use ref for immediate response)
+      if (!gameOverRef.current) {
         // Draw single glowing outline behind the whole snake when boosting
         if (snake.isBoosting && snake.visibleSegments.length > 0) {
           ctx.save();
@@ -2399,11 +2407,11 @@ export default function GamePage() {
       // No UI display needed
       
 
-      // Only continue game loop if game is not over
-      if (!gameOver) {
+      // Only continue game loop if game is not over (use ref for immediate response)
+      if (!gameOverRef.current) {
         animationId = requestAnimationFrame(gameLoop);
       } else {
-        console.log(`🛑 GAME LOOP STOPPED - gameOver = ${gameOver}`);
+        console.log(`🛑 GAME LOOP STOPPED - gameOverRef = ${gameOverRef.current}`);
       }
     };
 
