@@ -113,9 +113,14 @@ export class SmoothSnake {
       const dy = b.y - a.y;
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
+      // Calculate dynamic segment spacing based on snake size
+      // Small snakes: tight spacing (12), Large snakes: spread out (18)
+      const segmentProgress = Math.min(this.currentSegmentCount / MAX_SEGMENTS, 1.0);
+      const dynamicSpacing = this.SEGMENT_SPACING + (segmentProgress * 6); // 12 to 18 spacing
+      
       // Check if we need to place segments in this trail section
       // TRIPLE CHECK: Enforce 100 segment limit at every placement
-      while (distanceSoFar + this.SEGMENT_SPACING <= (distanceSoFar + segmentDist) && 
+      while (distanceSoFar + dynamicSpacing <= (distanceSoFar + segmentDist) && 
              this.visibleSegments.length < totalSegmentsToPlace && 
              this.visibleSegments.length < MAX_SEGMENTS &&
              segmentIndex < MAX_SEGMENTS) {
@@ -133,7 +138,7 @@ export class SmoothSnake {
         
         this.visibleSegments.push({ x: segmentX, y: segmentY, opacity });
         
-        distanceSoFar += this.SEGMENT_SPACING;
+        distanceSoFar += dynamicSpacing;
         segmentIndex++;
       }
       
