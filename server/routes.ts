@@ -308,6 +308,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gameWorld.food.push(serverFood);
           
           console.log(`Player ${playerId} dropped food at (${droppedFood.x.toFixed(1)}, ${droppedFood.y.toFixed(1)})`);
+        } else if (data.type === 'playerDeath') {
+          // Handle player death and death loot drops
+          const deathLoot = data.deathLoot;
+          
+          if (deathLoot && Array.isArray(deathLoot)) {
+            // Add all death loot items to server food
+            for (const loot of deathLoot) {
+              const serverLoot = {
+                id: `death_${Date.now()}_${Math.random()}`,
+                x: loot.x,
+                y: loot.y,
+                size: loot.size,
+                color: loot.color,
+                type: loot.type, // 'food' or 'money'
+                mass: loot.mass || 1,
+                value: loot.value || 0 // For money crates
+              };
+              gameWorld.food.push(serverLoot);
+            }
+            
+            console.log(`💀 Player ${playerId} died, added ${deathLoot.length} death loot items to server`);
+            
+            // Remove the dead player from active players
+            activePlayers.delete(playerId);
+            gameWorld.players.delete(playerId);
+          }
         }
       } catch (error) {
         console.error("WebSocket message error:", error);

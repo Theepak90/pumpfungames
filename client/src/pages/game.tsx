@@ -756,6 +756,98 @@ export default function GamePage() {
     setFoods(prevFoods => [...prevFoods, ...newCrates]);
   };
 
+  // Function to drop death loot for multiplayer (sends to server for synchronization)
+  const dropMultiplayerDeathLoot = (segments: Array<{ x: number; y: number; opacity: number }>, snakeMass: number, snakeMoney: number) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log('WebSocket not available, dropping local death loot only');
+      dropDeathFood(snake.head.x, snake.head.y, snakeMass);
+      dropMoneyCrates();
+      return;
+    }
+
+    const deathLoot: Array<{
+      x: number;
+      y: number;
+      size: number;
+      color: string;
+      type: 'food' | 'money';
+      mass?: number;
+      value?: number;
+    }> = [];
+
+    // Drop regular food along snake body segments
+    const foodCount = Math.floor(snakeMass);
+    for (let i = 0; i < foodCount; i++) {
+      let x, y;
+      
+      if (segments.length > 0) {
+        const segmentIndex = Math.floor((i / foodCount) * segments.length);
+        const segment = segments[Math.min(segmentIndex, segments.length - 1)];
+        
+        x = segment.x + (Math.random() - 0.5) * 8;
+        y = segment.y + (Math.random() - 0.5) * 8;
+      } else {
+        const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5;
+        const radius = 20 + Math.random() * 30;
+        x = snake.head.x + Math.cos(angle) * radius;
+        y = snake.head.y + Math.sin(angle) * radius;
+      }
+
+      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
+      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
+
+      deathLoot.push({
+        x: clampedX,
+        y: clampedY,
+        size: 7,
+        color: '#d55400', // Snake's orange color
+        type: 'food',
+        mass: 1
+      });
+    }
+
+    // Drop money crates along snake body segments
+    const segmentCount = segments.length;
+    const moneyPerCrate = segmentCount > 0 ? snakeMoney / segmentCount : 0;
+    
+    for (let i = 0; i < segmentCount; i++) {
+      let x, y;
+      
+      if (segments.length > 0) {
+        const segment = segments[i];
+        x = segment.x + (Math.random() - 0.5) * 15;
+        y = segment.y + (Math.random() - 0.5) * 15;
+      } else {
+        const angle = (i / segmentCount) * Math.PI * 2;
+        const radius = Math.random() * 40 + 20;
+        x = snake.head.x + Math.cos(angle) * radius;
+        y = snake.head.y + Math.sin(angle) * radius;
+      }
+
+      const clampedX = Math.max(MAP_CENTER_X - MAP_RADIUS + 50, Math.min(MAP_CENTER_X + MAP_RADIUS - 50, x));
+      const clampedY = Math.max(MAP_CENTER_Y - MAP_RADIUS + 50, Math.min(MAP_CENTER_Y + MAP_RADIUS - 50, y));
+
+      deathLoot.push({
+        x: clampedX,
+        y: clampedY,
+        size: 20,
+        color: '#00ff00', // Green color for money crates
+        type: 'money',
+        mass: 1,
+        value: moneyPerCrate
+      });
+    }
+
+    // Send death loot to server for synchronization
+    wsRef.current.send(JSON.stringify({
+      type: 'playerDeath',
+      playerId: myPlayerId,
+      deathLoot: deathLoot
+    }));
+
+    console.log(`💀 Sent death loot to server: ${deathLoot.length} items (${foodCount} food, ${segmentCount} money crates)`);
+  };
+
 
 
   // Load background image
@@ -1230,9 +1322,8 @@ export default function GamePage() {
       }
       
       if (hitBoundary) {
-        // Drop food and money crates when snake dies
-        dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
-        dropMoneyCrates();
+        // Drop death loot using multiplayer system for consistency
+        dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
         snake.money = 0; // Reset snake's money on death
         setGameOver(true);
         return;
@@ -1264,9 +1355,8 @@ export default function GamePage() {
       }
       
       if (hitBot) {
-        // Drop food and money crates when snake dies from collision
-        dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
-        dropMoneyCrates();
+        // Drop death loot using multiplayer system for consistency
+        dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
         snake.money = 0; // Reset snake's money on death
         setGameOver(true);
         return;
@@ -1295,22 +1385,12 @@ export default function GamePage() {
         
         if (headOnCollision) {
           // Both snakes die in head-on collision
-          // Player snake dies
-          dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
-          dropMoneyCrates();
+          // Player snake dies - use multiplayer death loot for consistency
+          dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
           snake.money = 0;
           
-          // Bot snake also dies
-          dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
-          
-          // Drop money crates for bot death too
-          const originalSegments = snake.visibleSegments;
-          const originalMoney = snake.money;
-          snake.visibleSegments = bot.visibleSegments;
-          snake.money = bot.money; // Use bot's money value
-          dropMoneyCrates();
-          snake.visibleSegments = originalSegments;
-          snake.money = originalMoney; // Restore player money
+          // Bot snake also dies - use multiplayer death loot for bot
+          dropMultiplayerDeathLoot(bot.visibleSegments, bot.totalMass, bot.money);
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1512,10 +1592,18 @@ export default function GamePage() {
         const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
         
         if (dist < snake.getSegmentRadius() + food.size) {
-          // Eat server food - give decent mass increase
-          const massGain = food.size * 0.05;
-          snake.totalMass += massGain;
-          setScore(prev => prev + Math.floor(massGain * 10));
+          if (food.type === 'money') {
+            // Money crate gives money to the snake's balance
+            const moneyGain = food.value || 0.1; // Default 10 cents if value not set
+            snake.money += moneyGain;
+            console.log(`💰 Collected death loot money crate: +$${moneyGain.toFixed(2)}, total: $${snake.money.toFixed(2)}`);
+          } else {
+            // Regular food gives mass increase
+            const massGain = food.size * 0.05;
+            snake.totalMass += massGain;
+            setScore(prev => prev + Math.floor(massGain * 10));
+            console.log(`🍎 Collected death loot food: +${massGain.toFixed(1)} mass, total: ${snake.totalMass.toFixed(1)}`);
+          }
           
           // Send food eating event to server for synchronized removal
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1544,8 +1632,8 @@ export default function GamePage() {
             console.log(`💀 CRASHED into player ${otherPlayer.id}!`);
             setGameOver(true);
             
-            // Drop death food along snake body
-            dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+            // Drop death food and money crates along snake body
+            dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
             
             return; // Stop the game loop
           }
@@ -1566,8 +1654,8 @@ export default function GamePage() {
             console.log(`💀 CRASHED into server player ${serverPlayer.id}!`);
             setGameOver(true);
             
-            // Drop death food along snake body
-            dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+            // Drop death food and money crates along snake body
+            dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
             
             return; // Stop the game loop
           }
@@ -1644,20 +1732,53 @@ export default function GamePage() {
       serverFood.forEach(food => {
         ctx.save();
         
-        // Add glow effect
-        ctx.shadowColor = food.color;
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = food.color;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw solid circle on top (no shadow)
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = food.color;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (food.type === 'money') {
+          // Render server money crates with the same style as local money crates
+          const time = Date.now() * 0.003; 
+          const wobbleX = Math.sin(time + food.x * 0.01) * 2;
+          const wobbleY = Math.cos(time * 1.2 + food.y * 0.01) * 1.5;
+          
+          const drawX = food.x + wobbleX;
+          const drawY = food.y + wobbleY;
+          
+          // Draw shadow first
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillRect(drawX - 10 + 2, drawY - 10 + 2, 20, 20);
+          
+          // Reset shadow
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw green background square
+          ctx.fillStyle = food.color;
+          ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+          
+          // Draw dollar sign if available
+          if (dollarSignImage) {
+            ctx.drawImage(dollarSignImage, drawX - 10, drawY - 10, 20, 20);
+          }
+        } else {
+          // Regular food rendering
+          ctx.shadowColor = food.color;
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw solid circle on top (no shadow)
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
         
         ctx.restore();
       });
