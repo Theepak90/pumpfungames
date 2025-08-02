@@ -1417,6 +1417,58 @@ export default function GamePage() {
         return newFoods;
       });
 
+      // Check collision with server food (shared food)
+      setServerFood(prevServerFood => {
+        const newServerFood = [...prevServerFood];
+        let scoreIncrease = 0;
+        
+        for (let i = newServerFood.length - 1; i >= 0; i--) {
+          const food = newServerFood[i];
+          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+          
+          if (dist < snake.getSegmentRadius() + food.size) {
+            // Eat server food - give small mass increase
+            const massGain = food.size * 0.02; // Small mass based on food size
+            snake.totalMass += massGain;
+            scoreIncrease += Math.floor(massGain * 10);
+            
+            // Remove eaten server food (it will respawn from server)
+            newServerFood.splice(i, 1);
+            break; // Only eat one food per frame
+          }
+        }
+        
+        if (scoreIncrease > 0) {
+          setScore(prev => prev + scoreIncrease);
+        }
+        
+        return newServerFood;
+      });
+
+      // Add food attraction/gravity effect for server food
+      setServerFood(prevServerFood => {
+        return prevServerFood.map(food => {
+          const dx = snake.head.x - food.x;
+          const dy = snake.head.y - food.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Apply strong attraction when close (within 80 units)
+          if (distance < 80 && distance > 0) {
+            const attractionStrength = 1.8; // Strong attraction like home screen
+            const pullX = (dx / distance) * attractionStrength;
+            const pullY = (dy / distance) * attractionStrength;
+            
+            return {
+              ...food,
+              x: food.x + pullX,
+              y: food.y + pullY
+            };
+          }
+          
+          return food;
+        });
+      });
+
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
       const maxSegmentZoom = 130;
@@ -1483,13 +1535,25 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw server food first (shared across all players)
+      // Draw server food first (shared across all players) with glow effects
       serverFood.forEach(food => {
         ctx.save();
+        
+        // Add glow effect
+        ctx.shadowColor = food.color;
+        ctx.shadowBlur = 15;
         ctx.fillStyle = food.color;
         ctx.beginPath();
         ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Draw solid circle on top (no shadow)
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = food.color;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
+        
         ctx.restore();
       });
 
