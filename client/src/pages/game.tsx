@@ -1715,25 +1715,14 @@ export default function GamePage() {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
-          // Draw body segments first (skip head at index 0)
-          fullSnakeBody.slice(1).forEach((segment: any, segIndex: number) => {
-            // Use the actual segment radius from server data to match snake size
+          // Draw segments from tail to head for proper layering
+          for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
+            const segment = fullSnakeBody[i];
             const segmentRadius = serverPlayer.segmentRadius || 10;
             
             ctx.fillStyle = serverPlayer.color || '#ff0000';
             ctx.beginPath();
             ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-            ctx.fill();
-          });
-          
-          // Draw head segment last (so it appears on top)
-          if (fullSnakeBody.length > 0) {
-            const head = fullSnakeBody[0];
-            const segmentRadius = serverPlayer.segmentRadius || 10;
-            
-            ctx.fillStyle = serverPlayer.color || '#ff0000';
-            ctx.beginPath();
-            ctx.arc(head.x, head.y, segmentRadius, 0, Math.PI * 2);
             ctx.fill();
           }
           
@@ -1826,25 +1815,14 @@ export default function GamePage() {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
-        // Draw body segments first (skip head at index 0)
-        fullSnakeBody.slice(1).forEach((segment: any, segIndex: number) => {
-          // Use the actual segment radius (same calculation as server data)
+        // Draw segments from tail to head for proper layering
+        for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
+          const segment = fullSnakeBody[i];
           const segmentRadius = snake.getSegmentRadius();
           
           ctx.fillStyle = '#d55400'; // Your snake color
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        
-        // Draw head segment last (so it appears on top)
-        if (fullSnakeBody.length > 0) {
-          const head = fullSnakeBody[0];
-          const segmentRadius = snake.getSegmentRadius();
-          
-          ctx.fillStyle = '#d55400'; // Your snake color
-          ctx.beginPath();
-          ctx.arc(head.x, head.y, segmentRadius, 0, Math.PI * 2);
           ctx.fill();
         }
         
