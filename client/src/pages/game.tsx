@@ -716,10 +716,11 @@ export default function GamePage() {
         const segmentIndex = Math.floor((i / foodCount) * segments.length);
         const segment = segments[Math.min(segmentIndex, segments.length - 1)];
         
-        // Add some randomness around each segment position
-        const randomOffset = 8;
-        x = segment.x + (Math.random() - 0.5) * randomOffset;
-        y = segment.y + (Math.random() - 0.5) * randomOffset;
+        // Add more spacing around each segment position to prevent overlap
+        const randomOffset = 20 + i * 2; // Increasing offset based on index
+        const angle = (i / foodCount) * Math.PI * 2 + Math.random() * 0.5;
+        x = segment.x + Math.cos(angle) * randomOffset;
+        y = segment.y + Math.sin(angle) * randomOffset;
       } else {
         // Fallback to death location if no segments
         const angle = (i / foodCount) * 2 * Math.PI + Math.random() * 0.5;
@@ -765,9 +766,11 @@ export default function GamePage() {
         // Place crate at each segment position
         const segment = segments[i];
         
-        // Add randomness around segment position
-        x = segment.x + (Math.random() - 0.5) * 15;
-        y = segment.y + (Math.random() - 0.5) * 15;
+        // Add more spacing around segment position to prevent overlap  
+        const offset = 25 + i * 3; // Increasing offset based on index
+        const angle = (i / segmentCount) * Math.PI * 2 + Math.random() * 0.3;
+        x = segment.x + Math.cos(angle) * offset;
+        y = segment.y + Math.sin(angle) * offset;
       } else {
         // Fallback to snake head position with spread
         const angle = (i / segmentCount) * Math.PI * 2;
@@ -1627,31 +1630,35 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Process server food with smooth attraction (no jittering)
+      // Store original positions to prevent server conflicts
       const processedServerFood = serverFood.map(food => {
+        // Create a copy with original server position preserved
+        const foodCopy = { ...food };
+        
         const dx = snake.head.x - food.x;
         const dy = snake.head.y - food.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Apply gentle attraction when close (within 60 units) - less aggressive than before
-        if (distance < 60 && distance > 0) {
-          const attractionStrength = Math.min(1.2, 30 / distance); // Gentler attraction
+        // Apply client-side visual attraction only (doesn't affect server position)
+        if (distance < 50 && distance > 0) {
+          const attractionStrength = Math.min(0.8, 20 / distance); // Even gentler
           const pullX = (dx / distance) * attractionStrength;
           const pullY = (dy / distance) * attractionStrength;
           
-          return {
-            ...food,
-            x: food.x + pullX,
-            y: food.y + pullY
-          };
+          // Store both server position and visual position
+          foodCopy.visualX = food.x + pullX;
+          foodCopy.visualY = food.y + pullY;
+        } else {
+          foodCopy.visualX = food.x;
+          foodCopy.visualY = food.y;
         }
         
-        return food;
+        return foodCopy;
       });
       
-      // Check for collisions with attracted server food using generous collision detection
+      // Check for collisions with server food using visual positions for smooth interaction
       processedServerFood.forEach(food => {
-        const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+        const dist = Math.sqrt((snake.head.x - (food.visualX || food.x)) ** 2 + (snake.head.y - (food.visualY || food.y)) ** 2);
         
         // More generous collision detection - food eaten when snake gets close enough
         const collisionRadius = food.type === 'money' ? 15 : (food.size * 1.5); // 50% larger collision area
@@ -1801,8 +1808,8 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw server food first (shared across all players) with glow effects
-      serverFood.forEach(food => {
+      // Draw server food first (shared across all players) with glow effects and attraction
+      processedServerFood.forEach(food => {
         ctx.save();
         
         if (food.type === 'money') {
@@ -1811,8 +1818,8 @@ export default function GamePage() {
           const wobbleX = Math.sin(time + food.x * 0.01) * 2;
           const wobbleY = Math.cos(time * 1.2 + food.y * 0.01) * 1.5;
           
-          const drawX = food.x + wobbleX;
-          const drawY = food.y + wobbleY;
+          const drawX = (food.visualX || food.x) + wobbleX;
+          const drawY = (food.visualY || food.y) + wobbleY;
           
           // Draw shadow first
           ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
@@ -1837,19 +1844,22 @@ export default function GamePage() {
             ctx.drawImage(dollarSignImage, drawX - 10, drawY - 10, 20, 20);
           }
         } else {
-          // Regular food rendering
+          // Regular food rendering with visual attraction positions
+          const visualX = food.visualX || food.x;
+          const visualY = food.visualY || food.y;
+          
           ctx.shadowColor = food.color;
           ctx.shadowBlur = 15;
           ctx.fillStyle = food.color;
           ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.arc(visualX, visualY, food.size, 0, Math.PI * 2);
           ctx.fill();
           
           // Draw solid circle on top (no shadow)
           ctx.shadowBlur = 0;
           ctx.fillStyle = food.color;
           ctx.beginPath();
-          ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+          ctx.arc(visualX, visualY, food.size, 0, Math.PI * 2);
           ctx.fill();
         }
         
