@@ -970,7 +970,10 @@ export default function GamePage() {
           type: 'update',
           segments: snake.visibleSegments.slice(0, 50).map(seg => ({ x: seg.x, y: seg.y })), // Send many more segments
           color: '#d55400',
-          money: snake.money
+          money: snake.money,
+          totalMass: snake.totalMass,
+          segmentRadius: snake.getSegmentRadius(),
+          visibleSegmentCount: snake.visibleSegments.length
         };
         console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
         wsRef.current.send(JSON.stringify(updateData));
@@ -1714,7 +1717,8 @@ export default function GamePage() {
           
           // Draw each segment as a distinct round ball (no interpolation between segments)
           fullSnakeBody.forEach((segment: any, segIndex: number) => {
-            const segmentRadius = 10; // Same as local snake
+            // Use the actual segment radius from server data to match snake size
+            const segmentRadius = serverPlayer.segmentRadius || 10;
             
             ctx.fillStyle = serverPlayer.color || '#ff0000';
             ctx.beginPath();

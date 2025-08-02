@@ -263,9 +263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             segments: data.segments || [],
             color: existingPlayer?.color || '#d55400',
             money: data.money || 1.00,
+            totalMass: data.totalMass || 6,
+            segmentRadius: data.segmentRadius || 8,
+            visibleSegmentCount: data.visibleSegmentCount || 0,
             lastUpdate: Date.now()
           };
-          console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments`);
+          console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments, mass: ${data.totalMass?.toFixed(1) || 'unknown'}, radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           activePlayers.set(playerId, player);
           gameWorld.players.set(playerId, player);
         } else if (data.type === 'eatFood') {
