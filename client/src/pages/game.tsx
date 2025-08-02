@@ -409,7 +409,7 @@ class SmoothSnake {
     return Math.min(1 + (this.totalMass - 10) / 100, maxScale);
   }
   
-  move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
+  move(mouseDirectionX: number, mouseDirectionY: number) {
     // Calculate target angle from mouse direction
     const targetAngle = Math.atan2(mouseDirectionY, mouseDirectionX);
     
@@ -432,7 +432,7 @@ class SmoothSnake {
     if (this.currentAngle < -Math.PI) this.currentAngle += 2 * Math.PI;
     
     // Handle boost mechanics
-    this.applyBoost(onDropFood);
+    this.applyBoost();
     
     // Move head
     const dx = Math.cos(this.currentAngle) * this.speed;
@@ -457,60 +457,12 @@ class SmoothSnake {
     this.applyGrowth();
   }
   
-  applyBoost(onDropFood?: (food: Food) => void) {
+  applyBoost() {
     if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST) {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Drop food more frequently for continuous trail effect
-      if (this.boostCooldown % 10 === 0 && onDropFood) {
-        // Visual effect: Make the last segment move into the second-to-last segment
-        if (this.visibleSegments.length >= 2) {
-          const lastSegment = this.visibleSegments[this.visibleSegments.length - 1];
-          const secondToLastSegment = this.visibleSegments[this.visibleSegments.length - 2];
-          
-          // Animate the last segment moving into the second-to-last position
-          const dx = secondToLastSegment.x - lastSegment.x;
-          const dy = secondToLastSegment.y - lastSegment.y;
-          const moveSpeed = 0.3; // How fast the segment moves (0-1)
-          
-          lastSegment.x += dx * moveSpeed;
-          lastSegment.y += dy * moveSpeed;
-          
-          // Make the last segment fade out as it moves
-          lastSegment.opacity = Math.max(0.2, lastSegment.opacity - 0.05);
-        }
-        
-        // Find the second-to-last segment position for food drop
-        let dropX = this.head.x;
-        let dropY = this.head.y;
-        
-        if (this.visibleSegments.length >= 2) {
-          // Use second-to-last segment position
-          const secondToLast = this.visibleSegments[this.visibleSegments.length - 2];
-          dropX = secondToLast.x;
-          dropY = secondToLast.y;
-        } else {
-          // Fallback to behind the head if not enough segments
-          dropX = this.head.x - Math.cos(this.currentAngle) * 25;
-          dropY = this.head.y - Math.sin(this.currentAngle) * 25;
-        }
-        
-        // Add slight randomness to avoid perfect stacking
-        dropX += (Math.random() - 0.5) * 8;
-        dropY += (Math.random() - 0.5) * 8;
-        
-        onDropFood({
-          x: dropX,
-          y: dropY,
-          size: 3.5,
-          color: '#f55400',
-          mass: 0.5 // Worth 0.5 mass so when eaten (0.5 * 0.5 = 0.25) it equals the 0.25 mass lost
-        });
-        
-        this.totalMass -= 0.25; // Reduce mass loss per drop to maintain same rate
-        this.updateVisibleSegments();
-      }
+      // Food dropping removed - no mass loss during boosting
     } else {
       this.speed = this.baseSpeed;
       this.isBoosting = false;
@@ -722,7 +674,6 @@ export default function GamePage() {
     if (!gameStarted) return;
     
     // Clear any local game state - server provides everything
-    setFoods([]);
     setBotSnakes([]);
     
     console.log("Game started - waiting for server world data");
@@ -1164,18 +1115,7 @@ export default function GamePage() {
           const segment = snake.visibleSegments[j];
           const dist = Math.sqrt((segment.x - bot.head.x) ** 2 + (segment.y - bot.head.y) ** 2);
           if (dist < snake.getSegmentRadius() + botRadius) {
-            // Player killed a bot - drop food and money squares
-            dropDeathFood(bot.head.x, bot.head.y, bot.totalMass);
-            
-            // Drop money crates when bot dies - use bot's actual money value
-            // Create temporary function call for bot death
-            const originalSegments = snake.visibleSegments;
-            const originalMoney = snake.money;
-            snake.visibleSegments = bot.visibleSegments; // Temporarily use bot segments
-            snake.money = bot.money; // Use bot's money value
-            dropMoneyCrates();
-            snake.visibleSegments = originalSegments; // Restore player segments
-            snake.money = originalMoney; // Restore player money
+            // Death food and money crates removed
             
             // Remove the killed bot
             setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1226,8 +1166,7 @@ export default function GamePage() {
             
             console.log(`💀 Game over state set and canvas cleared!`);
             
-            // Drop death food and money crates along snake body
-            dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
+            // Death loot removed
             
             return; // Stop the game loop
           }
@@ -1249,8 +1188,7 @@ export default function GamePage() {
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
-            // Drop death food and money crates along snake body
-            dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
+            // Death loot removed
             
             return; // Stop the game loop
           }
