@@ -1417,37 +1417,10 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Check collision with server food (shared food)
+      // Process server food: attraction + collision in one operation
       setServerFood(prevServerFood => {
-        const newServerFood = [...prevServerFood];
-        let scoreIncrease = 0;
-        
-        for (let i = newServerFood.length - 1; i >= 0; i--) {
-          const food = newServerFood[i];
-          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
-          
-          if (dist < snake.getSegmentRadius() + food.size) {
-            // Eat server food - give small mass increase
-            const massGain = food.size * 0.02; // Small mass based on food size
-            snake.totalMass += massGain;
-            scoreIncrease += Math.floor(massGain * 10);
-            
-            // Remove eaten server food (it will respawn from server)
-            newServerFood.splice(i, 1);
-            break; // Only eat one food per frame
-          }
-        }
-        
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
-        }
-        
-        return newServerFood;
-      });
-
-      // Add food attraction/gravity effect for server food
-      setServerFood(prevServerFood => {
-        return prevServerFood.map(food => {
+        // First apply attraction to all food
+        const attractedFood = prevServerFood.map(food => {
           const dx = snake.head.x - food.x;
           const dy = snake.head.y - food.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1467,6 +1440,31 @@ export default function GamePage() {
           
           return food;
         });
+        
+        // Then check for collisions and remove eaten food
+        let scoreIncrease = 0;
+        const remainingFood = attractedFood.filter(food => {
+          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+          
+          if (dist < snake.getSegmentRadius() + food.size) {
+            // Eat server food - give small mass increase
+            const massGain = food.size * 0.02; // Small mass based on food size
+            snake.totalMass += massGain;
+            scoreIncrease += Math.floor(massGain * 10);
+            
+            // Return false to filter out this food (eaten)
+            return false;
+          }
+          
+          // Return true to keep this food
+          return true;
+        });
+        
+        if (scoreIncrease > 0) {
+          setScore(prev => prev + scoreIncrease);
+        }
+        
+        return remainingFood;
       });
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
