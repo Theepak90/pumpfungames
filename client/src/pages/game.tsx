@@ -557,24 +557,13 @@ class SmoothSnake {
   eatFood(food: Food) {
     const mass = food.mass || 1;
     
-    // Apply strict segment and mass limit (100 segments max)
-    const MAX_SEGMENTS = 100;
-    const MAX_MASS = 100;
-    const currentSegments = Math.floor(this.totalMass / 1); // MASS_PER_SEGMENT = 1
-    
-    // Don't grow if already at or above limits
-    if (currentSegments >= MAX_SEGMENTS || this.totalMass >= MAX_MASS) {
-      return 0; // No mass added if at limit
+    // Snake can always eat food and gain mass, but segments cap at 100
+    // Allow unlimited mass growth but segments will be capped in updateVisibleSegments()
+    if (mass > 0) {
+      this.growthRemaining += mass * 0.5; // 1 mass = 0.5 segments worth of growth
     }
     
-    const maxAllowedMass = Math.min(MAX_MASS, MAX_SEGMENTS * 1); // MASS_PER_SEGMENT = 1
-    const actualMassToAdd = Math.min(mass, maxAllowedMass - this.totalMass);
-    
-    if (actualMassToAdd > 0) {
-      this.growthRemaining += actualMassToAdd * 0.5; // 1 mass = 0.5 segments
-    }
-    
-    return actualMassToAdd; // Return actual mass added
+    return mass; // Return actual mass added (always the full amount)
   }
   
   // Process growth at 10 mass per second rate
@@ -586,11 +575,9 @@ class SmoothSnake {
     this.partialGrowth += growthThisFrame;
     this.growthRemaining -= growthThisFrame;
     
-    // Add segments when we have enough partial growth, but respect limits
-    const MAX_MASS = 100;
-    const MAX_SEGMENTS = 100;
-    
-    while (this.partialGrowth >= 1 && this.totalMass < MAX_MASS && Math.floor(this.totalMass / 1) < MAX_SEGMENTS) {
+    // Add mass when we have enough partial growth - no limits on mass
+    // Segments will be visually capped at 100 in updateVisibleSegments()
+    while (this.partialGrowth >= 1) {
       this.totalMass += 1;
       this.partialGrowth -= 1;
     }
@@ -1534,20 +1521,11 @@ export default function GamePage() {
               // Money pickup - add to snake's money balance and mass
               snake.money += food.value || 0; // Add money value
               
-              // Directly add mass with strict segment and mass limit check
+              // Directly add mass - snake can always gain mass from money pickups
+              // Segments will be capped at 100 in updateVisibleSegments(), but mass can grow unlimited
               const massToAdd = food.mass || 1;
-              const MAX_SEGMENTS = 100;
-              const MAX_MASS = 100;
-              const currentSegments = Math.floor(snake.totalMass / 1); // MASS_PER_SEGMENT = 1
-              
-              // Don't grow if already at or above limits
-              if (currentSegments < MAX_SEGMENTS && snake.totalMass < MAX_MASS) {
-                const maxAllowedMass = Math.min(MAX_MASS, MAX_SEGMENTS * 1); // MASS_PER_SEGMENT = 1
-                const actualMassToAdd = Math.min(massToAdd, maxAllowedMass - snake.totalMass);
-                
-                if (actualMassToAdd > 0) {
-                  snake.totalMass += actualMassToAdd;
-                }
+              if (massToAdd > 0) {
+                snake.totalMass += massToAdd;
               }
               
               newFoods.splice(i, 1);
