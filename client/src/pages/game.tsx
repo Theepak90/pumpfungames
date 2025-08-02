@@ -557,8 +557,8 @@ class SmoothSnake {
   eatFood(food: Food) {
     const mass = food.mass || 1;
     
-    // Apply segment limit (40 segments max)
-    const MAX_SEGMENTS = 40;
+    // Apply segment limit (170 segments max)
+    const MAX_SEGMENTS = 170;
     const currentSegments = Math.floor(this.totalMass / 1); // MASS_PER_SEGMENT = 1
     
     if (currentSegments < MAX_SEGMENTS) {
@@ -1531,7 +1531,7 @@ export default function GamePage() {
               
               // Directly add mass with segment limit check
               const massToAdd = food.mass || 1;
-              const MAX_SEGMENTS = 40;
+              const MAX_SEGMENTS = 170;
               const currentSegments = Math.floor(snake.totalMass / 1); // MASS_PER_SEGMENT = 1
               
               if (currentSegments < MAX_SEGMENTS) {
