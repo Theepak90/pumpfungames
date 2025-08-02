@@ -1089,7 +1089,7 @@ export default function GamePage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
         const updateData = {
           type: 'update',
-          segments: snake.visibleSegments.slice(0, 200).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 200 segments
+          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
           color: '#d55400',
           money: snake.money,
           totalMass: snake.totalMass,

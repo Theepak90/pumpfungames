@@ -99,7 +99,7 @@ export class SmoothSnake {
     this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
-    let totalSegmentsToPlace = Math.ceil(this.currentSegmentCount); // Include potential fading segment
+    let totalSegmentsToPlace = Math.min(Math.ceil(this.currentSegmentCount), MAX_SEGMENTS); // Cap at 100 segments max
     
     // Process all segments in one pass to avoid distance calculation issues
     for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < totalSegmentsToPlace; i++) {
@@ -112,7 +112,8 @@ export class SmoothSnake {
       
       // Check if we need to place segments in this trail section
       while (distanceSoFar + this.SEGMENT_SPACING <= (distanceSoFar + segmentDist) && 
-             this.visibleSegments.length < totalSegmentsToPlace) {
+             this.visibleSegments.length < totalSegmentsToPlace && 
+             this.visibleSegments.length < MAX_SEGMENTS) {
         
         const progress = distanceSoFar / (distanceSoFar + segmentDist);
         const segmentX = a.x + (b.x - a.x) * progress;
@@ -230,19 +231,10 @@ export class SmoothSnake {
   }
   
   grow(mass: number) {
-    // Add constant for max segments (100 segments)
-    const MAX_SEGMENTS = 100;
-    const currentSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
-    
-    // Only grow if under segment limit
-    if (currentSegments < MAX_SEGMENTS) {
-      const maxAllowedMass = MAX_SEGMENTS * this.MASS_PER_SEGMENT;
-      const massToAdd = Math.min(mass, maxAllowedMass - this.totalMass);
-      
-      if (massToAdd > 0) {
-        this.totalMass += massToAdd;
-        this.growthRemaining += massToAdd;
-      }
+    // Allow unlimited mass growth - visual segments will be capped in updateVisibleSegments()
+    if (mass > 0) {
+      this.totalMass += mass;
+      this.growthRemaining += mass;
     }
   }
   
