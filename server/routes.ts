@@ -416,33 +416,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (wss.clients.size > 0) {
       // No bots in multiplayer - keep empty array
       
-      // Calculate barrier expansion based on player count
-      const currentPlayerCount = gameWorld.players.size;
-      const BASE_MAP_RADIUS = 1800;
-      const EXPANSION_RATE = 0.25; // 25% expansion per 2 players
-      const MAX_PLAYERS = 30; // Cap at 30 players
-      const EXPANSION_THRESHOLD = 6; // First expansion starts at 6 players
-      
-      // Calculate expansion tiers: first expansion at 6 players, then every 2 players adds 25%
-      const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
-      const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
-      const targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * EXPANSION_RATE));
-      
-      const shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
-      
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
         bots: gameWorld.bots,
         food: gameWorld.food,
-        players: Array.from(gameWorld.players.values()),
-        barrierExpansion: {
-          currentPlayerCount,
-          shouldExpand,
-          targetRadius,
-          baseRadius: BASE_MAP_RADIUS,
-          expansionTiers,
-          effectivePlayerCount
-        }
+        players: Array.from(gameWorld.players.values())
       });
       
       console.log(`Broadcasting to ${wss.clients.size} clients: ${gameWorld.players.size} players`);
