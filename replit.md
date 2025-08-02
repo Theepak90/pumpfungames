@@ -10,7 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Fixed Snake Death Rendering Issue (Latest)
+### Fixed Duplicate Money Counter UI Issue (Latest)
+- **Removed duplicate money counter**: Eliminated bottom money counter that was creating double display above snake heads
+- **Single visible money counter**: Only one properly styled money counter now appears, visible to all players
+- **Clean UI experience**: No more confusing duplicate dollar amounts above snake heads
+- **Maintained main styling**: Kept the top money counter with proper Press Start 2P font and scaling
+
+### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players
 - **Fixed game loop continuation bug**: Game loop now stops completely when gameOver=true, preventing re-rendering of dead snake
 - **Immediate collision response**: Canvas clears instantly on collision with immediate visual feedback

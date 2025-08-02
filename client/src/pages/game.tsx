@@ -2083,15 +2083,7 @@ export default function GamePage() {
           ctx.restore();
         }
         
-        // Draw your money above your head (same as remote snakes)
-        if (fullSnakeBody.length > 0) {
-          ctx.save();
-          ctx.fillStyle = '#fff';
-          ctx.font = `12px Arial`;
-          ctx.textAlign = 'center';
-          ctx.fillText(`$${snake.money.toFixed(2)}`, fullSnakeBody[0].x, fullSnakeBody[0].y - 25);
-          ctx.restore();
-        }
+
       }
 
       // Draw other players first (behind everything) - fallback (this should now be empty)
