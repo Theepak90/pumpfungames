@@ -578,12 +578,18 @@ export default function GamePage() {
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const wsRef = useRef<WebSocket | null>(null);
   
-  // Server-controlled barrier expansion state
+  // Server-controlled barrier expansion state with smooth animation
   const [serverBarrierExpansion, setServerBarrierExpansion] = useState<{
     shouldExpand: boolean;
     targetRadius: number;
     currentPlayerCount: number;
+    expansionTiers: number;
+    effectivePlayerCount: number;
   } | null>(null);
+  
+  // Animated barrier radius for smooth transitions
+  const [currentBarrierRadius, setCurrentBarrierRadius] = useState(BASE_MAP_RADIUS);
+  const previousTargetRadius = useRef(BASE_MAP_RADIUS);
 
   // Death food dropping removed
 
@@ -708,7 +714,7 @@ export default function GamePage() {
           // Handle server-side barrier expansion synchronization
           if (data.barrierExpansion) {
             setServerBarrierExpansion(data.barrierExpansion);
-            console.log(`🔄 Server barrier sync: players=${data.barrierExpansion.currentPlayerCount}, shouldExpand=${data.barrierExpansion.shouldExpand}, radius=${data.barrierExpansion.targetRadius}`);
+            console.log(`🔄 Server barrier sync: players=${data.barrierExpansion.currentPlayerCount}/${data.barrierExpansion.effectivePlayerCount}, tiers=${data.barrierExpansion.expansionTiers}, radius=${data.barrierExpansion.targetRadius}`);
           }
           
           if (data.players && data.players.length > 0) {
@@ -1009,24 +1015,55 @@ export default function GamePage() {
 
       // Food system removed
 
-      // Use server-provided barrier expansion data if available, otherwise fallback to local calculation
-      let activeRadius;
+      // Smooth barrier radius animation
+      let targetRadius;
       let shouldExpand;
       let currentPlayerCount;
       
       if (serverBarrierExpansion) {
         // Use server-authoritative barrier expansion
-        activeRadius = serverBarrierExpansion.targetRadius;
+        targetRadius = serverBarrierExpansion.targetRadius;
         shouldExpand = serverBarrierExpansion.shouldExpand;
         currentPlayerCount = serverBarrierExpansion.currentPlayerCount;
-        console.log(`🌐 Server barrier: players=${currentPlayerCount}, expanded=${shouldExpand}, radius=${activeRadius}`);
+        
+        // Animate barrier radius smoothly towards target
+        const ANIMATION_SPEED = 0.02; // Smooth animation speed
+        const radiusDiff = targetRadius - currentBarrierRadius;
+        
+        if (Math.abs(radiusDiff) > 1) {
+          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
+        } else {
+          setCurrentBarrierRadius(targetRadius);
+        }
+        
+        // Log only when target changes
+        if (previousTargetRadius.current !== targetRadius) {
+          console.log(`🌐 Barrier animating: players=${currentPlayerCount}, tiers=${serverBarrierExpansion.expansionTiers}, ${currentBarrierRadius.toFixed(0)} → ${targetRadius}`);
+          previousTargetRadius.current = targetRadius;
+        }
       } else {
         // Fallback to local calculation when server data not available
-        currentPlayerCount = otherPlayers.length + 1; // +1 for local player
-        shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
-        activeRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
-        console.log(`🔵 Local barrier: players=${currentPlayerCount}, expanded=${shouldExpand}, radius=${activeRadius}`);
+        currentPlayerCount = otherPlayers.length + 1;
+        const MAX_PLAYERS = 30;
+        const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
+        const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - 2) / 2));
+        targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * 0.25));
+        shouldExpand = currentPlayerCount >= 2;
+        
+        // Animate local barrier too
+        const ANIMATION_SPEED = 0.02;
+        const radiusDiff = targetRadius - currentBarrierRadius;
+        
+        if (Math.abs(radiusDiff) > 1) {
+          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
+        } else {
+          setCurrentBarrierRadius(targetRadius);
+        }
+        
+        console.log(`🔵 Local barrier: players=${currentPlayerCount}, tiers=${expansionTiers}, radius=${currentBarrierRadius.toFixed(0)}`);
       }
+      
+      const activeRadius = currentBarrierRadius;
       
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
@@ -1782,7 +1819,7 @@ export default function GamePage() {
           <circle
             cx="48"
             cy="48"
-            r="44"
+            r={44 * (currentBarrierRadius / BASE_MAP_RADIUS)}
             fill="black"
             stroke="#53d392"
             strokeWidth="2"
@@ -1834,9 +1871,9 @@ export default function GamePage() {
             {connectionStatus}
           </div>
           <div className="text-white text-xs font-mono">
-            Players: {otherPlayers.length + 1}
-            {(serverBarrierExpansion?.shouldExpand || (otherPlayers.length + 1 > EXPANSION_THRESHOLD)) && (
-              <span className=" text-green-400 ml-2">EXPANDED</span>
+            Players: {serverBarrierExpansion?.currentPlayerCount || (otherPlayers.length + 1)}
+            {serverBarrierExpansion?.expansionTiers !== undefined && serverBarrierExpansion.expansionTiers > 0 && (
+              <span className="text-green-400 ml-2">+{serverBarrierExpansion.expansionTiers}T</span>
             )}
           </div>
         </div>

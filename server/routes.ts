@@ -418,12 +418,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calculate barrier expansion based on player count
       const currentPlayerCount = gameWorld.players.size;
-      const EXPANSION_THRESHOLD = 2; // Must match client-side constant
-      const BASE_MAP_RADIUS = 1800; // Must match client-side constant
-      const EXPANSION_RATE = 0.25; // Must match client-side constant
+      const BASE_MAP_RADIUS = 1800;
+      const EXPANSION_RATE = 0.25; // 25% expansion per 2 players
+      const MAX_PLAYERS = 30; // Cap at 30 players
       
-      const shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
-      const targetRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
+      // Calculate expansion tiers: every 2 players adds 25%
+      const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
+      const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - 2) / 2));
+      const targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * EXPANSION_RATE));
+      
+      const shouldExpand = currentPlayerCount >= 2;
       
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
@@ -434,7 +438,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentPlayerCount,
           shouldExpand,
           targetRadius,
-          baseRadius: BASE_MAP_RADIUS
+          baseRadius: BASE_MAP_RADIUS,
+          expansionTiers,
+          effectivePlayerCount
         }
       });
       
