@@ -1942,34 +1942,24 @@ export default function GamePage() {
           // Apply dynamic spacing to other players' segments for consistency
           const fullSnakeBody = serverPlayer.segments;
           
-          // Calculate dynamic spacing for this player based on their segment count
+          // Use server segments with minimal spacing adjustment to match local appearance
+          // The server already sends properly spaced segments, just apply light filtering
           const MAX_SEGMENTS = 100;
           const segmentProgress = Math.min(fullSnakeBody.length / MAX_SEGMENTS, 1.0);
-          const dynamicSpacing = 12 + (segmentProgress * 6); // 12 to 18 spacing, same as local snake
           
-          // Apply spacing to segments for natural appearance
+          // Much lighter spacing - just filter every few segments for larger snakes
           const spacedSegments = [];
           if (fullSnakeBody.length > 0) {
-            spacedSegments.push(fullSnakeBody[0]); // Always include head
+            // For small snakes, show all segments. For larger snakes, show slightly fewer
+            const skipFactor = Math.floor(1 + segmentProgress * 1.5); // Skip 1-2 segments max
             
-            let lastIncludedIndex = 0;
-            let distanceAccumulator = 0;
+            for (let i = 0; i < fullSnakeBody.length && spacedSegments.length < MAX_SEGMENTS; i += skipFactor) {
+              spacedSegments.push(fullSnakeBody[i]);
+            }
             
-            for (let i = 1; i < fullSnakeBody.length && spacedSegments.length < MAX_SEGMENTS; i++) {
-              const prevSeg = fullSnakeBody[lastIncludedIndex];
-              const currSeg = fullSnakeBody[i];
-              
-              const dx = currSeg.x - prevSeg.x;
-              const dy = currSeg.y - prevSeg.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              
-              distanceAccumulator += dist;
-              
-              if (distanceAccumulator >= dynamicSpacing) {
-                spacedSegments.push(currSeg);
-                lastIncludedIndex = i;
-                distanceAccumulator = 0;
-              }
+            // Always ensure we have the head
+            if (spacedSegments.length === 0 || spacedSegments[0] !== fullSnakeBody[0]) {
+              spacedSegments.unshift(fullSnakeBody[0]);
             }
           }
           
