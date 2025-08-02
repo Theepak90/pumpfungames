@@ -61,19 +61,17 @@ export class SmoothSnake {
     }
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
+    console.log(`NEW SNAKE CREATED: mass=${this.totalMass}, visibleSegments=${this.visibleSegments.length}, trail=${this.segmentTrail.length}`);
     this.growthRemaining = 0;
     this.partialGrowth = 0; // Initialize partialGrowth for faster mass conversion
     this.distanceBuffer = 0;
     this.currentSegmentCount = this.START_MASS; // Start with exactly START_MASS segments
-    console.log(`NEW SNAKE CREATED: mass=${this.totalMass}, visibleSegments=${this.visibleSegments.length}, trail=${this.segmentTrail.length}`);
-    
-    // Initialize money
-    this.money = 1.00;
     
     // Force immediate segment generation
     console.log(`Before updateVisibleSegments: currentSegmentCount=${this.currentSegmentCount}`);
-    this.updateVisibleSegments();
-    console.log(`After updateVisibleSegments: visibleSegments=${this.visibleSegments.length}`);
+    
+    // Initialize money
+    this.money = 1.00;
     
     this.updateVisibleSegments();
     console.log(`After updateVisibleSegments: visibleSegments.length=${this.visibleSegments.length}`);

@@ -8,7 +8,9 @@ import LoadingScreen from '@/components/LoadingScreen';
 // Game constants
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
-const MAP_RADIUS = 1800; // Circular map radius
+const BASE_MAP_RADIUS = 1800; // Base circular map radius
+const EXPANSION_THRESHOLD = 6; // Players needed to trigger expansion
+const EXPANSION_RATE = 0.25; // 25% expansion rate
 // Food system removed
 const BOT_COUNT = 5;
 
@@ -56,7 +58,7 @@ function getRandomFoodColor(): string {
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 200);
+  const radius = Math.random() * (BASE_MAP_RADIUS - 200);
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
@@ -154,7 +156,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
     // Random wandering behavior (food targeting removed)
     if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
       const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-      if (distFromCenter > MAP_RADIUS * 0.6) {
+      if (distFromCenter > BASE_MAP_RADIUS * 0.6) {
         // Move toward center when near edges
         const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
         bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
@@ -204,7 +206,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
   
   // Keep bot within circular map bounds
   const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 50) {
+  if (distFromCenter > BASE_MAP_RADIUS - 50) {
     const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
     bot.targetAngle = angleToCenter;
   }
@@ -574,8 +576,20 @@ export default function GamePage() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
-  const [currentRoomId, setCurrentRoomId] = useState<number>(0);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Server-controlled barrier expansion state with smooth animation
+  const [serverBarrierExpansion, setServerBarrierExpansion] = useState<{
+    shouldExpand: boolean;
+    targetRadius: number;
+    currentPlayerCount: number;
+    expansionTiers: number;
+    effectivePlayerCount: number;
+  } | null>(null);
+  
+  // Animated barrier radius for smooth transitions
+  const [currentBarrierRadius, setCurrentBarrierRadius] = useState(BASE_MAP_RADIUS);
+  const previousTargetRadius = useRef(BASE_MAP_RADIUS);
 
   // Death food dropping removed
 
@@ -660,133 +674,160 @@ export default function GamePage() {
     console.log("Game started - waiting for server world data");
   }, [gameStarted]);
 
-  // HTTP Polling-based multiplayer connection (replacing WebSocket due to protocol issues)
+  // WebSocket connection for real multiplayer
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Starting HTTP-based multiplayer...");
-    setConnectionStatus('Connecting');
+    console.log("Connecting to multiplayer server...");
     
-    // Get an available multiplayer room
-    fetch('/api/multiplayer/room')
-      .then(res => res.json())
-      .then(data => {
-        const roomId = data.roomId;
-        setCurrentRoomId(roomId);
-        
-        // Generate player ID
-        const playerId = `player_${Date.now()}_${Math.random()}`;
-        setMyPlayerId(playerId);
-        console.log(`Connected to room ${roomId} as player ${playerId}`);
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+    
+    wsRef.current = socket;
 
-        setConnectionStatus('Connected');
-        
-        // Start polling for room state every 100ms for real-time updates
-        const startPolling = () => {
-          pollingIntervalRef.current = setInterval(() => {
-            fetch(`/api/multiplayer/state/${currentRoomId || roomId}`)
-              .then(res => {
-                if (res.status === 404) {
-                  console.log(`Room ${currentRoomId || roomId} cleaned up, getting new room...`);
-                  // Room was cleaned up, get a new one
-                  return fetch('/api/multiplayer/room')
-                    .then(res => res.json())
-                    .then(data => {
-                      const newRoomId = data.roomId;
-                      setCurrentRoomId(newRoomId);
-                      console.log(`🎯 Switched to new multiplayer room ${newRoomId}`);
-                      return { players: [] }; // Return empty for this cycle
-                    });
-                }
-                return res.json();
-              })
-              .then(data => {
-                if (data.players) {
-                  // Filter out our own player and update others
-                  const filteredPlayers = data.players.filter((p: any) => 
-                    p.id !== playerId && p.segments.length > 0
-                  );
-                  setOtherPlayers(filteredPlayers);
-                  console.log(`Room ${currentRoomId || roomId}: ${data.players.length} total players, showing ${filteredPlayers.length} others`);
-                }
-              })
-              .catch(err => {
-                console.error('Polling error:', err);
-                setConnectionStatus('Disconnected');
+    socket.onopen = () => {
+      console.log("Connected to multiplayer server!");
+      console.log("WebSocket readyState:", socket.readyState);
+      setConnectionStatus('Connected');
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'players') {
+          // Filter out our own player data and update others
+          const filteredPlayers = data.players.filter((p: any) => 
+            p.id !== myPlayerId && p.segments.length > 0
+          );
+          // Use server data directly to avoid position mismatch
+          setOtherPlayers(filteredPlayers);
+          console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+        } else if (data.type === 'welcome') {
+          setMyPlayerId(data.playerId);
+          console.log(`My player ID: ${data.playerId}`);
+        } else if (data.type === 'gameWorld') {
+          setServerBots(data.bots || []);
+          setServerPlayers(data.players || []);
+          console.log(`Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
+          
+          // Handle server-side barrier expansion synchronization
+          if (data.barrierExpansion) {
+            setServerBarrierExpansion(data.barrierExpansion);
+            console.log(`🔄 Server barrier sync: players=${data.barrierExpansion.currentPlayerCount}/${data.barrierExpansion.effectivePlayerCount}, tiers=${data.barrierExpansion.expansionTiers}, radius=${data.barrierExpansion.targetRadius}`);
+          }
+          
+          if (data.players && data.players.length > 0) {
+            data.players.forEach((player: any, idx: number) => {
+              console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
+            });
+          }
+          
+          // Force immediate re-render for proper snake body display with eyes
+          if (canvasRef.current) {
+            // Trigger multiple renders to ensure eyes appear immediately
+            for (let i = 0; i < 3; i++) {
+              window.requestAnimationFrame(() => {
+                // Multiple redraws ensure all elements render properly
               });
-          }, 100); // Poll every 100ms for smooth real-time updates
-        };
-        
-        startPolling();
-      })
-      .catch(error => {
-        console.error('Failed to get multiplayer room:', error);
-        setConnectionStatus('Connection Error');
-      });
+            }
+          }
+        } else if (data.type === 'death') {
+          console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
+          // Server detected our collision - immediately clear snake body and stop game
+          snake.visibleSegments = []; // Clear all body segments immediately
+          snake.segmentTrail = []; // Clear trail
+          snake.totalMass = 0; // Reset mass to 0
+          setGameOver(true);
+          gameOverRef.current = true;
+          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
 
-    // Cleanup function
+    socket.onclose = (event) => {
+      console.log("Disconnected from multiplayer server");
+      console.log("Close event:", event.code, event.reason);
+      setConnectionStatus('Disconnected');
+      wsRef.current = null;
+      
+      // Auto-reconnect after 2 seconds if not a normal closure
+      if (event.code !== 1000 && gameStarted) {
+        console.log("Attempting auto-reconnect in 2 seconds...");
+        setConnectionStatus('Reconnecting');
+        setTimeout(() => {
+          if (gameStarted && !wsRef.current) {
+            console.log("Auto-reconnecting to multiplayer server...");
+            // Create new WebSocket connection
+            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+            wsRef.current = newSocket;
+            
+            // Set up handlers for new connection
+            newSocket.onopen = () => {
+              console.log("Reconnected to multiplayer server!");
+              setConnectionStatus('Connected');
+            };
+            newSocket.onmessage = socket.onmessage;
+            newSocket.onclose = socket.onclose;
+            newSocket.onerror = socket.onerror;
+          }
+        }, 2000);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionStatus('Connection Error');
+    };
+
     return () => {
-      console.log("Cleaning up HTTP multiplayer connection...");
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
+      console.log("Cleaning up WebSocket connection...");
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
       }
     };
   }, [gameStarted]);
 
-  // Send player data to server via HTTP - depends on both gameStarted and room connection
+  // Send player data to server
   useEffect(() => {
-    if (!gameStarted || !myPlayerId || currentRoomId === null) {
-      console.log(`Not sending HTTP updates: gameStarted=${gameStarted}, playerId=${!!myPlayerId}, roomId=${currentRoomId}`);
+    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log(`Not sending updates: gameStarted=${gameStarted}, wsRef=${!!wsRef.current}, readyState=${wsRef.current?.readyState}`);
       return;
     }
 
-    console.log(`Starting HTTP position updates - snake has ${snake.visibleSegments.length} segments`);
+    console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
     
     const sendInterval = setInterval(() => {
       // Stop sending updates immediately if game is over
       if (gameOverRef.current) {
-        console.log(`🛑 Stopped sending HTTP updates: gameOver=${gameOverRef.current}`);
+        console.log(`🛑 Stopped sending updates: gameOver=${gameOverRef.current}`);
         return;
       }
       
-      // Always send updates, even if no segments (for initial positioning)
-      const updateData = {
-        roomId: currentRoomId,
-        playerId: myPlayerId,
-        segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
-        color: '#d55400',
-        money: snake.money || 1.00,
-        totalMass: snake.totalMass || 6,
-        segmentRadius: snake.getSegmentRadius ? snake.getSegmentRadius() : 8,
-        visibleSegmentCount: snake.visibleSegments.length
-      };
-      
-      // Debug logging to identify the sync issue
-      console.log(`🔍 DEBUG: currentRoomId=${currentRoomId}, myPlayerId=${myPlayerId}`);
-      
-      console.log(`📤 HTTP UPDATE: Sending player data - segments=${updateData.segments.length}, mass=${updateData.totalMass}, room=${currentRoomId}`);
-      
-      // Send update via HTTP POST
-      fetch('/api/multiplayer/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
-      })
-      .then(res => res.json())
-      .then(data => {
-        console.log(`✅ HTTP UPDATE SUCCESS:`, data);
-      })
-      .catch(err => {
-        console.error('❌ Failed to send player update:', err);
-      });
-    }, 100); // Send updates every 100ms for HTTP polling
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
+        const updateData = {
+          type: 'update',
+          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
+          color: '#d55400',
+          money: snake.money,
+          totalMass: snake.totalMass,
+          segmentRadius: snake.getSegmentRadius(),
+          visibleSegmentCount: snake.visibleSegments.length
+        };
+        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+        wsRef.current.send(JSON.stringify(updateData));
+      } else {
+        console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
+      }
+    }, 50); // Send updates every 50ms for more responsive multiplayer
 
     return () => {
-      console.log('Clearing HTTP position update interval');
+      console.log('Clearing position update interval');
       clearInterval(sendInterval);
     };
-  }, [gameStarted, myPlayerId, currentRoomId, gameOver]);
+  }, [gameStarted, wsRef.current?.readyState, gameOver]);
 
   // Mouse tracking
   useEffect(() => {
@@ -974,6 +1015,56 @@ export default function GamePage() {
 
       // Food system removed
 
+      // Smooth barrier radius animation
+      let targetRadius;
+      let shouldExpand;
+      let currentPlayerCount;
+      
+      if (serverBarrierExpansion) {
+        // Use server-authoritative barrier expansion
+        targetRadius = serverBarrierExpansion.targetRadius;
+        shouldExpand = serverBarrierExpansion.shouldExpand;
+        currentPlayerCount = serverBarrierExpansion.currentPlayerCount;
+        
+        // Animate barrier radius smoothly towards target
+        const ANIMATION_SPEED = 0.002; // Smooth animation speed (10x slower)
+        const radiusDiff = targetRadius - currentBarrierRadius;
+        
+        if (Math.abs(radiusDiff) > 1) {
+          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
+        } else {
+          setCurrentBarrierRadius(targetRadius);
+        }
+        
+        // Log only when target changes
+        if (previousTargetRadius.current !== targetRadius) {
+          console.log(`🌐 Barrier animating: players=${currentPlayerCount}, tiers=${serverBarrierExpansion.expansionTiers}, ${currentBarrierRadius.toFixed(0)} → ${targetRadius}`);
+          previousTargetRadius.current = targetRadius;
+        }
+      } else {
+        // Fallback to local calculation when server data not available
+        currentPlayerCount = otherPlayers.length + 1;
+        const MAX_PLAYERS = 30;
+        const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
+        const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
+        targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * 0.25));
+        shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
+        
+        // Animate local barrier too
+        const ANIMATION_SPEED = 0.02;
+        const radiusDiff = targetRadius - currentBarrierRadius;
+        
+        if (Math.abs(radiusDiff) > 1) {
+          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
+        } else {
+          setCurrentBarrierRadius(targetRadius);
+        }
+        
+        console.log(`🔵 Local barrier: players=${currentPlayerCount}, tiers=${expansionTiers}, radius=${currentBarrierRadius.toFixed(0)}`);
+      }
+      
+      const activeRadius = currentBarrierRadius;
+      
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
@@ -982,7 +1073,7 @@ export default function GamePage() {
         const distanceFromCenter = Math.sqrt(
           (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
         );
-        if (distanceFromCenter > MAP_RADIUS) {
+        if (distanceFromCenter > activeRadius) {
           hitBoundary = true;
           break;
         }
@@ -1207,7 +1298,7 @@ export default function GamePage() {
 
       // Draw background image across the full map area if loaded
       if (backgroundImage) {
-        const mapSize = MAP_RADIUS * 2.5;
+        const mapSize = BASE_MAP_RADIUS * 2.5;
         // Draw background image tiled across the entire game area
         const pattern = ctx.createPattern(backgroundImage, 'repeat');
         if (pattern) {
@@ -1220,10 +1311,10 @@ export default function GamePage() {
       ctx.save();
       
       // Create a clipping path for the area outside the safe zone
-      const mapSize = MAP_RADIUS * 2.5;
+      const mapSize = BASE_MAP_RADIUS * 2.5;
       ctx.beginPath();
       ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2, true); // Subtract safe zone (clockwise) - using dynamic radius
       ctx.clip();
       
       // Fill only the clipped area (outside the circle) with green overlay
@@ -1232,11 +1323,11 @@ export default function GamePage() {
       
       ctx.restore();
 
-      // Draw thin death barrier line
+      // Draw thin death barrier line - using dynamic radius
       ctx.strokeStyle = '#53d392';
       ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // All food rendering removed
@@ -1728,7 +1819,7 @@ export default function GamePage() {
           <circle
             cx="48"
             cy="48"
-            r="44"
+            r={44 * (currentBarrierRadius / BASE_MAP_RADIUS)}
             fill="black"
             stroke="#53d392"
             strokeWidth="2"
@@ -1737,19 +1828,32 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((snake.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                cy={48 + ((snake.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
                 r="2"
                 fill="#ff4444"
               />
             )}
             
+            {/* Other players dots */}
+            {otherPlayers.map(player => (
+              player.segments && player.segments.length > 0 && (
+                <circle
+                  key={player.id}
+                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
+                  r="2"
+                  fill={player.color}
+                />
+              )
+            ))}
+            
             {/* Bot snake dots */}
             {botSnakes.map(bot => (
               <circle
                 key={bot.id}
-                cx={48 + ((bot.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((bot.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((bot.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                cy={48 + ((bot.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
                 r="1.5"
                 fill={bot.color}
               />
@@ -1767,7 +1871,10 @@ export default function GamePage() {
             {connectionStatus}
           </div>
           <div className="text-white text-xs font-mono">
-            Players: {otherPlayers.length + 1}
+            Players: {serverBarrierExpansion?.currentPlayerCount || (otherPlayers.length + 1)}
+            {serverBarrierExpansion?.expansionTiers !== undefined && serverBarrierExpansion.expansionTiers > 0 && (
+              <span className="text-green-400 ml-2">+{serverBarrierExpansion.expansionTiers}T</span>
+            )}
           </div>
         </div>
       </div>
