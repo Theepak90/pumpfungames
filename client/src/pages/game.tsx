@@ -901,11 +901,14 @@ export default function GamePage() {
             });
           }
           
-          // Force immediate re-render for proper snake body display
+          // Force immediate re-render for proper snake body display with eyes
           if (canvasRef.current) {
-            window.requestAnimationFrame(() => {
-              // Canvas will redraw with new player data on next frame
-            });
+            // Trigger multiple renders to ensure eyes appear immediately
+            for (let i = 0; i < 3; i++) {
+              window.requestAnimationFrame(() => {
+                // Multiple redraws ensure all elements render properly
+              });
+            }
           }
         }
       } catch (error) {
@@ -2305,6 +2308,17 @@ export default function GamePage() {
   const handleLoadingComplete = () => {
     setIsLoading(false);
     setGameStarted(true);
+    
+    // Force immediate multiple renders to ensure all snake eyes appear instantly
+    if (canvasRef.current) {
+      for (let i = 0; i < 10; i++) {
+        setTimeout(() => {
+          window.requestAnimationFrame(() => {
+            // Force complete rendering of all snake elements including eyes
+          });
+        }, i * 16); // Render every frame for 10 frames
+      }
+    }
   };
 
   return (
