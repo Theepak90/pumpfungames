@@ -258,14 +258,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (data.type === 'update') {
           // Update player data in both activePlayers and gameWorld
           const existingPlayer = activePlayers.get(playerId);
+          // Enforce 100-segment limit on server side
+          const MAX_SEGMENTS = 100;
+          const segments = data.segments || [];
+          const limitedSegments = segments.length > MAX_SEGMENTS ? segments.slice(0, MAX_SEGMENTS) : segments;
+          const limitedMass = Math.min(data.totalMass || 6, MAX_SEGMENTS);
+          
           const player = {
             id: playerId,
-            segments: data.segments || [],
+            segments: limitedSegments,
             color: existingPlayer?.color || '#d55400',
             money: data.money || 1.00,
-            totalMass: data.totalMass || 6,
+            totalMass: limitedMass,
             segmentRadius: data.segmentRadius || 8,
-            visibleSegmentCount: data.visibleSegmentCount || 0,
+            visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
             lastUpdate: Date.now()
           };
           console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments, mass: ${data.totalMass?.toFixed(1) || 'unknown'}, radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);

@@ -1939,8 +1939,12 @@ export default function GamePage() {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
+          // Optimize rendering for large snakes - limit visible segments for performance
+          const maxRenderSegments = 150; // Cap rendering at 150 segments for performance
+          const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
+          
           // Draw segments from tail to head for proper layering
-          for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
+          for (let i = segmentsToRender - 1; i >= 0; i--) {
             const segment = fullSnakeBody[i];
             const segmentRadius = serverPlayer.segmentRadius || 10;
             
@@ -1950,7 +1954,7 @@ export default function GamePage() {
             ctx.fill();
           }
           
-          console.log(`Rendered snake ${serverPlayer.id} with ${fullSnakeBody.length} round ball segments`);
+          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} round ball segments`);
           
           ctx.restore();
           
@@ -2056,8 +2060,12 @@ export default function GamePage() {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
+        // Optimize rendering for large snakes - limit visible segments for performance
+        const maxRenderSegments = 150; // Cap rendering at 150 segments for performance
+        const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
+        
         // Draw segments from tail to head for proper layering
-        for (let i = fullSnakeBody.length - 1; i >= 0; i--) {
+        for (let i = segmentsToRender - 1; i >= 0; i--) {
           const segment = fullSnakeBody[i];
           const segmentRadius = snake.getSegmentRadius();
           
