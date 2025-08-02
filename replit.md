@@ -10,24 +10,26 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Implemented Server-Authoritative Multiplayer (Latest)
+### Completed Multiplayer System with Fixed Rendering (Latest)
 - **Real-time multiplayer functionality**: Players can see each other simultaneously on `/game`
 - **Server-controlled game state**: All bots, food, and player positions managed centrally by server
 - **Synchronized game world**: Every player sees identical bots and food in same locations
-- **WebSocket communication**: Real-time updates every 100ms with player position broadcasting
+- **WebSocket communication**: Real-time updates every 50ms with player position broadcasting
 - **Multiple player support**: Each tab connects as unique player with different colors
 - **Shared game session**: No more separate lobbies - all players join the same world instance
 - **Full snake body rendering**: Players see complete snakes with interpolated segments for smooth trails
 - **Position synchronization**: Each player's segments are broadcast and rendered as full snake bodies
 - **Proper visual separation**: Local player sees detailed snake rendering while other players appear as smooth server-rendered trails
-- **Eliminated rendering conflicts**: Fixed duplicate snake and money display issues by separating local vs remote player rendering
+- **Fixed rendering order**: Death zone overlay now renders AFTER snakes, eliminating green screen issue
+- **Restored background grid**: Scrolling grid pattern follows camera movement properly
+- **Unified snake rendering**: All snakes (local and remote) use same visual system with eyes, shadows, scaling
 
-### Fixed White Screen Flashing Issue
-- **Removed WebSocket conflicts**: Eliminated WebSocket server that was interfering with Vite HMR
-- **Stabilized Vite connection**: Fixed persistent connection lost/restart loop causing white flashing
-- **Reverted to stable single-player**: Game now loads reliably without connection issues
-- **Clean server setup**: Simplified Express server without conflicting WebSocket implementations
-- **Improved user experience**: No more screen flashing or connection interruptions
+### Fixed Critical Rendering Issues
+- **Eliminated green screen bug**: Fixed rendering order so death zone overlay draws after snakes instead of covering them
+- **Restored camera following**: Snake head position safely handled to prevent invalid camera transforms
+- **Fixed background grid**: Grid pattern now properly follows camera movement and renders behind game elements
+- **Proper layer ordering**: Background → Food → Snakes → Death Zone overlay for correct visual hierarchy
+- **Multiplayer visual consistency**: All players see identical rendering with proper snake styling
 
 ### Home Screen Snake Improvements
 - **Tighter segments**: Reduced segment spacing from 16 to 8 to match multiplayer game appearance
