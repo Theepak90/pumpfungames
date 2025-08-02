@@ -1627,10 +1627,29 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Process server food without attraction to prevent jittering
-      const processedServerFood = serverFood;
+      // Process server food with smooth attraction (no jittering)
+      const processedServerFood = serverFood.map(food => {
+        const dx = snake.head.x - food.x;
+        const dy = snake.head.y - food.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Apply gentle attraction when close (within 60 units) - less aggressive than before
+        if (distance < 60 && distance > 0) {
+          const attractionStrength = Math.min(1.2, 30 / distance); // Gentler attraction
+          const pullX = (dx / distance) * attractionStrength;
+          const pullY = (dy / distance) * attractionStrength;
+          
+          return {
+            ...food,
+            x: food.x + pullX,
+            y: food.y + pullY
+          };
+        }
+        
+        return food;
+      });
       
-      // Check for collisions with server food using generous collision detection
+      // Check for collisions with attracted server food using generous collision detection
       processedServerFood.forEach(food => {
         const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
         
@@ -1661,7 +1680,7 @@ export default function GamePage() {
         }
       });
       
-      // Just display the attracted food positions (server handles removal)
+      // Display the attracted food positions (server handles removal)
       setServerFood(processedServerFood);
 
       // Check for collisions with other players' snakes
