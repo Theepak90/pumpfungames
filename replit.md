@@ -22,7 +22,9 @@ Preferred communication style: Simple, everyday language.
 - **Proper visual separation**: Local player sees detailed snake rendering while other players appear as smooth server-rendered trails
 - **Eliminated rendering conflicts**: Fixed duplicate snake and money display issues by separating local vs remote player rendering
 - **Food system enhancements**: Added glow effects, attraction physics, and collision detection for server food
-- **Known issue**: Food jitters due to server position updates conflicting with local attraction effects
+- **Snake size synchronization**: Fixed size mismatch where players appeared different sizes on different screens
+- **Complete visual consistency**: All snakes now appear identical in size and proportions across all player screens
+- **Proportional eye scaling**: Eyes and pupils scale correctly with snake size for authentic appearance
 
 ### Fixed White Screen Flashing Issue
 - **Removed WebSocket conflicts**: Eliminated WebSocket server that was interfering with Vite HMR

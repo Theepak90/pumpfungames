@@ -1810,10 +1810,8 @@ export default function GamePage() {
           // Your snake color
           ctx.fillStyle = '#d55400';
           
-          // Proper size gradient for your snake
-          const baseRadius = 8;
-          const headBonus = Math.max(0, (10 - index) * 0.5);
-          const radius = baseRadius + headBonus;
+          // Use the same radius as what we send to the server
+          const radius = snake.getSegmentRadius();
           
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
