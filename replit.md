@@ -10,14 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Fixed Money Counter Font and Scaling Issues (Latest)
-- **Removed duplicate money counter**: Eliminated bottom money counter that was creating double display above snake heads
+### Fixed Snake Growth and Money Counter Issues (Latest)
+- **Snake growth capped at 40 segments**: Snake stops growing completely after reaching 40 segments, preventing money counter from moving off-screen
 - **Unified font styling**: All money counters now use Press Start 2P retro font instead of Arial
-- **Dynamic size scaling**: Money counter text grows bigger as snakes get bigger, maintaining visual consistency
-- **Proper outline styling**: All money displays have consistent white text with dark outline for visibility
-- **Complete visual consistency**: Local player and other players' money counters now look identical
 - **Font scaling capped at 40 mass**: Money counter text stops growing after 40 mass equivalent (4 segments)
+- **Fixed positioning**: Money counter stays consistently above snake head without moving around
+- **Complete visual consistency**: Local player and other players' money counters now look identical
 - **Black outline color #000000**: All money counter text uses consistent black outline for better visibility
+- **Growth limit applied everywhere**: Both regular food eating and money pickup respect the 40-segment limit
+- **SmoothSnake class updates**: Added segment limit logic to grow() method and updateVisibleSegments()
 
 ### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players

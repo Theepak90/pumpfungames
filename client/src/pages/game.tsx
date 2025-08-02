@@ -556,8 +556,23 @@ class SmoothSnake {
   
   eatFood(food: Food) {
     const mass = food.mass || 1;
-    this.growthRemaining += mass * 0.5; // 1 mass = 0.5 segments
-    return mass; // Return score increase
+    
+    // Apply segment limit (40 segments max)
+    const MAX_SEGMENTS = 40;
+    const currentSegments = Math.floor(this.totalMass / 1); // MASS_PER_SEGMENT = 1
+    
+    if (currentSegments < MAX_SEGMENTS) {
+      const maxAllowedMass = MAX_SEGMENTS * 1; // MASS_PER_SEGMENT = 1
+      const actualMassToAdd = Math.min(mass, maxAllowedMass - this.totalMass);
+      
+      if (actualMassToAdd > 0) {
+        this.growthRemaining += actualMassToAdd * 0.5; // 1 mass = 0.5 segments
+      }
+      
+      return actualMassToAdd; // Return actual mass added
+    }
+    
+    return 0; // No growth if at segment limit
   }
   
   // Process growth at 10 mass per second rate
@@ -1513,7 +1528,21 @@ export default function GamePage() {
             if (food.type === 'money') {
               // Money pickup - add to snake's money balance and mass
               snake.money += food.value || 0; // Add money value
-              snake.totalMass += food.mass || 1; // Add mass (each crate worth 1 mass)
+              
+              // Directly add mass with segment limit check
+              const massToAdd = food.mass || 1;
+              const MAX_SEGMENTS = 40;
+              const currentSegments = Math.floor(snake.totalMass / 1); // MASS_PER_SEGMENT = 1
+              
+              if (currentSegments < MAX_SEGMENTS) {
+                const maxAllowedMass = MAX_SEGMENTS * 1; // MASS_PER_SEGMENT = 1
+                const actualMassToAdd = Math.min(massToAdd, maxAllowedMass - snake.totalMass);
+                
+                if (actualMassToAdd > 0) {
+                  snake.totalMass += actualMassToAdd;
+                }
+              }
+              
               newFoods.splice(i, 1);
               continue; // Don't spawn replacement food for money
             } else {
