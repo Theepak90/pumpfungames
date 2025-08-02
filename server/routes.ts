@@ -269,8 +269,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastUpdate: Date.now()
           };
           console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments, mass: ${data.totalMass?.toFixed(1) || 'unknown'}, radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
-          activePlayers.set(playerId, player);
-          gameWorld.players.set(playerId, player);
+          
+          // Check for collisions with other players BEFORE updating position
+          const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
+          if (currentPlayerHead && data.segmentRadius) {
+            let collisionDetected = false;
+            
+            // Check collision with all other players
+            for (const [otherPlayerId, otherPlayer] of gameWorld.players) {
+              if (otherPlayerId === playerId) continue; // Skip self
+              if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
+              
+              // Check collision with all segments of other player
+              for (const segment of otherPlayer.segments) {
+                const dist = Math.sqrt(
+                  (currentPlayerHead.x - segment.x) ** 2 + 
+                  (currentPlayerHead.y - segment.y) ** 2
+                );
+                const collisionRadius = data.segmentRadius + (otherPlayer.segmentRadius || 10);
+                
+                if (dist < collisionRadius) {
+                  console.log(`💀 SERVER: Player ${playerId} crashed into ${otherPlayerId}!`);
+                  collisionDetected = true;
+                  
+                  // Remove crashed player immediately
+                  activePlayers.delete(playerId);
+                  gameWorld.players.delete(playerId);
+                  
+                  // Send death notification to crashed player
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                      type: 'death',
+                      reason: 'collision',
+                      crashedInto: otherPlayerId
+                    }));
+                  }
+                  
+                  // Create death loot where the player died
+                  const deathFood = [];
+                  for (let i = 0; i < Math.min(data.segments.length, 10); i++) {
+                    const segment = data.segments[i];
+                    deathFood.push({
+                      id: `death_${Date.now()}_${Math.random()}`,
+                      x: segment.x + (Math.random() - 0.5) * 40,
+                      y: segment.y + (Math.random() - 0.5) * 40,
+                      mass: 0.5,
+                      color: player.color,
+                      glowIntensity: 0.8
+                    });
+                  }
+                  gameWorld.food.push(...deathFood);
+                  
+                  console.log(`💀 Player ${playerId} removed from server, ${deathFood.length} death food created`);
+                  break;
+                }
+              }
+              if (collisionDetected) break;
+            }
+            
+            // Only update player if no collision detected
+            if (!collisionDetected) {
+              activePlayers.set(playerId, player);
+              gameWorld.players.set(playerId, player);
+            }
+          } else {
+            // No collision check needed if no head position
+            activePlayers.set(playerId, player);
+            gameWorld.players.set(playerId, player);
+          }
         } else if (data.type === 'eatFood') {
           // Handle server-side food collision
           const foodId = data.foodId;

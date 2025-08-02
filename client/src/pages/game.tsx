@@ -1008,6 +1008,11 @@ export default function GamePage() {
               });
             }
           }
+        } else if (data.type === 'death') {
+          console.log(`💀 SERVER DEATH: ${data.reason} - crashed into ${data.crashedInto}`);
+          // Server detected our collision - immediately stop game
+          setGameOver(true);
+          gameOverRef.current = true;
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
