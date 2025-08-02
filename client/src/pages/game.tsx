@@ -9,7 +9,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const BASE_MAP_RADIUS = 1800; // Base circular map radius
-const EXPANSION_THRESHOLD = 2; // Players needed to trigger expansion (lowered for testing)
+const EXPANSION_THRESHOLD = 6; // Players needed to trigger expansion
 const EXPANSION_RATE = 0.25; // 25% expansion rate
 // Food system removed
 const BOT_COUNT = 5;
@@ -1046,9 +1046,9 @@ export default function GamePage() {
         currentPlayerCount = otherPlayers.length + 1;
         const MAX_PLAYERS = 30;
         const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
-        const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - 2) / 2));
+        const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
         targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * 0.25));
-        shouldExpand = currentPlayerCount >= 2;
+        shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
         
         // Animate local barrier too
         const ANIMATION_SPEED = 0.02;

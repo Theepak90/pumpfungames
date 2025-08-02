@@ -421,13 +421,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const BASE_MAP_RADIUS = 1800;
       const EXPANSION_RATE = 0.25; // 25% expansion per 2 players
       const MAX_PLAYERS = 30; // Cap at 30 players
+      const EXPANSION_THRESHOLD = 6; // First expansion starts at 6 players
       
-      // Calculate expansion tiers: every 2 players adds 25%
+      // Calculate expansion tiers: first expansion at 6 players, then every 2 players adds 25%
       const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
-      const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - 2) / 2));
+      const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
       const targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * EXPANSION_RATE));
       
-      const shouldExpand = currentPlayerCount >= 2;
+      const shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
       
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
