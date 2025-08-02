@@ -1417,55 +1417,53 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Process server food: attraction + collision in one operation
-      setServerFood(prevServerFood => {
-        // First apply attraction to all food
-        const attractedFood = prevServerFood.map(food => {
-          const dx = snake.head.x - food.x;
-          const dy = snake.head.y - food.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          // Apply strong attraction when close (within 80 units)
-          if (distance < 80 && distance > 0) {
-            const attractionStrength = 1.8; // Strong attraction like home screen
-            const pullX = (dx / distance) * attractionStrength;
-            const pullY = (dy / distance) * attractionStrength;
-            
-            return {
-              ...food,
-              x: food.x + pullX,
-              y: food.y + pullY
-            };
-          }
-          
-          return food;
-        });
+      // Process server food: smooth attraction + collision detection
+      const processedServerFood = serverFood.map(food => {
+        const dx = snake.head.x - food.x;
+        const dy = snake.head.y - food.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Then check for collisions and remove eaten food
-        let scoreIncrease = 0;
-        const remainingFood = attractedFood.filter(food => {
-          const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+        // Apply smooth attraction when close (within 100 units)
+        if (distance < 100 && distance > 0) {
+          const attractionStrength = Math.min(2.5, 50 / distance); // Stronger when closer
+          const pullX = (dx / distance) * attractionStrength;
+          const pullY = (dy / distance) * attractionStrength;
           
-          if (dist < snake.getSegmentRadius() + food.size) {
-            // Eat server food - give small mass increase
-            const massGain = food.size * 0.02; // Small mass based on food size
-            snake.totalMass += massGain;
-            scoreIncrease += Math.floor(massGain * 10);
-            
-            // Return false to filter out this food (eaten)
-            return false;
-          }
-          
-          // Return true to keep this food
-          return true;
-        });
-        
-        if (scoreIncrease > 0) {
-          setScore(prev => prev + scoreIncrease);
+          return {
+            ...food,
+            x: food.x + pullX,
+            y: food.y + pullY
+          };
         }
         
-        return remainingFood;
+        return food;
       });
+      
+      // Check for collisions with attracted food positions
+      let scoreIncrease = 0;
+      const remainingFood = processedServerFood.filter(food => {
+        const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
+        
+        if (dist < snake.getSegmentRadius() + food.size) {
+          // Eat server food - give decent mass increase
+          const massGain = food.size * 0.05; // Increased from 0.02 for better progression
+          snake.totalMass += massGain;
+          scoreIncrease += Math.floor(massGain * 10);
+          
+          // Return false to filter out this food (eaten)
+          return false;
+        }
+        
+        // Return true to keep this food
+        return true;
+      });
+      
+      if (scoreIncrease > 0) {
+        setScore(prev => prev + scoreIncrease);
+      }
+      
+      // Update server food with processed positions
+      setServerFood(remainingFood);
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;

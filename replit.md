@@ -12,15 +12,17 @@ Preferred communication style: Simple, everyday language.
 
 ### Implemented Server-Authoritative Multiplayer (Latest)
 - **Real-time multiplayer functionality**: Players can see each other simultaneously on `/game`
-- **Server-controlled game state**: All bots, food, and player positions managed centrally by server
-- **Synchronized game world**: Every player sees identical bots and food in same locations
-- **WebSocket communication**: Real-time updates every 100ms with player position broadcasting
+- **Server-controlled game state**: All bots completely removed, food managed centrally by server
+- **Synchronized game world**: Every player sees identical food in same locations
+- **WebSocket communication**: Real-time updates every 50ms with player position broadcasting
 - **Multiple player support**: Each tab connects as unique player with different colors
 - **Shared game session**: No more separate lobbies - all players join the same world instance
 - **Full snake body rendering**: Players see complete snakes with interpolated segments for smooth trails
 - **Position synchronization**: Each player's segments are broadcast and rendered as full snake bodies
 - **Proper visual separation**: Local player sees detailed snake rendering while other players appear as smooth server-rendered trails
 - **Eliminated rendering conflicts**: Fixed duplicate snake and money display issues by separating local vs remote player rendering
+- **Food system enhancements**: Added glow effects, attraction physics, and collision detection for server food
+- **Known issue**: Food jitters due to server position updates conflicting with local attraction effects
 
 ### Fixed White Screen Flashing Issue
 - **Removed WebSocket conflicts**: Eliminated WebSocket server that was interfering with Vite HMR
