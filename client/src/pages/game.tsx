@@ -657,6 +657,7 @@ export default function GamePage() {
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const wsRef = useRef<WebSocket | null>(null);
 
   // Function to drop food when snake dies (1 food per mass, in snake color)
