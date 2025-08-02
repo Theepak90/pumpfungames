@@ -734,7 +734,7 @@ export default function GamePage() {
     };
   }, [gameStarted]);
 
-  // Send player data to server via HTTP
+  // Send player data to server via HTTP - depends on both gameStarted and room connection
   useEffect(() => {
     if (!gameStarted || !myPlayerId || currentRoomId === null) {
       console.log(`Not sending HTTP updates: gameStarted=${gameStarted}, playerId=${!!myPlayerId}, roomId=${currentRoomId}`);
@@ -761,6 +761,9 @@ export default function GamePage() {
         segmentRadius: snake.getSegmentRadius ? snake.getSegmentRadius() : 8,
         visibleSegmentCount: snake.visibleSegments.length
       };
+      
+      // Debug logging to identify the sync issue
+      console.log(`🔍 DEBUG: currentRoomId=${currentRoomId}, myPlayerId=${myPlayerId}`);
       
       console.log(`📤 HTTP UPDATE: Sending player data - segments=${updateData.segments.length}, mass=${updateData.totalMass}, room=${currentRoomId}`);
       
