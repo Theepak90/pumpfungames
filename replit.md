@@ -17,7 +17,7 @@ Preferred communication style: Simple, everyday language.
 - **Proper outline styling**: All money displays have consistent white text with dark outline for visibility
 - **Complete visual consistency**: Local player and other players' money counters now look identical
 - **Font scaling capped at 100 mass**: Money counter text stops growing after 100 mass equivalent
-- **Green outline color #53d493**: All money counter text uses consistent green outline for better visibility
+- **Black outline color #000000**: All money counter text uses consistent black outline for better visibility
 
 ### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players

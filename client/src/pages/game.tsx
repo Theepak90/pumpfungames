@@ -1999,7 +1999,7 @@ export default function GamePage() {
             ctx.save();
             ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
             ctx.fillStyle = "#ffffff";
-            ctx.strokeStyle = "#53d493";
+            ctx.strokeStyle = "#000000";
             ctx.lineWidth = 3 * scaleFactor;
             ctx.textAlign = "center";
             
@@ -2132,7 +2132,7 @@ export default function GamePage() {
               
               ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
               ctx.fillStyle = "#ffffff";
-              ctx.strokeStyle = "#53d493";
+              ctx.strokeStyle = "#000000";
               ctx.lineWidth = 3 * scaleFactor;
               ctx.textAlign = "center";
               
@@ -2352,7 +2352,7 @@ export default function GamePage() {
           
           ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
           ctx.fillStyle = "#ffffff";
-          ctx.strokeStyle = "#53d493";
+          ctx.strokeStyle = "#000000";
           ctx.lineWidth = 3 * scaleFactor;
           ctx.textAlign = "center";
           
