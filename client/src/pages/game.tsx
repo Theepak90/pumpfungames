@@ -9,7 +9,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const BASE_MAP_RADIUS = 1800; // Base circular map radius
-const EXPANSION_THRESHOLD = 5; // Players needed to trigger expansion
+const EXPANSION_THRESHOLD = 2; // Players needed to trigger expansion (lowered for testing)
 const EXPANSION_RATE = 0.25; // 25% expansion rate
 // Food system removed
 const BOT_COUNT = 5;
@@ -1000,8 +1000,9 @@ export default function GamePage() {
       const shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
       const targetRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
       
-      // Log expansion status (only once per second to avoid spam)
-      if (currentPlayerCount > EXPANSION_THRESHOLD && Math.random() < 0.01) {
+      // Log expansion status
+      console.log(`Player count: ${currentPlayerCount}, threshold: ${EXPANSION_THRESHOLD}, should expand: ${shouldExpand}`);
+      if (shouldExpand) {
         console.log(`🔵 BARRIER EXPANDING: ${currentPlayerCount} players online, radius: ${BASE_MAP_RADIUS} → ${targetRadius}`);
       }
       
