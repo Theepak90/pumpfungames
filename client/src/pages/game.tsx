@@ -1786,7 +1786,7 @@ export default function GamePage() {
             {connectionStatus}
           </div>
           <div className="text-white text-xs font-mono">
-            Players: {otherPlayers.length + 1}
+            Players: {serverPlayers.length}
           </div>
         </div>
       </div>
