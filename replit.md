@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 - **Dynamic size scaling**: Money counter text grows bigger as snakes get bigger, maintaining visual consistency
 - **Proper outline styling**: All money displays have consistent white text with dark outline for visibility
 - **Complete visual consistency**: Local player and other players' money counters now look identical
-- **Font scaling capped at 100 mass**: Money counter text stops growing after 100 mass equivalent
+- **Font scaling capped at 40 mass**: Money counter text stops growing after 40 mass equivalent (4 segments)
 - **Black outline color #000000**: All money counter text uses consistent black outline for better visibility
 
 ### Fixed Snake Death Rendering Issue

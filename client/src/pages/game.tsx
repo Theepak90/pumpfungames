@@ -1990,9 +1990,9 @@ export default function GamePage() {
             const head = fullSnakeBody[0];
             const segmentRadius = serverPlayer.segmentRadius || 10;
             
-            // Calculate scale factor based on segment radius, capped at 100 mass equivalent
+            // Calculate scale factor based on segment radius, capped at 40 mass equivalent
             const baseRadius = 10;
-            const maxRadius = 20; // Equivalent to ~100 mass
+            const maxRadius = 15; // Equivalent to ~40 mass
             const cappedRadius = Math.min(segmentRadius, maxRadius);
             const scaleFactor = Math.max(0.8, cappedRadius / baseRadius);
             
@@ -2124,9 +2124,9 @@ export default function GamePage() {
             if (index === 0) {
               const segmentRadius = radius; // Use the radius we calculated above
               
-              // Calculate scale factor based on segment radius, capped at 100 mass equivalent
+              // Calculate scale factor based on segment radius, capped at 40 mass equivalent
               const baseRadius = 10;
-              const maxRadius = 20; // Equivalent to ~100 mass
+              const maxRadius = 15; // Equivalent to ~40 mass
               const cappedRadius = Math.min(segmentRadius, maxRadius);
               const scaleFactor = Math.max(0.8, cappedRadius / baseRadius);
               
@@ -2344,9 +2344,9 @@ export default function GamePage() {
         if (snake.visibleSegments.length > 0) {
           const snakeHead = snake.visibleSegments[0];
           
-          // Cap the scaling at 100 mass equivalent (like other players)
+          // Cap the scaling at 40 mass equivalent (4 segments)
           const baseMass = 6; // Starting mass
-          const maxMass = 100; // Cap at 100 mass
+          const maxMass = 40; // Cap at 40 mass
           const cappedMass = Math.min(snake.visibleSegments.length, maxMass);
           const scaleFactor = Math.max(0.8, cappedMass / baseMass);
           
