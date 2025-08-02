@@ -16,6 +16,9 @@ Preferred communication style: Simple, everyday language.
 - **Immediate collision response**: Canvas clears instantly on collision with immediate visual feedback
 - **Proper death loot system**: Money crates and food drop correctly along snake body segments
 - **Clean visual transitions**: No more ghost snake appearing after death due to animation frame continuation
+- **Server-side collision detection**: Server detects all player collisions and immediately removes crashed players
+- **Death notification system**: Server sends death messages to crashed players with immediate local response
+- **Stopped update race condition**: Crashed players immediately stop sending position updates to prevent re-appearing
 
 ### Implemented Server-Authoritative Multiplayer
 - **Real-time multiplayer functionality**: Players can see each other simultaneously on `/game`

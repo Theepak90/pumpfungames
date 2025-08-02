@@ -1009,10 +1009,11 @@ export default function GamePage() {
             }
           }
         } else if (data.type === 'death') {
-          console.log(`💀 SERVER DEATH: ${data.reason} - crashed into ${data.crashedInto}`);
+          console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately stop game
           setGameOver(true);
           gameOverRef.current = true;
+          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1072,6 +1073,12 @@ export default function GamePage() {
     console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
     
     const sendInterval = setInterval(() => {
+      // Stop sending updates immediately if game is over
+      if (gameOverRef.current) {
+        console.log(`🛑 Stopped sending updates: gameOver=${gameOverRef.current}`);
+        return;
+      }
+      
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
         const updateData = {
           type: 'update',
@@ -1093,7 +1100,7 @@ export default function GamePage() {
       console.log('Clearing position update interval');
       clearInterval(sendInterval);
     };
-  }, [gameStarted, wsRef.current?.readyState]);
+  }, [gameStarted, wsRef.current?.readyState, gameOver]);
 
   // Mouse tracking
   useEffect(() => {
