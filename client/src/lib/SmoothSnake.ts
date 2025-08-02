@@ -231,10 +231,17 @@ export class SmoothSnake {
   }
   
   grow(mass: number) {
-    // Allow unlimited mass growth - visual segments will be capped in updateVisibleSegments()
-    if (mass > 0) {
-      this.totalMass += mass;
-      this.growthRemaining += mass;
+    // Cap mass growth at 100 - no strength increase beyond this point
+    const MAX_MASS = 100;
+    
+    if (this.totalMass >= MAX_MASS) {
+      return; // No growth if already at max mass
+    }
+    
+    const actualMassToAdd = Math.min(mass, MAX_MASS - this.totalMass);
+    if (actualMassToAdd > 0) {
+      this.totalMass += actualMassToAdd;
+      this.growthRemaining += actualMassToAdd;
     }
   }
   

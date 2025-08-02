@@ -258,23 +258,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (data.type === 'update') {
           // Update player data in both activePlayers and gameWorld
           const existingPlayer = activePlayers.get(playerId);
-          // Enforce 100-segment limit on server side (mass can be unlimited)
+          // Enforce 100-segment and 100-mass limits on server side
           const MAX_SEGMENTS = 100;
+          const MAX_MASS = 100;
           const segments = data.segments || [];
           const limitedSegments = segments.length > MAX_SEGMENTS ? segments.slice(0, MAX_SEGMENTS) : segments;
-          const originalMass = data.totalMass || 6; // Keep original mass (no limiting)
+          const limitedMass = Math.min(data.totalMass || 6, MAX_MASS); // Cap mass at 100
           
           const player = {
             id: playerId,
             segments: limitedSegments,
             color: existingPlayer?.color || '#d55400',
             money: data.money || 1.00,
-            totalMass: originalMass, // Keep unlimited mass
+            totalMass: limitedMass, // Cap mass at 100
             segmentRadius: data.segmentRadius || 8,
             visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
             lastUpdate: Date.now()
           };
-          console.log(`Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${originalMass.toFixed(1)}, radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          console.log(`Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;

@@ -557,13 +557,20 @@ class SmoothSnake {
   eatFood(food: Food) {
     const mass = food.mass || 1;
     
-    // Snake can always eat food and gain mass, but segments cap at 100
-    // Allow unlimited mass growth but segments will be capped in updateVisibleSegments()
-    if (mass > 0) {
-      this.growthRemaining += mass * 0.5; // 1 mass = 0.5 segments worth of growth
+    // Cap both segments and mass at 100 - no growth beyond this point
+    const MAX_MASS = 100;
+    const currentMass = this.totalMass;
+    
+    if (currentMass >= MAX_MASS) {
+      return 0; // No growth if already at max mass/strength
     }
     
-    return mass; // Return actual mass added (always the full amount)
+    const actualMassToAdd = Math.min(mass, MAX_MASS - currentMass);
+    if (actualMassToAdd > 0) {
+      this.growthRemaining += actualMassToAdd * 0.5; // 1 mass = 0.5 segments worth of growth
+    }
+    
+    return actualMassToAdd; // Return actual mass added
   }
   
   // Process growth at 10 mass per second rate
@@ -575,9 +582,9 @@ class SmoothSnake {
     this.partialGrowth += growthThisFrame;
     this.growthRemaining -= growthThisFrame;
     
-    // Add mass when we have enough partial growth - no limits on mass
-    // Segments will be visually capped at 100 in updateVisibleSegments()
-    while (this.partialGrowth >= 1) {
+    // Add mass when we have enough partial growth, but cap at 100 total mass
+    const MAX_MASS = 100;
+    while (this.partialGrowth >= 1 && this.totalMass < MAX_MASS) {
       this.totalMass += 1;
       this.partialGrowth -= 1;
     }
@@ -1521,11 +1528,15 @@ export default function GamePage() {
               // Money pickup - add to snake's money balance and mass
               snake.money += food.value || 0; // Add money value
               
-              // Directly add mass - snake can always gain mass from money pickups
-              // Segments will be capped at 100 in updateVisibleSegments(), but mass can grow unlimited
+              // Add mass from money pickups but cap at 100 total mass
               const massToAdd = food.mass || 1;
-              if (massToAdd > 0) {
-                snake.totalMass += massToAdd;
+              const MAX_MASS = 100;
+              
+              if (snake.totalMass < MAX_MASS) {
+                const actualMassToAdd = Math.min(massToAdd, MAX_MASS - snake.totalMass);
+                if (actualMassToAdd > 0) {
+                  snake.totalMass += actualMassToAdd;
+                }
               }
               
               newFoods.splice(i, 1);
