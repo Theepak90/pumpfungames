@@ -1939,29 +1939,10 @@ export default function GamePage() {
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Apply dynamic spacing to other players' segments for consistency
+          // Use server segments exactly as sent - no spacing modifications
+          // This ensures other players see your snake exactly as you see it on your screen
           const fullSnakeBody = serverPlayer.segments;
-          
-          // Use server segments with minimal spacing adjustment to match local appearance
-          // The server already sends properly spaced segments, just apply light filtering
-          const MAX_SEGMENTS = 100;
-          const segmentProgress = Math.min(fullSnakeBody.length / MAX_SEGMENTS, 1.0);
-          
-          // Much lighter spacing - just filter every few segments for larger snakes
-          const spacedSegments = [];
-          if (fullSnakeBody.length > 0) {
-            // For small snakes, show all segments. For larger snakes, show slightly fewer
-            const skipFactor = Math.floor(1 + segmentProgress * 1.5); // Skip 1-2 segments max
-            
-            for (let i = 0; i < fullSnakeBody.length && spacedSegments.length < MAX_SEGMENTS; i += skipFactor) {
-              spacedSegments.push(fullSnakeBody[i]);
-            }
-            
-            // Always ensure we have the head
-            if (spacedSegments.length === 0 || spacedSegments[0] !== fullSnakeBody[0]) {
-              spacedSegments.unshift(fullSnakeBody[0]);
-            }
-          }
+          const spacedSegments = fullSnakeBody; // Use all segments as-is from server
           
           // Draw snake body with EXACT same styling as local snake
           ctx.save();
@@ -1986,7 +1967,7 @@ export default function GamePage() {
             ctx.fill();
           }
           
-          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} dynamically spaced segments`);
+          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} exact server segments`);
           
           ctx.restore();
           
