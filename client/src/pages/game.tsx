@@ -1577,24 +1577,90 @@ export default function GamePage() {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
           
-          // IMPROVED: Render remote snakes with EXACT same visuals as local snake
-          drawSnakeWithFullVisuals(ctx, serverPlayer.segments, serverPlayer.color, false, 1.0);
+          // IMPROVED: Render remote snakes with direct drawing (same as local snake)
+          serverPlayer.segments.forEach((segment, index) => {
+            ctx.save();
+            
+            // Remote snake color
+            ctx.fillStyle = serverPlayer.color || '#4ecdc4';
+            
+            // Make segments visible  
+            const radius = index === 0 ? 15 : 12; // Head larger than body
+            
+            // Add shadow for visibility
+            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // White outline for head
+            if (index === 0) {
+              ctx.shadowBlur = 0;
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+            
+            ctx.restore();
+          });
           
           console.log(`Rendered remote snake ${serverPlayer.id} with ${serverPlayer.segments.length} segments`);
         }
       });
 
-      // FIXED: Draw your own snake locally using the same helper function for consistency
-      if (gameStarted && snake.visibleSegments.length > 0) {
-        drawSnakeWithFullVisuals(ctx, snake.visibleSegments, '#d55400', isMouseDown, 1.0);
+      // CRITICAL FIX: Draw your own snake with direct rendering - ALWAYS render if segments exist
+      if (snake.visibleSegments.length > 0) {
+        console.log(`Drawing local snake with ${snake.visibleSegments.length} segments at positions:`, snake.visibleSegments.slice(0, 3));
+        
+        // Draw snake segments directly with simple solid circles
+        snake.visibleSegments.forEach((segment, index) => {
+          ctx.save();
+          
+          // Your snake color - bright orange so it's very visible
+          ctx.fillStyle = '#ff6600';
+          
+          // Make segments large and visible
+          const radius = index === 0 ? 15 : 12; // Head larger than body
+          
+          // Add shadow for visibility
+          ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          
+          ctx.beginPath();
+          ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // White outline for head
+          if (index === 0) {
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+          
+          ctx.restore();
+        });
         
         // Draw your money above your head
-        ctx.save();
-        ctx.fillStyle = '#fff';
-        ctx.font = `12px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 25);
-        ctx.restore();
+        if (snake.visibleSegments.length > 0) {
+          ctx.save();
+          ctx.fillStyle = '#fff';
+          ctx.font = `14px Arial`;
+          ctx.textAlign = 'center';
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 30);
+          ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 30);
+          ctx.restore();
+        }
+      } else {
+        console.log(`NOT DRAWING SNAKE: gameStarted=${gameStarted}, segments=${snake.visibleSegments.length}`);
       }
 
       // FIXED: Now draw the death zone AFTER everything else so it doesn't cover the snakes
@@ -1980,6 +2046,17 @@ export default function GamePage() {
   const handleLoadingComplete = () => {
     setIsLoading(false);
     setGameStarted(true);
+    
+    // CRITICAL FIX: Force game initialization and reset snake
+    console.log("Loading complete - forcing game start and snake reset");
+    
+    // Reset snake position to a known good position
+    snake.reset();
+    snake.head.x = MAP_CENTER_X;
+    snake.head.y = MAP_CENTER_Y;
+    snake.update(Date.now());
+    
+    console.log(`Snake reset: head=(${snake.head.x}, ${snake.head.y}), segments=${snake.visibleSegments.length}`);
   };
 
   return (
