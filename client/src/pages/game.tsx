@@ -1745,30 +1745,7 @@ export default function GamePage() {
         }
       });
 
-      // Draw server bots first (shared across all players)
-      serverBots.forEach(bot => {
-        if (bot.segments && bot.segments.length > 0) {
-          bot.segments.forEach((segment: any, index: number) => {
-            ctx.save();
-            
-            ctx.fillStyle = bot.color || '#4ecdc4';
-            ctx.beginPath();
-            const radius = (index === 0 ? 12 : 8);
-            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw bot money above head
-            if (index === 0) {
-              ctx.fillStyle = '#fff';
-              ctx.font = `10px Arial`;
-              ctx.textAlign = 'center';
-              ctx.fillText(`$${bot.money.toFixed(2)}`, segment.x, segment.y - 25);
-            }
-            
-            ctx.restore();
-          });
-        }
-      });
+      // No bots in multiplayer - removed all bot rendering
 
       // Draw local bot snakes (fallback)
       botSnakes.forEach(bot => {

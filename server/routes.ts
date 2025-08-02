@@ -187,19 +187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function initializeGameWorld() {
     if (gameWorld.initialized) return;
     
-    // Create shared bots
-    for (let i = 0; i < 8; i++) {
-      gameWorld.bots.push({
-        id: `bot_${i}`,
-        x: Math.random() * 4000 - 2000,
-        y: Math.random() * 4000 - 2000,
-        segments: [
-          { x: Math.random() * 4000 - 2000, y: Math.random() * 4000 - 2000 }
-        ],
-        color: ['#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4'][i % 4],
-        money: 1.50 + Math.random() * 2
-      });
-    }
+    // Don't create bots - multiplayer is for human players only
+    gameWorld.bots = [];
     
     // Create shared food
     for (let i = 0; i < 200; i++) {
@@ -213,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     gameWorld.initialized = true;
-    console.log('Shared game world initialized');
+    console.log('Shared game world initialized (food only, no bots)');
   }
 
   wss.on("connection", function connection(ws: any) {
@@ -301,12 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broadcast game state every 50ms for more responsive multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
-      // Update bot positions (simple movement simulation)
-      gameWorld.bots.forEach(bot => {
-        bot.x += (Math.random() - 0.5) * 20;
-        bot.y += (Math.random() - 0.5) * 20;
-        bot.segments[0] = { x: bot.x, y: bot.y };
-      });
+      // No bots in multiplayer - keep empty array
       
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
