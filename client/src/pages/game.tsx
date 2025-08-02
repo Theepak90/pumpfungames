@@ -1971,7 +1971,7 @@ export default function GamePage() {
       });
 
       // Draw your own snake locally using EXACT same rendering as remote players
-      if (gameStarted && snake.visibleSegments.length > 0) {
+      if (gameStarted && snake.visibleSegments.length > 0 && !gameOver) {
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
