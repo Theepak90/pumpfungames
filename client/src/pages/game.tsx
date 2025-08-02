@@ -9,7 +9,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
-const FOOD_COUNT = 300; // Doubled from 150
+// Food system removed
 const BOT_COUNT = 5;
 
 interface Position {
@@ -1693,7 +1693,7 @@ export default function GamePage() {
       cancelAnimationFrame(animationId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [mouseDirection, snake, foods, gameOver, canvasSize, score, hiddenAt, gameStarted]);
+  }, [mouseDirection, snake, gameOver, canvasSize, score, hiddenAt, gameStarted]);
 
   const resetGame = () => {
     setGameOver(false);
