@@ -83,14 +83,14 @@ export class SmoothSnake {
     const massBasedSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     const targetSegmentCount = Math.min(massBasedSegments, MAX_SEGMENTS);
     
-    // Smoothly animate currentSegmentCount toward target
+    // Smoothly animate currentSegmentCount toward target, but cap at MAX_SEGMENTS
     const transitionSpeed = 0.08; // Slightly slower for more stability
-    if (this.currentSegmentCount < targetSegmentCount) {
+    if (this.currentSegmentCount < targetSegmentCount && this.currentSegmentCount < MAX_SEGMENTS) {
       this.currentSegmentCount += transitionSpeed;
     } else if (this.currentSegmentCount > targetSegmentCount) {
       this.currentSegmentCount -= transitionSpeed;
     }
-    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    this.currentSegmentCount = Math.max(1, Math.min(this.currentSegmentCount, MAX_SEGMENTS));
     
     // Use floor for solid segments, check if we need a fading segment
     const solidSegmentCount = Math.floor(this.currentSegmentCount);
