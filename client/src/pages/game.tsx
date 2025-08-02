@@ -1629,8 +1629,9 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
-            console.log(`💀 CRASHED into player ${otherPlayer.id}!`);
+            console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
             setGameOver(true);
+            console.log(`💀 Game over state set, gameOver should now be: true`);
             
             // Drop death food and money crates along snake body
             dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
@@ -2227,6 +2228,7 @@ export default function GamePage() {
 
       // Only render snake if game is not over
       if (!gameOver) {
+        // DEBUG: Snake is being rendered because gameOver = false
         // Draw single glowing outline behind the whole snake when boosting
         if (snake.isBoosting && snake.visibleSegments.length > 0) {
           ctx.save();
