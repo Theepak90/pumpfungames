@@ -13,12 +13,12 @@ Preferred communication style: Simple, everyday language.
 ### Fixed Snake Growth and Money Counter Positioning (Latest)
 - **Snake growth capped at 40 segments**: Snake stops growing completely after reaching 40 segments, preventing money counter from moving off-screen
 - **Money counter positioned closer**: Reduced offset from 35 to 20 scaleFactor units for much closer positioning to snake head
-- **Text size capped at 15 mass**: Money counter text stops growing at 15 mass instead of 40 mass for smaller, more manageable size
+- **Text size capped at 4 mass**: Money counter text stops growing at just 4 mass for very small, compact size
 - **Unified font styling**: All money counters now use Press Start 2P retro font instead of Arial
 - **Complete visual consistency**: Local player and other players' money counters now look identical
 - **Black outline color #000000**: All money counter text uses consistent black outline for better visibility
 - **Growth limit applied everywhere**: Both regular food eating and money pickup respect the 40-segment limit
-- **Updated all three rendering locations**: Server players, fallback players, and local player money displays all use the closer positioning and smaller text cap
+- **Updated all three rendering locations**: Server players, fallback players, and local player money displays all use the closer positioning and very small text cap at 4 mass
 
 ### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players
