@@ -2225,8 +2225,10 @@ export default function GamePage() {
       
       ctx.globalAlpha = 1.0;
 
-      // Draw single glowing outline behind the whole snake when boosting
-      if (snake.isBoosting && snake.visibleSegments.length > 0) {
+      // Only render snake if game is not over
+      if (!gameOver) {
+        // Draw single glowing outline behind the whole snake when boosting
+        if (snake.isBoosting && snake.visibleSegments.length > 0) {
         ctx.save();
         ctx.beginPath();
         
@@ -2383,8 +2385,9 @@ export default function GamePage() {
         ctx.restore();
       }
 
-      // Restore context
-      ctx.restore();
+        // Restore context
+        ctx.restore();
+      } // Close gameOver check
 
       // No UI display needed
       
