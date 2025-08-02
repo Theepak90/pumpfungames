@@ -322,11 +322,11 @@ export default function Home() {
   const handleStartGame = async () => {
     toast({
       title: "Starting Game!",
-      description: "Joining multiplayer room.",
+      description: "Loading snake game.",
     });
     
-    // Navigate to room 1 - server will auto-assign to best room
-    setLocation('/game/1');
+    // Navigate to single-player game for stable experience
+    setLocation('/game');
   };
 
   // Handle daily crate claim

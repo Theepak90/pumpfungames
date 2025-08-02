@@ -167,86 +167,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Room status endpoint for room assignment
-  app.get("/api/multiplayer/room-status/:roomId", (req, res) => {
-    const roomId = req.params.roomId;
-    const room = gameRooms.get(roomId);
-    
-    if (!room) {
-      return res.status(404).json({ message: "Room not found" });
-    }
-    
-    const playerCount = room.players.size;
-    const isFull = playerCount >= MAX_PLAYERS_PER_ROOM;
-    
-    res.json({
-      roomId,
-      playerCount,
-      maxPlayers: MAX_PLAYERS_PER_ROOM,
-      isFull,
-      status: 'active'
-    });
-  });
-
-  // Get all rooms status
-  app.get("/api/multiplayer/rooms", (req, res) => {
-    const roomsStatus = Array.from(gameRooms.entries()).map(([roomId, room]) => ({
-      roomId,
-      playerCount: room.players.size,
-      maxPlayers: MAX_PLAYERS_PER_ROOM,
-      isFull: room.players.size >= MAX_PLAYERS_PER_ROOM
-    }));
-    
-    res.json({ rooms: roomsStatus });
-  });
-
-  // Multi-room WebSocket server system
+  // WebSocket server for multiplayer on /ws path
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws'
   });
 
-  // Room management - support rooms 1-20
-  const MAX_ROOMS = 20;
-  const MAX_PLAYERS_PER_ROOM = 8;
+  const activePlayers = new Map();
   
-  const gameRooms = new Map<string, {
-    players: Map<string, any>;
-    activePlayers: Map<string, any>;
-    gameWorld: {
-      bots: any[];
-      food: any[];
-      players: Map<string, any>;
-      initialized: boolean;
-    };
-  }>();
+  // Shared game world state
+  const gameWorld = {
+    bots: [] as any[],
+    food: [] as any[],
+    players: new Map() as Map<string, any>,
+    initialized: false
+  };
 
-  // Initialize all rooms
-  for (let i = 1; i <= MAX_ROOMS; i++) {
-    gameRooms.set(i.toString(), {
-      players: new Map(),
-      activePlayers: new Map(),
-      gameWorld: {
-        bots: [],
-        food: [],
-        players: new Map(),
-        initialized: false
-      }
-    });
-  }
-
-  // Initialize room game world
-  function initializeRoomGameWorld(roomId: string) {
-    const room = gameRooms.get(roomId);
-    if (!room || room.gameWorld.initialized) return;
+  // Initialize shared game world
+  function initializeGameWorld() {
+    if (gameWorld.initialized) return;
     
     // Don't create bots - multiplayer is for human players only
-    room.gameWorld.bots = [];
+    gameWorld.bots = [];
     
-    // Create shared food for this room
+    // Create shared food
     for (let i = 0; i < 200; i++) {
-      room.gameWorld.food.push({
-        id: `food_${roomId}_${i}`,
+      gameWorld.food.push({
+        id: `food_${i}`,
         x: Math.random() * 4000 - 2000,
         y: Math.random() * 4000 - 2000,
         size: 4 + Math.random() * 6,
@@ -254,86 +201,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
-    room.gameWorld.initialized = true;
-    console.log(`Room ${roomId} game world initialized (food only, no bots)`);
+    gameWorld.initialized = true;
+    console.log('Shared game world initialized (food only, no bots)');
   }
 
-  wss.on("connection", function connection(ws: any, req: any) {
-    // Extract room ID from query string
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const roomId = url.searchParams.get('room') || '1';
-    
-    // Validate room ID
-    if (!gameRooms.has(roomId)) {
-      ws.close(1003, 'Invalid room');
-      return;
-    }
-    
-    const room = gameRooms.get(roomId)!;
-    
-    // Check if room is full
-    if (room.players.size >= MAX_PLAYERS_PER_ROOM) {
-      ws.close(1003, 'Room full');
-      return;
-    }
-    
+  wss.on("connection", function connection(ws: any) {
     const playerId = `player_${Date.now()}_${Math.random()}`;
-    console.log(`Player ${playerId} joined room ${roomId}. Room players: ${room.players.size + 1}/${MAX_PLAYERS_PER_ROOM}`);
+    console.log(`Player ${playerId} joined multiplayer. Active: ${wss.clients.size}`);
+    console.log(`WebSocket readyState: ${ws.readyState}`);
     
     ws.playerId = playerId;
-    ws.roomId = roomId;
     
     // Assign different colors to different players
     const colors = ['#d55400', '#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-    const playerColor = colors[room.players.size % colors.length];
+    const playerColor = colors[wss.clients.size % colors.length];
     
     const player = {
       id: playerId,
       segments: [],
       color: playerColor,
       money: 1.00,
-      lastUpdate: Date.now(),
-      roomId: roomId
+      lastUpdate: Date.now()
     };
     
-    room.activePlayers.set(playerId, player);
-    room.gameWorld.players.set(playerId, player);
+    activePlayers.set(playerId, player);
+    gameWorld.players.set(playerId, player); // Also add to shared game world
 
-    // Send welcome message with player ID and room info
+    // Send welcome message with player ID
     ws.send(JSON.stringify({
       type: 'welcome',
-      playerId: playerId,
-      roomId: roomId,
-      playerCount: room.players.size + 1
+      playerId: playerId
     }));
 
-    // Initialize room game world if needed
-    initializeRoomGameWorld(roomId);
+    // Initialize game world if needed
+    initializeGameWorld();
     
     // Send current players to new player
     setTimeout(() => {
       ws.send(JSON.stringify({
         type: 'players',
-        players: Array.from(room.activePlayers.values())
+        players: Array.from(activePlayers.values())
       }));
       
-      // Send room game world state including all players
+      // Send shared game world state including all players
       ws.send(JSON.stringify({
         type: 'gameWorld',
-        bots: room.gameWorld.bots,
-        food: room.gameWorld.food,
-        players: Array.from(room.gameWorld.players.values())
+        bots: gameWorld.bots,
+        food: gameWorld.food,
+        players: Array.from(gameWorld.players.values())
       }));
     }, 100);
 
     ws.on("message", function incoming(message: any) {
       try {
         const data = JSON.parse(message.toString());
-        const room = gameRooms.get(roomId)!;
-        
         if (data.type === 'update') {
-          // Update player data in room
-          const existingPlayer = room.activePlayers.get(playerId);
+          // Update player data in both activePlayers and gameWorld
+          const existingPlayer = activePlayers.get(playerId);
           // Enforce 100-segment and 100-mass limits on server side
           const MAX_SEGMENTS = 100;
           const MAX_MASS = 100;
@@ -349,18 +273,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalMass: limitedMass, // Cap mass at 100
             segmentRadius: data.segmentRadius || 8,
             visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
-            lastUpdate: Date.now(),
-            roomId: roomId
+            lastUpdate: Date.now()
           };
-          console.log(`Room ${roomId} - Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          console.log(`Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
-          // Check for collisions with other players in same room BEFORE updating position
+          // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
           if (currentPlayerHead && data.segmentRadius) {
             let collisionDetected = false;
             
-            // Check collision with all other players in the same room
-            for (const [otherPlayerId, otherPlayer] of Array.from(room.gameWorld.players)) {
+            // Check collision with all other players
+            for (const [otherPlayerId, otherPlayer] of Array.from(gameWorld.players)) {
               if (otherPlayerId === playerId) continue; // Skip self
               if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
               
@@ -373,12 +296,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const collisionRadius = data.segmentRadius + (otherPlayer.segmentRadius || 10);
                 
                 if (dist < collisionRadius) {
-                  console.log(`💀 SERVER: Player ${playerId} in room ${roomId} crashed into ${otherPlayerId}!`);
+                  console.log(`💀 SERVER: Player ${playerId} crashed into ${otherPlayerId}!`);
                   collisionDetected = true;
                   
-                  // Remove crashed player immediately from room
-                  room.activePlayers.delete(playerId);
-                  room.gameWorld.players.delete(playerId);
+                  // Remove crashed player immediately
+                  activePlayers.delete(playerId);
+                  gameWorld.players.delete(playerId);
                   
                   // Send death notification to crashed player (client will handle death loot)
                   if (ws.readyState === WebSocket.OPEN) {
@@ -389,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }));
                   }
                   
-                  console.log(`💀 Player ${playerId} removed from room ${roomId} (client will handle death loot)`);
+                  console.log(`💀 Player ${playerId} removed from server (client will handle death loot)`);
                   break;
                 }
               }
@@ -398,60 +321,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Only update player if no collision detected
             if (!collisionDetected) {
-              room.activePlayers.set(playerId, player);
-              room.gameWorld.players.set(playerId, player);
+              activePlayers.set(playerId, player);
+              gameWorld.players.set(playerId, player);
             }
           } else {
             // No collision check needed if no head position
-            room.activePlayers.set(playerId, player);
-            room.gameWorld.players.set(playerId, player);
+            activePlayers.set(playerId, player);
+            gameWorld.players.set(playerId, player);
           }
         } else if (data.type === 'eatFood') {
-          // Handle server-side food collision within room
+          // Handle server-side food collision
           const foodId = data.foodId;
-          const foodIndex = room.gameWorld.food.findIndex((f: any) => f.id === foodId);
+          const foodIndex = gameWorld.food.findIndex(f => f.id === foodId);
           
           if (foodIndex !== -1) {
-            // Remove eaten food from room
-            const eatenFood = room.gameWorld.food[foodIndex];
-            room.gameWorld.food.splice(foodIndex, 1);
+            // Remove eaten food from server
+            const eatenFood = gameWorld.food[foodIndex];
+            gameWorld.food.splice(foodIndex, 1);
             
-            // Create new food to maintain count for this room
+            // Create new food to maintain count
             const newFood = {
-              id: `food_${roomId}_${Date.now()}_${Math.random()}`,
+              id: `food_${Date.now()}_${Math.random()}`,
               x: Math.random() * 4000 - 2000,
               y: Math.random() * 4000 - 2000,
               size: 4 + Math.random() * 6,
               color: ['#ff4444', '#44ff44', '#4444ff', '#ffff44'][Math.floor(Math.random() * 4)]
             };
-            room.gameWorld.food.push(newFood);
+            gameWorld.food.push(newFood);
             
-            console.log(`Room ${roomId} - Player ${playerId} ate food ${foodId}, spawned new food ${newFood.id}`);
+            console.log(`Player ${playerId} ate food ${foodId}, spawned new food ${newFood.id}`);
           }
         } else if (data.type === 'dropFood') {
-          // Handle server-side food dropping from boosting within room
+          // Handle server-side food dropping from boosting
           const droppedFood = data.food;
           
-          // Add dropped food to room's food array with unique ID
+          // Add dropped food to server's food array with unique ID
           const serverFood = {
-            id: `dropped_${roomId}_${Date.now()}_${Math.random()}`,
+            id: `dropped_${Date.now()}_${Math.random()}`,
             x: droppedFood.x,
             y: droppedFood.y,
             size: droppedFood.size,
             color: droppedFood.color
           };
-          room.gameWorld.food.push(serverFood);
+          gameWorld.food.push(serverFood);
           
-          console.log(`Room ${roomId} - Player ${playerId} dropped food at (${droppedFood.x.toFixed(1)}, ${droppedFood.y.toFixed(1)})`);
+          console.log(`Player ${playerId} dropped food at (${droppedFood.x.toFixed(1)}, ${droppedFood.y.toFixed(1)})`);
         } else if (data.type === 'playerDeath') {
-          // Handle player death and death loot drops within room
+          // Handle player death and death loot drops
           const deathLoot = data.deathLoot;
           
           if (deathLoot && Array.isArray(deathLoot)) {
-            // Add all death loot items to room food
+            // Add all death loot items to server food
             for (const loot of deathLoot) {
               const serverLoot = {
-                id: `death_${roomId}_${Date.now()}_${Math.random()}`,
+                id: `death_${Date.now()}_${Math.random()}`,
                 x: loot.x,
                 y: loot.y,
                 size: loot.size,
@@ -460,14 +383,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 mass: loot.mass || 1,
                 value: loot.value || 0 // For money crates
               };
-              room.gameWorld.food.push(serverLoot);
+              gameWorld.food.push(serverLoot);
             }
             
-            console.log(`💀 Room ${roomId} - Player ${playerId} died, added ${deathLoot.length} death loot items to room`);
+            console.log(`💀 Player ${playerId} died, added ${deathLoot.length} death loot items to server`);
             
-            // Remove the dead player from room
-            room.activePlayers.delete(playerId);
-            room.gameWorld.players.delete(playerId);
+            // Remove the dead player from active players
+            activePlayers.delete(playerId);
+            gameWorld.players.delete(playerId);
           }
         }
       } catch (error) {
@@ -476,77 +399,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     ws.on("close", (code: number, reason: Buffer) => {
-      const room = gameRooms.get(roomId);
-      if (room) {
-        room.activePlayers.delete(playerId);
-        room.gameWorld.players.delete(playerId);
-        console.log(`Player ${playerId} left room ${roomId}. Code: ${code}, Reason: ${reason.toString()}, Room players: ${room.players.size}`);
-      }
+      console.log(`Player ${playerId} left multiplayer. Code: ${code}, Reason: ${reason.toString()}, Remaining: ${wss.clients.size - 1}`);
+      activePlayers.delete(playerId);
+      gameWorld.players.delete(playerId);
     });
 
     ws.on("error", (error: any) => {
-      const room = gameRooms.get(roomId);
-      if (room) {
-        room.activePlayers.delete(playerId);
-        room.gameWorld.players.delete(playerId);
-        console.error(`WebSocket error for player ${playerId} in room ${roomId}:`, error);
-      }
+      console.error(`WebSocket error for player ${playerId}:`, error);
+      activePlayers.delete(playerId);
+      gameWorld.players.delete(playerId);
     });
   });
 
-  // Broadcast game state every 100ms for stable multiplayer - per room
+  // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
-      // Broadcast to each room separately
-      gameRooms.forEach((room, roomId) => {
-        if (room.gameWorld.players.size > 0) {
-          // Calculate barrier expansion based on room player count
-          const currentPlayerCount = room.gameWorld.players.size;
-          const BASE_MAP_RADIUS = 1800;
-          const EXPANSION_RATE = 0.25; // 25% expansion per 2 players
-          const MAX_PLAYERS = MAX_PLAYERS_PER_ROOM; // Use room max players
-          const EXPANSION_THRESHOLD = 6; // First expansion starts at 6 players
-          
-          // Calculate expansion tiers: first expansion at 6 players, then every 2 players adds 25%
-          const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
-          const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
-          const targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * EXPANSION_RATE));
-          
-          const shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
-          
-          const worldMessage = JSON.stringify({
-            type: 'gameWorld',
-            bots: room.gameWorld.bots,
-            food: room.gameWorld.food,
-            players: Array.from(room.gameWorld.players.values()),
-            barrierExpansion: {
-              currentPlayerCount,
-              shouldExpand,
-              targetRadius,
-              baseRadius: BASE_MAP_RADIUS,
-              expansionTiers,
-              effectivePlayerCount
-            }
-          });
-          
-          console.log(`Broadcasting to room ${roomId}: ${room.gameWorld.players.size} players`);
-          
-          // Send to clients in this room
-          wss.clients.forEach((client: any) => {
-            if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
-              try {
-                client.send(worldMessage);
-              } catch (error) {
-                console.error(`Broadcast error for room ${roomId}:`, error);
-                // Clean up from room
-                if (room.activePlayers.has(client.playerId)) {
-                  room.activePlayers.delete(client.playerId);
-                  room.gameWorld.players.delete(client.playerId);
-                }
-                client.terminate();
-              }
-            }
-          });
+      // No bots in multiplayer - keep empty array
+      
+      const worldMessage = JSON.stringify({
+        type: 'gameWorld',
+        bots: gameWorld.bots,
+        food: gameWorld.food,
+        players: Array.from(gameWorld.players.values())
+      });
+      
+      console.log(`Broadcasting to ${wss.clients.size} clients: ${gameWorld.players.size} players`);
+      
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          try {
+            client.send(worldMessage);
+          } catch (error) {
+            console.error('Broadcast error:', error);
+            // Remove disconnected clients
+            client.terminate();
+          }
+        } else {
+          // Clean up disconnected clients
+          console.log('Removing disconnected client');
+          client.terminate();
         }
       });
     }

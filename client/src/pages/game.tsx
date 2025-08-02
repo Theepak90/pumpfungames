@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useLocation, useParams } from 'wouter';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
@@ -8,9 +8,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 // Game constants
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
-const BASE_MAP_RADIUS = 1800; // Base circular map radius
-const EXPANSION_THRESHOLD = 6; // Players needed to trigger expansion
-const EXPANSION_RATE = 0.25; // 25% expansion rate
+const MAP_RADIUS = 1800; // Circular map radius
 // Food system removed
 const BOT_COUNT = 5;
 
@@ -58,7 +56,7 @@ function getRandomFoodColor(): string {
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (BASE_MAP_RADIUS - 200);
+  const radius = Math.random() * (MAP_RADIUS - 200);
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
@@ -156,7 +154,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
     // Random wandering behavior (food targeting removed)
     if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
       const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-      if (distFromCenter > BASE_MAP_RADIUS * 0.6) {
+      if (distFromCenter > MAP_RADIUS * 0.6) {
         // Move toward center when near edges
         const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
         bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
@@ -206,7 +204,7 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
   
   // Keep bot within circular map bounds
   const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > BASE_MAP_RADIUS - 50) {
+  if (distFromCenter > MAP_RADIUS - 50) {
     const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
     bot.targetAngle = angleToCenter;
   }
@@ -527,8 +525,6 @@ class SmoothSnake {
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
-  const params = useParams<{ roomId?: string }>();
-  const [assignedRoom, setAssignedRoom] = useState<string>('1');
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
@@ -579,19 +575,6 @@ export default function GamePage() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const wsRef = useRef<WebSocket | null>(null);
-  
-  // Server-controlled barrier expansion state with smooth animation
-  const [serverBarrierExpansion, setServerBarrierExpansion] = useState<{
-    shouldExpand: boolean;
-    targetRadius: number;
-    currentPlayerCount: number;
-    expansionTiers: number;
-    effectivePlayerCount: number;
-  } | null>(null);
-  
-  // Animated barrier radius for smooth transitions
-  const [currentBarrierRadius, setCurrentBarrierRadius] = useState(BASE_MAP_RADIUS);
-  const previousTargetRadius = useRef(BASE_MAP_RADIUS);
 
   // Death food dropping removed
 
@@ -601,47 +584,6 @@ export default function GamePage() {
   // All death loot functions removed
 
 
-
-  // Room assignment and auto-redirect logic
-  useEffect(() => {
-    const checkRoomAvailability = async () => {
-      const targetRoom = params.roomId || '1';
-      
-      // Validate room number (1-20)
-      const roomNum = parseInt(targetRoom);
-      if (isNaN(roomNum) || roomNum < 1 || roomNum > 20) {
-        setLocation('/game/1');
-        return;
-      }
-      
-      try {
-        // Check room status to see if it's full
-        const response = await fetch(`/api/multiplayer/room-status/${targetRoom}`);
-        const roomStatus = await response.json();
-        
-        if (roomStatus.isFull) {
-          // Find next available room
-          for (let i = 1; i <= 20; i++) {
-            const checkResponse = await fetch(`/api/multiplayer/room-status/${i}`);
-            const checkStatus = await checkResponse.json();
-            if (!checkStatus.isFull) {
-              setLocation(`/game/${i}`);
-              return;
-            }
-          }
-          // All rooms full - stay in current room
-          setAssignedRoom(targetRoom);
-        } else {
-          setAssignedRoom(targetRoom);
-        }
-      } catch (error) {
-        console.error('Failed to check room status:', error);
-        setAssignedRoom(targetRoom);
-      }
-    };
-    
-    checkRoomAvailability();
-  }, [params.roomId, setLocation]);
 
   // Load background image
   useEffect(() => {
@@ -721,11 +663,11 @@ export default function GamePage() {
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log(`Connecting to multiplayer server room ${assignedRoom}...`);
+    console.log("Connecting to multiplayer server...");
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${assignedRoom}`);
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
     
     wsRef.current = socket;
 
@@ -753,13 +695,6 @@ export default function GamePage() {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
           console.log(`Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
-          
-          // Handle server-side barrier expansion synchronization
-          if (data.barrierExpansion) {
-            setServerBarrierExpansion(data.barrierExpansion);
-            console.log(`🔄 Server barrier sync: players=${data.barrierExpansion.currentPlayerCount}/${data.barrierExpansion.effectivePlayerCount}, tiers=${data.barrierExpansion.expansionTiers}, radius=${data.barrierExpansion.targetRadius}`);
-          }
-          
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -831,7 +766,7 @@ export default function GamePage() {
         socket.close();
       }
     };
-  }, [gameStarted, assignedRoom]);
+  }, [gameStarted]);
 
   // Send player data to server
   useEffect(() => {
@@ -1058,56 +993,6 @@ export default function GamePage() {
 
       // Food system removed
 
-      // Smooth barrier radius animation
-      let targetRadius;
-      let shouldExpand;
-      let currentPlayerCount;
-      
-      if (serverBarrierExpansion) {
-        // Use server-authoritative barrier expansion
-        targetRadius = serverBarrierExpansion.targetRadius;
-        shouldExpand = serverBarrierExpansion.shouldExpand;
-        currentPlayerCount = serverBarrierExpansion.currentPlayerCount;
-        
-        // Animate barrier radius smoothly towards target
-        const ANIMATION_SPEED = 0.002; // Smooth animation speed (10x slower)
-        const radiusDiff = targetRadius - currentBarrierRadius;
-        
-        if (Math.abs(radiusDiff) > 1) {
-          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
-        } else {
-          setCurrentBarrierRadius(targetRadius);
-        }
-        
-        // Log only when target changes
-        if (previousTargetRadius.current !== targetRadius) {
-          console.log(`🌐 Barrier animating: players=${currentPlayerCount}, tiers=${serverBarrierExpansion.expansionTiers}, ${currentBarrierRadius.toFixed(0)} → ${targetRadius}`);
-          previousTargetRadius.current = targetRadius;
-        }
-      } else {
-        // Fallback to local calculation when server data not available
-        currentPlayerCount = otherPlayers.length + 1;
-        const MAX_PLAYERS = 30;
-        const effectivePlayerCount = Math.min(currentPlayerCount, MAX_PLAYERS);
-        const expansionTiers = Math.max(0, Math.floor((effectivePlayerCount - EXPANSION_THRESHOLD) / 2));
-        targetRadius = BASE_MAP_RADIUS * (1 + (expansionTiers * 0.25));
-        shouldExpand = currentPlayerCount >= EXPANSION_THRESHOLD;
-        
-        // Animate local barrier too
-        const ANIMATION_SPEED = 0.02;
-        const radiusDiff = targetRadius - currentBarrierRadius;
-        
-        if (Math.abs(radiusDiff) > 1) {
-          setCurrentBarrierRadius(prev => prev + radiusDiff * ANIMATION_SPEED);
-        } else {
-          setCurrentBarrierRadius(targetRadius);
-        }
-        
-        console.log(`🔵 Local barrier: players=${currentPlayerCount}, tiers=${expansionTiers}, radius=${currentBarrierRadius.toFixed(0)}`);
-      }
-      
-      const activeRadius = currentBarrierRadius;
-      
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
@@ -1116,7 +1001,7 @@ export default function GamePage() {
         const distanceFromCenter = Math.sqrt(
           (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
         );
-        if (distanceFromCenter > activeRadius) {
+        if (distanceFromCenter > MAP_RADIUS) {
           hitBoundary = true;
           break;
         }
@@ -1341,7 +1226,7 @@ export default function GamePage() {
 
       // Draw background image across the full map area if loaded
       if (backgroundImage) {
-        const mapSize = BASE_MAP_RADIUS * 2.5;
+        const mapSize = MAP_RADIUS * 2.5;
         // Draw background image tiled across the entire game area
         const pattern = ctx.createPattern(backgroundImage, 'repeat');
         if (pattern) {
@@ -1354,10 +1239,10 @@ export default function GamePage() {
       ctx.save();
       
       // Create a clipping path for the area outside the safe zone
-      const mapSize = BASE_MAP_RADIUS * 2.5;
+      const mapSize = MAP_RADIUS * 2.5;
       ctx.beginPath();
       ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2, true); // Subtract safe zone (clockwise) - using dynamic radius
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
       ctx.clip();
       
       // Fill only the clipped area (outside the circle) with green overlay
@@ -1366,11 +1251,11 @@ export default function GamePage() {
       
       ctx.restore();
 
-      // Draw thin death barrier line - using dynamic radius
+      // Draw thin death barrier line
       ctx.strokeStyle = '#53d392';
       ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2);
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
       // All food rendering removed
@@ -1862,7 +1747,7 @@ export default function GamePage() {
           <circle
             cx="48"
             cy="48"
-            r={44 * (currentBarrierRadius / BASE_MAP_RADIUS)}
+            r="44"
             fill="black"
             stroke="#53d392"
             strokeWidth="2"
@@ -1871,32 +1756,19 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
+                cx={48 + ((snake.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
+                cy={48 + ((snake.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
                 r="2"
                 fill="#ff4444"
               />
             )}
             
-            {/* Other players dots */}
-            {otherPlayers.map(player => (
-              player.segments && player.segments.length > 0 && (
-                <circle
-                  key={player.id}
-                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / currentBarrierRadius) * 44}
-                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
-                  r="2"
-                  fill={player.color}
-                />
-              )
-            ))}
-            
             {/* Bot snake dots */}
             {botSnakes.map(bot => (
               <circle
                 key={bot.id}
-                cx={48 + ((bot.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
-                cy={48 + ((bot.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
+                cx={48 + ((bot.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
+                cy={48 + ((bot.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
                 r="1.5"
                 fill={bot.color}
               />
@@ -1914,10 +1786,7 @@ export default function GamePage() {
             {connectionStatus}
           </div>
           <div className="text-white text-xs font-mono">
-            Players: {serverBarrierExpansion?.currentPlayerCount || (otherPlayers.length + 1)}
-            {serverBarrierExpansion?.expansionTiers !== undefined && serverBarrierExpansion.expansionTiers > 0 && (
-              <span className="text-green-400 ml-2">+{serverBarrierExpansion.expansionTiers}T</span>
-            )}
+            Players: {otherPlayers.length + 1}
           </div>
         </div>
       </div>
