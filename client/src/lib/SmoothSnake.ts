@@ -80,13 +80,6 @@ export class SmoothSnake {
   updateVisibleSegments() {
     // Calculate target segment count based on mass, capped at 40 segments
     const MAX_SEGMENTS = 40;
-    
-    // FORCE cap the total mass to prevent infinite growth
-    const maxAllowedMass = MAX_SEGMENTS * this.MASS_PER_SEGMENT;
-    if (this.totalMass > maxAllowedMass) {
-      this.totalMass = maxAllowedMass;
-    }
-    
     const targetSegmentCount = Math.min(Math.floor(this.totalMass / this.MASS_PER_SEGMENT), MAX_SEGMENTS);
     
     // Smoothly animate currentSegmentCount toward target
