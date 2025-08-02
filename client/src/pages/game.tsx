@@ -448,14 +448,16 @@ class SmoothSnake {
   }
   
   getSegmentRadius() {
-    // Keep constant width - no scaling with mass
-    return this.SEGMENT_RADIUS;
+    // Dynamic scaling based on mass (baseline at mass=10, caps at 5x width)
+    const maxScale = 5;
+    const scaleFactor = Math.min(1 + (this.totalMass - 10) / 100, maxScale);
+    return this.SEGMENT_RADIUS * scaleFactor;
   }
 
   // Get scale factor for all visual elements
   getScaleFactor() {
-    // Keep constant scale - no width scaling with mass
-    return 1;
+    const maxScale = 5;
+    return Math.min(1 + (this.totalMass - 10) / 100, maxScale);
   }
   
   move(mouseDirectionX: number, mouseDirectionY: number, onDropFood?: (food: Food) => void) {
@@ -1935,44 +1937,11 @@ export default function GamePage() {
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Apply dynamic spacing to server segments to match local snake appearance
-          const receivedSegments = serverPlayer.segments;
-          const segmentCount = receivedSegments.length;
+          // Use server segments directly to avoid position mismatch
+          const fullSnakeBody = serverPlayer.segments;
           
-          // Calculate dynamic spacing based on segment count (same as local snake)
-          const MAX_SEGMENTS = 100;
-          const segmentProgress = Math.min(segmentCount / MAX_SEGMENTS, 1.0);
-          const dynamicSpacing = 12 + (segmentProgress * 6); // 12 to 18 spacing
-          const baseSpacing = 12; // Original spacing segments were sent with
-          const spacingRatio = dynamicSpacing / baseSpacing;
-          
-          // Apply spacing transformation to segments
-          const adjustedSegments: Array<{x: number, y: number}> = [];
-          for (let i = 0; i < receivedSegments.length; i++) {
-            if (i === 0) {
-              // Keep head position unchanged
-              adjustedSegments.push(receivedSegments[i]);
-            } else {
-              // Adjust segment positions based on spacing ratio
-              const prevAdjusted = adjustedSegments[i - 1];
-              const current = receivedSegments[i];
-              
-              // Calculate direction from previous to current
-              const dx = current.x - prevAdjusted.x;
-              const dy = current.y - prevAdjusted.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              
-              if (distance > 0) {
-                // Apply spacing ratio
-                const newDistance = distance * spacingRatio;
-                const adjustedX = prevAdjusted.x + (dx / distance) * newDistance;
-                const adjustedY = prevAdjusted.y + (dy / distance) * newDistance;
-                adjustedSegments.push({ x: adjustedX, y: adjustedY });
-              } else {
-                adjustedSegments.push(current);
-              }
-            }
-          }
+          // Use all segments as-is since we're now sending many more segments
+          // No need for tail extension - just use the received segments with interpolation
           
           // Draw snake body with EXACT same styling as local snake
           ctx.save();
@@ -1984,15 +1953,13 @@ export default function GamePage() {
           ctx.shadowOffsetY = 2;
           
           // Cap rendering at exactly 100 segments to match game limits
-          const maxRenderSegments = 100;
-          const segmentsToRender = Math.min(adjustedSegments.length, maxRenderSegments);
-          
-          // Use constant radius (no width scaling)
-          const segmentRadius = 8; // Same as getSegmentRadius() now returns
+          const maxRenderSegments = 100; // Hard cap at 100 segments max
+          const segmentsToRender = Math.min(fullSnakeBody.length, maxRenderSegments);
           
           // Draw segments from tail to head for proper layering
           for (let i = segmentsToRender - 1; i >= 0; i--) {
-            const segment = adjustedSegments[i];
+            const segment = fullSnakeBody[i];
+            const segmentRadius = serverPlayer.segmentRadius || 10;
             
             ctx.fillStyle = serverPlayer.color || '#ff0000';
             ctx.beginPath();
@@ -2000,26 +1967,27 @@ export default function GamePage() {
             ctx.fill();
           }
           
-          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${adjustedSegments.length} round ball segments`);
+          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} round ball segments`);
           
           ctx.restore();
           
           // Draw rotated square eyes exactly like local snake
-          if (adjustedSegments.length > 0) {
-            const head = adjustedSegments[0];
+          if (fullSnakeBody.length > 0) {
+            const head = fullSnakeBody[0];
             
             // Calculate movement direction from first two segments
             let movementAngle = 0;
-            if (adjustedSegments.length > 1) {
-              const dx = head.x - adjustedSegments[1].x;
-              const dy = head.y - adjustedSegments[1].y;
+            if (fullSnakeBody.length > 1) {
+              const dx = head.x - fullSnakeBody[1].x;
+              const dy = head.y - fullSnakeBody[1].y;
               movementAngle = Math.atan2(dy, dx);
             }
             
-            // Use constant eye sizing (no scaling with snake size)
-            const eyeDistance = 4; // Constant eye distance
-            const eyeSize = 2.4; // Constant eye size  
-            const pupilSize = 1.2; // Constant pupil size
+            // Scale eyes with snake size
+            const segmentRadius = serverPlayer.segmentRadius || 10;
+            const eyeDistance = segmentRadius * 0.5; // Scale eye distance with snake size
+            const eyeSize = segmentRadius * 0.3; // Scale eye size with snake size
+            const pupilSize = segmentRadius * 0.15; // Scale pupil with snake size
             
             // Eye positions perpendicular to movement direction
             const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -2064,12 +2032,15 @@ export default function GamePage() {
           }
           
           // Draw player money above head with proper scaling and font
-          if (adjustedSegments.length > 0) {
-            const head = adjustedSegments[0];
-            const segmentRadius = 8; // Constant radius, no scaling
+          if (fullSnakeBody.length > 0) {
+            const head = fullSnakeBody[0];
+            const segmentRadius = serverPlayer.segmentRadius || 10;
             
-            // Use constant scale factor (no scaling with snake size)
-            const scaleFactor = 1;
+            // Calculate scale factor based on segment radius, capped at 4 mass equivalent
+            const baseRadius = 10;
+            const maxRadius = 10.2; // Equivalent to ~4 mass
+            const cappedRadius = Math.min(segmentRadius, maxRadius);
+            const scaleFactor = Math.max(0.8, cappedRadius / baseRadius);
             
             ctx.save();
             ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
