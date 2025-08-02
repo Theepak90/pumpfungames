@@ -260,9 +260,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existingPlayer = activePlayers.get(playerId);
           // Enforce 100-segment limit on server side
           const MAX_SEGMENTS = 100;
+          const MAX_MASS = 100;
           const segments = data.segments || [];
           const limitedSegments = segments.length > MAX_SEGMENTS ? segments.slice(0, MAX_SEGMENTS) : segments;
-          const limitedMass = Math.min(data.totalMass || 6, MAX_SEGMENTS);
+          const limitedMass = Math.min(data.totalMass || 6, MAX_MASS);
           
           const player = {
             id: playerId,
@@ -274,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
             lastUpdate: Date.now()
           };
-          console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments, mass: ${data.totalMass?.toFixed(1) || 'unknown'}, radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          console.log(`Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;

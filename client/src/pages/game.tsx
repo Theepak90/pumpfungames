@@ -2599,6 +2599,18 @@ export default function GamePage() {
         </div>
       </div>
 
+      {/* Mass Counter */}
+      <div className="absolute top-20 right-4 z-10">
+        <div className="bg-black/60 border border-gray-500 rounded px-3 py-2">
+          <div className="text-white text-sm font-mono">
+            Mass: {Math.floor(snake.totalMass).toFixed(0)}
+          </div>
+          <div className="text-gray-300 text-xs font-mono">
+            Segments: {snake.visibleSegments.length}
+          </div>
+        </div>
+      </div>
+
       {/* Instructions */}
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-black/60 border border-gray-500 rounded px-3 py-2">
