@@ -2229,161 +2229,161 @@ export default function GamePage() {
       if (!gameOver) {
         // Draw single glowing outline behind the whole snake when boosting
         if (snake.isBoosting && snake.visibleSegments.length > 0) {
+          ctx.save();
+          ctx.beginPath();
+          
+          const segmentRadius = snake.getSegmentRadius();
+          const scaleFactor = snake.getScaleFactor();
+          
+          // Create a composite path for all segments
+          for (let i = 0; i < snake.visibleSegments.length; i++) {
+            const segment = snake.visibleSegments[i];
+            ctx.moveTo(segment.x + segmentRadius, segment.y);
+            ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+          }
+          
+          // Apply single glow effect to the entire snake outline
+          ctx.shadowColor = "white";
+          ctx.shadowBlur = 15;
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 3 * scaleFactor;
+          ctx.stroke();
+          ctx.restore();
+        }
+        
+
+        
+        // Draw snake segments with appropriate shadow effects
         ctx.save();
-        ctx.beginPath();
         
-        const segmentRadius = snake.getSegmentRadius();
-        const scaleFactor = snake.getScaleFactor();
+        if (!snake.isBoosting) {
+          // Add subtle drop shadow when not boosting
+          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+        } else {
+          // Ensure no shadow when boosting (glow effect is already applied)
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        }
         
-        // Create a composite path for all segments
-        for (let i = 0; i < snake.visibleSegments.length; i++) {
+        for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
           const segment = snake.visibleSegments[i];
-          ctx.moveTo(segment.x + segmentRadius, segment.y);
+          const segmentRadius = snake.getSegmentRadius();
+          
+          ctx.globalAlpha = segment.opacity;
+          
+          // Draw solid segment
+          ctx.fillStyle = "#d55400";
+          ctx.beginPath();
           ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+          ctx.fill();
         }
         
-        // Apply single glow effect to the entire snake outline
-        ctx.shadowColor = "white";
-        ctx.shadowBlur = 15;
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 3 * scaleFactor;
-        ctx.stroke();
         ctx.restore();
-      }
-      
+        
+        // Reset global alpha
+        ctx.globalAlpha = 1.0;
 
-      
-      // Draw snake segments with appropriate shadow effects
-      ctx.save();
-      
-      if (!snake.isBoosting) {
-        // Add subtle drop shadow when not boosting
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-      } else {
-        // Ensure no shadow when boosting (glow effect is already applied)
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-      }
-      
-      for (let i = snake.visibleSegments.length - 1; i >= 0; i--) {
-        const segment = snake.visibleSegments[i];
-        const segmentRadius = snake.getSegmentRadius();
-        
-        ctx.globalAlpha = segment.opacity;
-        
-        // Draw solid segment
-        ctx.fillStyle = "#d55400";
-        ctx.beginPath();
-        ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      ctx.restore();
-      
-      // Reset global alpha
-      ctx.globalAlpha = 1.0;
-
-      // Draw money balance above snake head
-      if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.visibleSegments[0];
-        const scaleFactor = snake.getScaleFactor();
-        
-        ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#134242";
-        ctx.lineWidth = 3 * scaleFactor;
-        ctx.textAlign = "center";
-        
-        const moneyText = `$${snake.money.toFixed(2)}`;
-        const offsetY = 35 * scaleFactor; // Scale the offset with snake size
-        
-        // Draw text outline for better visibility
-        ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
-        ctx.fillText(moneyText, snakeHead.x, snakeHead.y - offsetY);
-        
-        // Draw cash-out progress bar under money counter
-        if (cashingOut) {
-          const barWidth = 40 * scaleFactor; // Smaller width
-          const barHeight = 3 * scaleFactor; // Smaller height
-          const barX = snakeHead.x - barWidth / 2;
-          const barY = snakeHead.y - offsetY + 15; // Closer to money counter
+        // Draw money balance above snake head
+        if (snake.visibleSegments.length > 0) {
+          const snakeHead = snake.visibleSegments[0];
+          const scaleFactor = snake.getScaleFactor();
           
-          // Background bar
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(barX, barY, barWidth, barHeight);
+          ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#134242";
+          ctx.lineWidth = 3 * scaleFactor;
+          ctx.textAlign = "center";
           
-          // Progress bar
-          ctx.fillStyle = '#53d493'; // Green progress
-          ctx.fillRect(barX, barY, barWidth * cashOutProgress, barHeight);
+          const moneyText = `$${snake.money.toFixed(2)}`;
+          const offsetY = 35 * scaleFactor; // Scale the offset with snake size
           
-          // Border
-          ctx.strokeStyle = '#134242';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(barX, barY, barWidth, barHeight);
+          // Draw text outline for better visibility
+          ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
+          ctx.fillText(moneyText, snakeHead.x, snakeHead.y - offsetY);
+          
+          // Draw cash-out progress bar under money counter
+          if (cashingOut) {
+            const barWidth = 40 * scaleFactor; // Smaller width
+            const barHeight = 3 * scaleFactor; // Smaller height
+            const barX = snakeHead.x - barWidth / 2;
+            const barY = snakeHead.y - offsetY + 15; // Closer to money counter
+            
+            // Background bar
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            // Progress bar
+            ctx.fillStyle = '#53d493'; // Green progress
+            ctx.fillRect(barX, barY, barWidth * cashOutProgress, barHeight);
+            
+            // Border
+            ctx.strokeStyle = '#134242';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+          }
         }
-      }
 
-      // Draw eyes that track the cursor smoothly (after head is drawn)
-      if (snake.visibleSegments.length > 0) {
-        const snakeHead = snake.visibleSegments[0];
-        const movementAngle = snake.currentAngle;
-        // Dynamic eye scaling based on mass (same scale as segments)
-        const scaleFactor = snake.getScaleFactor();
-        const eyeDistance = 5 * scaleFactor; // Scale distance from center
-        const eyeSize = 3 * scaleFactor; // Scale eye size
-        const pupilSize = 1.5 * scaleFactor; // Scale pupil size
-        
-        // Calculate cursor direction using mouse direction vector
-        const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
-        
-        // Eye positions perpendicular to movement direction
-        const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
-        const eye1Y = snakeHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
-        const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
-        const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
-        
-        // Draw rotated square eyes
-        ctx.save();
-        
-        // Draw first eye with rotation
-        ctx.translate(eye1X, eye1Y);
-        ctx.rotate(movementAngle);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-        
-        // Draw first pupil (rotated relative to eye)
-        const pupilOffset = 1.2;
-        ctx.fillStyle = 'black';
-        ctx.fillRect(
-          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          pupilSize * 2, 
-          pupilSize * 2
-        );
-        ctx.restore();
-        
-        // Draw second eye with rotation
-        ctx.save();
-        ctx.translate(eye2X, eye2Y);
-        ctx.rotate(movementAngle);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-        
-        // Draw second pupil (rotated relative to eye)
-        ctx.fillStyle = 'black';
-        ctx.fillRect(
-          (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
-          pupilSize * 2, 
-          pupilSize * 2
-        );
-        ctx.restore();
-      }
+        // Draw eyes that track the cursor smoothly (after head is drawn)
+        if (snake.visibleSegments.length > 0) {
+          const snakeHead = snake.visibleSegments[0];
+          const movementAngle = snake.currentAngle;
+          // Dynamic eye scaling based on mass (same scale as segments)
+          const scaleFactor = snake.getScaleFactor();
+          const eyeDistance = 5 * scaleFactor; // Scale distance from center
+          const eyeSize = 3 * scaleFactor; // Scale eye size
+          const pupilSize = 1.5 * scaleFactor; // Scale pupil size
+          
+          // Calculate cursor direction using mouse direction vector
+          const cursorAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
+          
+          // Eye positions perpendicular to movement direction
+          const eye1X = snakeHead.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+          const eye1Y = snakeHead.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+          const eye2X = snakeHead.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+          const eye2Y = snakeHead.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+          
+          // Draw rotated square eyes
+          ctx.save();
+          
+          // Draw first eye with rotation
+          ctx.translate(eye1X, eye1Y);
+          ctx.rotate(movementAngle);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Draw first pupil (rotated relative to eye)
+          const pupilOffset = 1.2;
+          ctx.fillStyle = 'black';
+          ctx.fillRect(
+            (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+            (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
+          
+          // Draw second eye with rotation
+          ctx.save();
+          ctx.translate(eye2X, eye2Y);
+          ctx.rotate(movementAngle);
+          ctx.fillStyle = 'white';
+          ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
+          
+          // Draw second pupil (rotated relative to eye)
+          ctx.fillStyle = 'black';
+          ctx.fillRect(
+            (Math.cos(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+            (Math.sin(cursorAngle - movementAngle) * pupilOffset) - pupilSize,
+            pupilSize * 2, 
+            pupilSize * 2
+          );
+          ctx.restore();
+        }
 
         // Restore context
         ctx.restore();
