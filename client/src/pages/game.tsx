@@ -1985,13 +1985,28 @@ export default function GamePage() {
             ctx.restore();
           }
           
-          // Draw player money above head
+          // Draw player money above head with proper scaling and font
           if (fullSnakeBody.length > 0) {
+            const head = fullSnakeBody[0];
+            const segmentRadius = serverPlayer.segmentRadius || 10;
+            
+            // Calculate scale factor based on segment radius (similar to local snake)
+            const baseRadius = 10;
+            const scaleFactor = Math.max(0.8, segmentRadius / baseRadius);
+            
             ctx.save();
-            ctx.fillStyle = '#fff';
-            ctx.font = `12px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText(`$${serverPlayer.money?.toFixed(2) || '1.00'}`, fullSnakeBody[0].x, fullSnakeBody[0].y - 25);
+            ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#134242";
+            ctx.lineWidth = 3 * scaleFactor;
+            ctx.textAlign = "center";
+            
+            const moneyText = `$${serverPlayer.money?.toFixed(2) || '1.00'}`;
+            const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+            
+            // Draw text outline for better visibility
+            ctx.strokeText(moneyText, head.x, head.y - offsetY);
+            ctx.fillText(moneyText, head.x, head.y - offsetY);
             ctx.restore();
           }
         }
@@ -2103,12 +2118,26 @@ export default function GamePage() {
             ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
             ctx.fill();
             
-            // Draw player money above head
+            // Draw player money above head with proper scaling and font
             if (index === 0) {
-              ctx.fillStyle = '#fff';
-              ctx.font = `12px Arial`;
-              ctx.textAlign = 'center';
-              ctx.fillText(`$${player.money.toFixed(2)}`, segment.x, segment.y - 25);
+              const segmentRadius = radius; // Use the radius we calculated above
+              
+              // Calculate scale factor based on segment radius
+              const baseRadius = 10;
+              const scaleFactor = Math.max(0.8, segmentRadius / baseRadius);
+              
+              ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
+              ctx.fillStyle = "#ffffff";
+              ctx.strokeStyle = "#134242";
+              ctx.lineWidth = 3 * scaleFactor;
+              ctx.textAlign = "center";
+              
+              const moneyText = `$${player.money.toFixed(2)}`;
+              const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+              
+              // Draw text outline for better visibility
+              ctx.strokeText(moneyText, segment.x, segment.y - offsetY);
+              ctx.fillText(moneyText, segment.x, segment.y - offsetY);
             }
             
             ctx.restore();

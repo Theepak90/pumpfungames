@@ -10,11 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Fixed Duplicate Money Counter UI Issue (Latest)
+### Fixed Money Counter Font and Scaling Issues (Latest)
 - **Removed duplicate money counter**: Eliminated bottom money counter that was creating double display above snake heads
-- **Single visible money counter**: Only one properly styled money counter now appears, visible to all players
-- **Clean UI experience**: No more confusing duplicate dollar amounts above snake heads
-- **Maintained main styling**: Kept the top money counter with proper Press Start 2P font and scaling
+- **Unified font styling**: All money counters now use Press Start 2P retro font instead of Arial
+- **Dynamic size scaling**: Money counter text grows bigger as snakes get bigger, maintaining visual consistency
+- **Proper outline styling**: All money displays have consistent white text with dark outline for visibility
+- **Complete visual consistency**: Local player and other players' money counters now look identical
 
 ### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players
