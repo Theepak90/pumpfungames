@@ -1983,11 +1983,18 @@ export default function GamePage() {
               movementAngle = Math.atan2(dy, dx);
             }
             
-            // Scale eyes with snake size
-            const segmentRadius = serverPlayer.segmentRadius || 10;
-            const eyeDistance = segmentRadius * 0.5; // Scale eye distance with snake size
-            const eyeSize = segmentRadius * 0.3; // Scale eye size with snake size
-            const pupilSize = segmentRadius * 0.15; // Scale pupil with snake size
+            // Cap eye scaling at 100 segments for multiplayer snakes
+            const MAX_SEGMENTS = 100;
+            const currentSegments = Math.min(fullSnakeBody.length, MAX_SEGMENTS);
+            const segmentProgress = currentSegments / MAX_SEGMENTS;
+            const maxEyeScale = 3.0; // Cap at 3x size like segment scaling
+            const baseEyeScale = 1 + (segmentProgress * (maxEyeScale - 1));
+            
+            const baseRadius = 10;
+            const cappedRadius = baseRadius * baseEyeScale;
+            const eyeDistance = cappedRadius * 0.5; // Scale eye distance with capped size
+            const eyeSize = cappedRadius * 0.3; // Scale eye size with capped size
+            const pupilSize = cappedRadius * 0.15; // Scale pupil with capped size
             
             // Eye positions perpendicular to movement direction
             const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -2273,8 +2280,12 @@ export default function GamePage() {
         if (snake.visibleSegments.length > 0) {
           const snakeHead = snake.visibleSegments[0];
           const movementAngle = snake.currentAngle;
-          // Dynamic eye scaling based on mass (same scale as segments)
-          const scaleFactor = snake.getScaleFactor();
+          // Cap eye scaling at 100 segments
+          const MAX_SEGMENTS = 100;
+          const currentSegments = Math.min(snake.visibleSegments.length, MAX_SEGMENTS);
+          const segmentProgress = currentSegments / MAX_SEGMENTS;
+          const maxEyeScale = 3.0; // Cap at 3x size like segment scaling
+          const scaleFactor = 1 + (segmentProgress * (maxEyeScale - 1));
           const eyeDistance = 5 * scaleFactor; // Scale distance from center
           const eyeSize = 3 * scaleFactor; // Scale eye size
           const pupilSize = 1.5 * scaleFactor; // Scale pupil size
