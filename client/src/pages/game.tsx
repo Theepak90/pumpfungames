@@ -1640,8 +1640,8 @@ export default function GamePage() {
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         // Apply client-side visual attraction only (doesn't affect server position)
-        if (distance < 50 && distance > 0) {
-          const attractionStrength = Math.min(0.8, 20 / distance); // Even gentler
+        if (distance < 80 && distance > 0) {
+          const attractionStrength = Math.min(1.5, 40 / distance); // Stronger attraction
           const pullX = (dx / distance) * attractionStrength;
           const pullY = (dy / distance) * attractionStrength;
           
