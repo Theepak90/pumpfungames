@@ -175,8 +175,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const activePlayers = new Map();
   
-  // Shared game world state - pure snake-vs-snake gameplay
+  // Shared game world state
   const gameWorld = {
+    bots: [] as any[],
+    // Food array removed per user request
     players: new Map() as Map<string, any>,
     initialized: false
   };
@@ -185,8 +187,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function initializeGameWorld() {
     if (gameWorld.initialized) return;
     
+    // Don't create bots - multiplayer is for human players only
+    gameWorld.bots = [];
+    
+    // Food system removed per user request
+    
     gameWorld.initialized = true;
-    console.log('Shared game world initialized (no food, no bots - pure multiplayer)');
+    console.log('Shared game world initialized (no food, no bots)');
   }
 
   wss.on("connection", function connection(ws: any) {
@@ -230,6 +237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send shared game world state including all players
       ws.send(JSON.stringify({
         type: 'gameWorld',
+        bots: gameWorld.bots,
+        // Food data removed per user request
         players: Array.from(gameWorld.players.values())
       }));
     }, 100);
@@ -311,7 +320,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             activePlayers.set(playerId, player);
             gameWorld.players.set(playerId, player);
           }
-          // All food systems removed - pure snake-vs-snake gameplay
+        } else if (data.type === 'eatFood') {
+          // Food system removed per user request
+        } else if (data.type === 'dropFood') {
+          // Food dropping system removed per user request
+        } else if (data.type === 'playerDeath') {
+          // Death loot system removed per user request
+          
+          // Remove the dead player from active players
+          activePlayers.delete(playerId);
+          gameWorld.players.delete(playerId);
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -334,9 +352,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
-      // Pure snake-vs-snake multiplayer
+      // No bots in multiplayer - keep empty array
+      
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
+        bots: gameWorld.bots,
+        // Food data removed per user request
         players: Array.from(gameWorld.players.values())
       });
       
