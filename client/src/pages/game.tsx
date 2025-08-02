@@ -1539,8 +1539,8 @@ export default function GamePage() {
           const food = newFoods[i];
           const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
           
-          // Use appropriate collision detection based on food type
-          const collisionRadius = food.type === 'money' ? 10 : food.size; // Money squares are 20x20px (10px radius)
+          // More generous collision detection for local food too
+          const collisionRadius = food.type === 'money' ? 15 : (food.size * 1.5); // 50% larger collision area
           if (dist < snake.getSegmentRadius() + collisionRadius) {
             // Handle different food types
             if (food.type === 'money') {
@@ -1627,33 +1627,16 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Process server food: smooth attraction + server-synchronized collision detection
-      const processedServerFood = serverFood.map(food => {
-        const dx = snake.head.x - food.x;
-        const dy = snake.head.y - food.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Apply smooth attraction when close (within 100 units)
-        if (distance < 100 && distance > 0) {
-          const attractionStrength = Math.min(2.5, 50 / distance); // Stronger when closer
-          const pullX = (dx / distance) * attractionStrength;
-          const pullY = (dy / distance) * attractionStrength;
-          
-          return {
-            ...food,
-            x: food.x + pullX,
-            y: food.y + pullY
-          };
-        }
-        
-        return food;
-      });
+      // Process server food without attraction to prevent jittering
+      const processedServerFood = serverFood;
       
-      // Check for collisions with attracted food positions - send to server for synchronized removal
+      // Check for collisions with server food using generous collision detection
       processedServerFood.forEach(food => {
         const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
         
-        if (dist < snake.getSegmentRadius() + food.size) {
+        // More generous collision detection - food eaten when snake gets close enough
+        const collisionRadius = food.type === 'money' ? 15 : (food.size * 1.5); // 50% larger collision area
+        if (dist < snake.getSegmentRadius() + collisionRadius) {
           if (food.type === 'money') {
             // Money crate gives money to the snake's balance
             const moneyGain = food.value || 0.1; // Default 10 cents if value not set
