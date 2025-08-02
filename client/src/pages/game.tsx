@@ -1000,8 +1000,8 @@ export default function GamePage() {
       const shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
       const targetRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
       
-      // Log expansion status
-      if (currentPlayerCount > EXPANSION_THRESHOLD) {
+      // Log expansion status (only once per second to avoid spam)
+      if (currentPlayerCount > EXPANSION_THRESHOLD && Math.random() < 0.01) {
         console.log(`🔵 BARRIER EXPANDING: ${currentPlayerCount} players online, radius: ${BASE_MAP_RADIUS} → ${targetRadius}`);
       }
       
@@ -1778,6 +1778,19 @@ export default function GamePage() {
               />
             )}
             
+            {/* Other players dots */}
+            {otherPlayers.map(player => (
+              player.segments && player.segments.length > 0 && (
+                <circle
+                  key={player.id}
+                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
+                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                  r="2"
+                  fill={player.color}
+                />
+              )
+            ))}
+            
             {/* Bot snake dots */}
             {botSnakes.map(bot => (
               <circle
@@ -1802,6 +1815,9 @@ export default function GamePage() {
           </div>
           <div className="text-white text-xs font-mono">
             Players: {otherPlayers.length + 1}
+            {otherPlayers.length + 1 > EXPANSION_THRESHOLD && (
+              <span className=" text-green-400 ml-2">EXPANDED</span>
+            )}
           </div>
         </div>
       </div>
