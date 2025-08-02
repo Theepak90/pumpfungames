@@ -1065,13 +1065,18 @@ export default function GamePage() {
       
       const activeRadius = currentBarrierRadius;
       
-      // Check circular map boundaries (death barrier) - using eye positions
+      // Calculate world scale factor based on barrier expansion
+      const worldScaleFactor = currentBarrierRadius / BASE_MAP_RADIUS;
+      const scaledMapCenterX = MAP_CENTER_X * worldScaleFactor;
+      const scaledMapCenterY = MAP_CENTER_Y * worldScaleFactor;
+      
+      // Check circular map boundaries (death barrier) - using eye positions with scaled center
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
       
       for (const eye of eyePositions) {
         const distanceFromCenter = Math.sqrt(
-          (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
+          (eye.x - scaledMapCenterX) ** 2 + (eye.y - scaledMapCenterY) ** 2
         );
         if (distanceFromCenter > activeRadius) {
           hitBoundary = true;
@@ -1323,11 +1328,11 @@ export default function GamePage() {
       
       ctx.restore();
 
-      // Draw thin death barrier line - using dynamic radius
+      // Draw thin death barrier line - using scaled center and dynamic radius
       ctx.strokeStyle = '#53d392';
       ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, activeRadius, 0, Math.PI * 2);
+      ctx.arc(scaledMapCenterX, scaledMapCenterY, activeRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // All food rendering removed
@@ -1828,8 +1833,8 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                cx={48 + ((snake.head.x - scaledMapCenterX) / activeRadius) * (44 * (currentBarrierRadius / BASE_MAP_RADIUS))}
+                cy={48 + ((snake.head.y - scaledMapCenterY) / activeRadius) * (44 * (currentBarrierRadius / BASE_MAP_RADIUS))}
                 r="2"
                 fill="#ff4444"
               />
@@ -1840,8 +1845,8 @@ export default function GamePage() {
               player.segments && player.segments.length > 0 && (
                 <circle
                   key={player.id}
-                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
-                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                  cx={48 + ((player.segments[0].x - scaledMapCenterX) / activeRadius) * (44 * (currentBarrierRadius / BASE_MAP_RADIUS))}
+                  cy={48 + ((player.segments[0].y - scaledMapCenterY) / activeRadius) * (44 * (currentBarrierRadius / BASE_MAP_RADIUS))}
                   r="2"
                   fill={player.color}
                 />
