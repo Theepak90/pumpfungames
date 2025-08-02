@@ -577,6 +577,13 @@ export default function GamePage() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const wsRef = useRef<WebSocket | null>(null);
+  
+  // Server-controlled barrier expansion state
+  const [serverBarrierExpansion, setServerBarrierExpansion] = useState<{
+    shouldExpand: boolean;
+    targetRadius: number;
+    currentPlayerCount: number;
+  } | null>(null);
 
   // Death food dropping removed
 
@@ -697,6 +704,13 @@ export default function GamePage() {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
           console.log(`Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
+          
+          // Handle server-side barrier expansion synchronization
+          if (data.barrierExpansion) {
+            setServerBarrierExpansion(data.barrierExpansion);
+            console.log(`🔄 Server barrier sync: players=${data.barrierExpansion.currentPlayerCount}, shouldExpand=${data.barrierExpansion.shouldExpand}, radius=${data.barrierExpansion.targetRadius}`);
+          }
+          
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -995,19 +1009,24 @@ export default function GamePage() {
 
       // Food system removed
 
-      // Calculate dynamic map radius based on player count
-      const currentPlayerCount = otherPlayers.length + 1; // +1 for local player
-      const shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
-      const targetRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
+      // Use server-provided barrier expansion data if available, otherwise fallback to local calculation
+      let activeRadius;
+      let shouldExpand;
+      let currentPlayerCount;
       
-      // Log expansion status
-      console.log(`Player count: ${currentPlayerCount}, threshold: ${EXPANSION_THRESHOLD}, should expand: ${shouldExpand}`);
-      if (shouldExpand) {
-        console.log(`🔵 BARRIER EXPANDING: ${currentPlayerCount} players online, radius: ${BASE_MAP_RADIUS} → ${targetRadius}`);
+      if (serverBarrierExpansion) {
+        // Use server-authoritative barrier expansion
+        activeRadius = serverBarrierExpansion.targetRadius;
+        shouldExpand = serverBarrierExpansion.shouldExpand;
+        currentPlayerCount = serverBarrierExpansion.currentPlayerCount;
+        console.log(`🌐 Server barrier: players=${currentPlayerCount}, expanded=${shouldExpand}, radius=${activeRadius}`);
+      } else {
+        // Fallback to local calculation when server data not available
+        currentPlayerCount = otherPlayers.length + 1; // +1 for local player
+        shouldExpand = currentPlayerCount > EXPANSION_THRESHOLD;
+        activeRadius = shouldExpand ? BASE_MAP_RADIUS * (1 + EXPANSION_RATE) : BASE_MAP_RADIUS;
+        console.log(`🔵 Local barrier: players=${currentPlayerCount}, expanded=${shouldExpand}, radius=${activeRadius}`);
       }
-      
-      // Use current radius for immediate expansion (will be smoothed later)
-      const activeRadius = targetRadius;
       
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
@@ -1816,7 +1835,7 @@ export default function GamePage() {
           </div>
           <div className="text-white text-xs font-mono">
             Players: {otherPlayers.length + 1}
-            {otherPlayers.length + 1 > EXPANSION_THRESHOLD && (
+            {(serverBarrierExpansion?.shouldExpand || (otherPlayers.length + 1 > EXPANSION_THRESHOLD)) && (
               <span className=" text-green-400 ml-2">EXPANDED</span>
             )}
           </div>
