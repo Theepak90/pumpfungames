@@ -290,6 +290,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             console.log(`Player ${playerId} ate food ${foodId}, spawned new food ${newFood.id}`);
           }
+        } else if (data.type === 'dropFood') {
+          // Handle server-side food dropping from boosting
+          const droppedFood = data.food;
+          
+          // Add dropped food to server's food array with unique ID
+          const serverFood = {
+            id: `dropped_${Date.now()}_${Math.random()}`,
+            x: droppedFood.x,
+            y: droppedFood.y,
+            size: droppedFood.size,
+            color: droppedFood.color
+          };
+          gameWorld.food.push(serverFood);
+          
+          console.log(`Player ${playerId} dropped food at (${droppedFood.x.toFixed(1)}, ${droppedFood.y.toFixed(1)})`);
         }
       } catch (error) {
         console.error("WebSocket message error:", error);

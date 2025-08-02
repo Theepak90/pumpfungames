@@ -133,7 +133,7 @@ export class SmoothSnake {
     }
   }
   
-  move(directionX: number, directionY: number, onCollectFood: (index: number) => void) {
+  move(directionX: number, directionY: number, onDropFood?: (food: any) => void) {
     // Handle turn multiplier when boosting
     const dynamicTurnSpeed = this.isBoosting ? this.turnSpeed * 2 : this.turnSpeed;
     
@@ -157,6 +157,40 @@ export class SmoothSnake {
     // Handle boosting mechanics
     if (this.isBoosting && this.totalMass > this.MIN_MASS_TO_BOOST && this.boostCooldown <= 0) {
       this.speed = this.baseSpeed * this.boostMultiplier;
+      this.boostCooldown++;
+      
+      // Drop food more frequently for continuous trail effect
+      if (this.boostCooldown % 10 === 0 && onDropFood) {
+        // Find drop position behind the snake
+        let dropX = this.head.x;
+        let dropY = this.head.y;
+        
+        if (this.visibleSegments.length >= 2) {
+          // Use second-to-last segment position
+          const secondToLast = this.visibleSegments[this.visibleSegments.length - 2];
+          dropX = secondToLast.x;
+          dropY = secondToLast.y;
+        } else {
+          // Fallback to behind the head if not enough segments
+          dropX = this.head.x - Math.cos(this.currentAngle) * 25;
+          dropY = this.head.y - Math.sin(this.currentAngle) * 25;
+        }
+        
+        // Add slight randomness to avoid perfect stacking
+        dropX += (Math.random() - 0.5) * 8;
+        dropY += (Math.random() - 0.5) * 8;
+        
+        onDropFood({
+          x: dropX,
+          y: dropY,
+          size: 3.5,
+          color: '#f55400',
+          mass: 0.5,
+          type: 'normal'
+        });
+        
+        this.totalMass -= 0.25; // Reduce mass when dropping food
+      }
       
       // Lose mass when boosting
       this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.08);

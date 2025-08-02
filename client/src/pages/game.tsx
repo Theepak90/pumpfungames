@@ -879,7 +879,19 @@ export default function GamePage() {
           console.log(`My player ID: ${data.playerId}`);
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
-          setServerFood(data.food || []);
+          
+          // Server food includes all food (normal, eaten, and dropped from boosting)
+          const serverFoods = (data.food || []).map((serverFood: any) => ({
+            ...serverFood,
+            // Convert server food format to client format
+            type: serverFood.type || 'normal',
+            mass: serverFood.mass || 1
+          }));
+          
+          // Use server food as the authoritative source
+          setFoods(serverFoods);
+          setServerFood(serverFoods);
+          
           setServerPlayers(data.players || []);
           console.log(`Received shared world: ${data.bots?.length} bots, ${data.food?.length} food, ${data.players?.length} players`);
           if (data.players && data.players.length > 0) {
@@ -1102,12 +1114,32 @@ export default function GamePage() {
       if (cashingOut) {
         // Snake moves in straight line when cashing out (no player control)
         snake.move(Math.cos(snake.currentAngle), Math.sin(snake.currentAngle), (droppedFood: Food) => {
+          // Add dropped food locally
           setFoods(prevFoods => [...prevFoods, droppedFood]);
+          
+          // Send dropped food to server for synchronization
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && myPlayerId) {
+            wsRef.current.send(JSON.stringify({
+              type: 'dropFood',
+              food: droppedFood,
+              playerId: myPlayerId
+            }));
+          }
         });
       } else {
         // Normal mouse control
         snake.move(mouseDirection.x, mouseDirection.y, (droppedFood: Food) => {
+          // Add dropped food locally
           setFoods(prevFoods => [...prevFoods, droppedFood]);
+          
+          // Send dropped food to server for synchronization
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && myPlayerId) {
+            wsRef.current.send(JSON.stringify({
+              type: 'dropFood',
+              food: droppedFood,
+              playerId: myPlayerId
+            }));
+          }
         });
       }
 
