@@ -167,76 +167,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Room management system
+  interface GameRoom {
+    id: number;
+    players: Map<string, any>;
+    bots: any[];
+    maxPlayers: number;
+    initialized: boolean;
+    lastActivity: number;
+  }
+
+  const gameRooms = new Map<number, GameRoom>();
+  const playerToRoom = new Map<string, number>();
+
+  // Initialize first room
+  function createRoom(roomId: number): GameRoom {
+    const room: GameRoom = {
+      id: roomId,
+      players: new Map(),
+      bots: [],
+      maxPlayers: 8,
+      initialized: true,
+      lastActivity: Date.now()
+    };
+    gameRooms.set(roomId, room);
+    console.log(`Created room ${roomId}`);
+    return room;
+  }
+
+  // Find best available room (prioritize filling existing rooms)
+  function findBestRoom(): GameRoom {
+    // First, try to find a room with space (prioritize lower room numbers)
+    const sortedRooms = Array.from(gameRooms.entries()).sort((a, b) => a[0] - b[0]);
+    for (const [roomId, room] of sortedRooms) {
+      if (room.players.size < room.maxPlayers) {
+        console.log(`Found available space in room ${roomId} (${room.players.size}/${room.maxPlayers})`);
+        return room;
+      }
+    }
+    
+    // If all rooms are full, create a new one
+    const newRoomId = gameRooms.size + 1;
+    console.log(`All rooms full, creating new room ${newRoomId}`);
+    return createRoom(newRoomId);
+  }
+
+  // API endpoint to get best available room
+  app.get("/api/room/join", (req, res) => {
+    const room = findBestRoom();
+    res.json({ 
+      roomId: room.id,
+      currentPlayers: room.players.size,
+      maxPlayers: room.maxPlayers
+    });
+  });
+
   // WebSocket server for multiplayer on /ws path
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws'
   });
 
-  const activePlayers = new Map();
-  
-  // Shared game world state
-  const gameWorld = {
-    bots: [] as any[],
-    food: [] as any[],
-    players: new Map() as Map<string, any>,
-    initialized: false
-  };
-
-  // Initialize shared game world
-  function initializeGameWorld() {
-    if (gameWorld.initialized) return;
-    
-    // Pure multiplayer - no bots, no food
-    gameWorld.bots = [];
-    
-    gameWorld.initialized = true;
-    console.log('Shared game world initialized (multiplayer only, no food/bots)');
+  // Create initial room if none exist
+  if (gameRooms.size === 0) {
+    createRoom(1);
   }
 
-  wss.on("connection", function connection(ws: any) {
+  wss.on("connection", function connection(ws: any, req: any) {
     const playerId = `player_${Date.now()}_${Math.random()}`;
-    console.log(`Player ${playerId} joined multiplayer. Active: ${wss.clients.size}`);
-    console.log(`WebSocket readyState: ${ws.readyState}`);
+    console.log(`Player ${playerId} attempting to join. Total WebSocket connections: ${wss.clients.size}`);
+    
+    // Extract room ID from query parameters
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const requestedRoomId = parseInt(url.searchParams.get('room') || '1');
+    
+    // Find the requested room or best available room
+    let targetRoom = gameRooms.get(requestedRoomId);
+    if (!targetRoom || targetRoom.players.size >= targetRoom.maxPlayers) {
+      targetRoom = findBestRoom();
+    }
+    
+    // Check if room is full
+    if (targetRoom.players.size >= targetRoom.maxPlayers) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Room is full'
+      }));
+      ws.close();
+      return;
+    }
     
     ws.playerId = playerId;
+    ws.roomId = targetRoom.id;
+    playerToRoom.set(playerId, targetRoom.id);
+    
+    console.log(`Player ${playerId} joined room ${targetRoom.id}. Room players: ${targetRoom.players.size + 1}/${targetRoom.maxPlayers}`);
+    console.log(`WebSocket readyState: ${ws.readyState}`);
     
     // Assign different colors to different players
     const colors = ['#d55400', '#4ecdc4', '#ff6b6b', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-    const playerColor = colors[wss.clients.size % colors.length];
+    const playerColor = colors[targetRoom.players.size % colors.length];
     
     const player = {
       id: playerId,
       segments: [],
       color: playerColor,
       money: 1.00,
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
+      roomId: targetRoom.id
     };
     
-    activePlayers.set(playerId, player);
-    gameWorld.players.set(playerId, player); // Also add to shared game world
+    // Add player to room
+    targetRoom.players.set(playerId, player);
+    targetRoom.lastActivity = Date.now();
 
-    // Send welcome message with player ID
+    // Send welcome message with player ID and room info
     ws.send(JSON.stringify({
       type: 'welcome',
-      playerId: playerId
+      playerId: playerId,
+      roomId: targetRoom.id,
+      currentPlayers: targetRoom.players.size,
+      maxPlayers: targetRoom.maxPlayers
     }));
-
-    // Initialize game world if needed
-    initializeGameWorld();
     
     // Send current players to new player
     setTimeout(() => {
       ws.send(JSON.stringify({
         type: 'players',
-        players: Array.from(activePlayers.values())
+        players: Array.from(targetRoom.players.values())
       }));
       
-      // Send shared game world state including all players
+      // Send shared game world state including all players in this room
       ws.send(JSON.stringify({
         type: 'gameWorld',
-        bots: gameWorld.bots,
-        players: Array.from(gameWorld.players.values())
+        bots: targetRoom.bots,
+        players: Array.from(targetRoom.players.values())
       }));
     }, 100);
 
@@ -244,8 +309,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = JSON.parse(message.toString());
         if (data.type === 'update') {
-          // Update player data in both activePlayers and gameWorld
-          const existingPlayer = activePlayers.get(playerId);
+          // Get player's room
+          const roomId = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomId!);
+          if (!room) return;
+          
+          // Update player data in room
+          const existingPlayer = room.players.get(playerId);
           // Enforce 100-segment and 100-mass limits on server side
           const MAX_SEGMENTS = 100;
           const MAX_MASS = 100;
@@ -253,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const limitedSegments = segments.length > MAX_SEGMENTS ? segments.slice(0, MAX_SEGMENTS) : segments;
           const limitedMass = Math.min(data.totalMass || 6, MAX_MASS); // Cap mass at 100
           
-          const player = {
+          const updatedPlayer = {
             id: playerId,
             segments: limitedSegments,
             color: existingPlayer?.color || '#d55400',
@@ -261,17 +331,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalMass: limitedMass, // Cap mass at 100
             segmentRadius: data.segmentRadius || 8,
             visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
-            lastUpdate: Date.now()
+            lastUpdate: Date.now(),
+            roomId: room.id
           };
-          console.log(`Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          console.log(`Room ${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
           if (currentPlayerHead && data.segmentRadius) {
             let collisionDetected = false;
             
-            // Check collision with all other players
-            for (const [otherPlayerId, otherPlayer] of Array.from(gameWorld.players)) {
+            // Check collision with all other players in same room
+            for (const [otherPlayerId, otherPlayer] of Array.from(room.players)) {
               if (otherPlayerId === playerId) continue; // Skip self
               if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
               
@@ -284,14 +355,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const collisionRadius = data.segmentRadius + (otherPlayer.segmentRadius || 10);
                 
                 if (dist < collisionRadius) {
-                  console.log(`💀 SERVER: Player ${playerId} crashed into ${otherPlayerId}!`);
+                  console.log(`💀 SERVER Room ${room.id}: Player ${playerId} crashed into ${otherPlayerId}!`);
                   collisionDetected = true;
                   
-                  // Remove crashed player immediately
-                  activePlayers.delete(playerId);
-                  gameWorld.players.delete(playerId);
+                  // Remove crashed player immediately from room
+                  room.players.delete(playerId);
+                  playerToRoom.delete(playerId);
                   
-                  // Send death notification to crashed player (client will handle death loot)
+                  // Send death notification to crashed player
                   if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                       type: 'death',
@@ -300,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }));
                   }
                   
-                  console.log(`💀 Player ${playerId} removed from server (client will handle death loot)`);
+                  console.log(`💀 Player ${playerId} removed from room ${room.id}`);
                   break;
                 }
               }
@@ -309,13 +380,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Only update player if no collision detected
             if (!collisionDetected) {
-              activePlayers.set(playerId, player);
-              gameWorld.players.set(playerId, player);
+              room.players.set(playerId, updatedPlayer);
+              room.lastActivity = Date.now();
             }
           } else {
             // No collision check needed if no head position
-            activePlayers.set(playerId, player);
-            gameWorld.players.set(playerId, player);
+            room.players.set(playerId, updatedPlayer);
+            room.lastActivity = Date.now();
           }
         } // Food system completely removed from multiplayer
       } catch (error) {
@@ -324,46 +395,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     ws.on("close", (code: number, reason: Buffer) => {
-      console.log(`Player ${playerId} left multiplayer. Code: ${code}, Reason: ${reason.toString()}, Remaining: ${wss.clients.size - 1}`);
-      activePlayers.delete(playerId);
-      gameWorld.players.delete(playerId);
+      const roomId = playerToRoom.get(playerId);
+      const room = gameRooms.get(roomId!);
+      console.log(`Player ${playerId} left room ${roomId}. Code: ${code}, Reason: ${reason.toString()}`);
+      
+      if (room) {
+        room.players.delete(playerId);
+        console.log(`Room ${roomId} now has ${room.players.size}/${room.maxPlayers} players`);
+      }
+      playerToRoom.delete(playerId);
     });
 
     ws.on("error", (error: any) => {
-      console.error(`WebSocket error for player ${playerId}:`, error);
-      activePlayers.delete(playerId);
-      gameWorld.players.delete(playerId);
+      const roomId = playerToRoom.get(playerId);
+      const room = gameRooms.get(roomId!);
+      console.error(`WebSocket error for player ${playerId} in room ${roomId}:`, error);
+      
+      if (room) {
+        room.players.delete(playerId);
+      }
+      playerToRoom.delete(playerId);
     });
   });
 
   // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
-      // No bots in multiplayer - keep empty array
-      
-      const worldMessage = JSON.stringify({
-        type: 'gameWorld',
-        bots: gameWorld.bots,
-        players: Array.from(gameWorld.players.values())
-      });
-      
-      console.log(`Broadcasting to ${wss.clients.size} clients: ${gameWorld.players.size} players`);
-      
-      wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          try {
-            client.send(worldMessage);
-          } catch (error) {
-            console.error('Broadcast error:', error);
-            // Remove disconnected clients
-            client.terminate();
+      // Broadcast to each room separately
+      for (const [roomId, room] of gameRooms) {
+        if (room.players.size === 0) continue;
+        
+        const worldMessage = JSON.stringify({
+          type: 'gameWorld',
+          bots: room.bots,
+          players: Array.from(room.players.values()),
+          roomId: roomId
+        });
+        
+        // Find clients in this room and broadcast to them
+        wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+            try {
+              client.send(worldMessage);
+            } catch (error) {
+              console.error(`Broadcast error to room ${roomId}:`, error);
+              client.terminate();
+            }
           }
-        } else {
-          // Clean up disconnected clients
-          console.log('Removing disconnected client');
-          client.terminate();
-        }
-      });
+        });
+      }
     }
   }, 100);
 

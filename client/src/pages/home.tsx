@@ -320,13 +320,32 @@ export default function Home() {
 
   // Start game handler
   const handleStartGame = async () => {
-    toast({
-      title: "Starting Game!",
-      description: "Loading snake game.",
-    });
-    
-    // Navigate to single-player game for stable experience
-    setLocation('/game');
+    try {
+      toast({
+        title: "Finding Game Room...",
+        description: "Looking for available room.",
+      });
+      
+      // Get best available room from server
+      const response = await fetch('/api/room/join');
+      const roomData = await response.json();
+      
+      toast({
+        title: "Joining Game!",
+        description: `Entering room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
+      });
+      
+      // Navigate to room-specific game
+      setLocation(`/snake/${roomData.roomId}`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Could not find available room. Trying backup...",
+        variant: "destructive",
+      });
+      // Fallback to room 1
+      setLocation('/snake/1');
+    }
   };
 
   // Handle daily crate claim

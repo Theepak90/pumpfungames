@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
@@ -525,6 +525,8 @@ class SmoothSnake {
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
+  const params = useParams();
+  const roomId = params?.roomId || '1'; // Default to room 1 if no room specified
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
@@ -663,11 +665,11 @@ export default function GamePage() {
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Connecting to multiplayer server...");
+    console.log(`Connecting to multiplayer server room ${roomId}...`);
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
     
     wsRef.current = socket;
 
@@ -690,11 +692,11 @@ export default function GamePage() {
           console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
         } else if (data.type === 'welcome') {
           setMyPlayerId(data.playerId);
-          console.log(`My player ID: ${data.playerId}`);
+          console.log(`My player ID: ${data.playerId} in room ${data.roomId || roomId}`);
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
-          console.log(`Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
+          console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -739,7 +741,7 @@ export default function GamePage() {
           if (gameStarted && !wsRef.current) {
             console.log("Auto-reconnecting to multiplayer server...");
             // Create new WebSocket connection
-            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
             wsRef.current = newSocket;
             
             // Set up handlers for new connection
@@ -766,7 +768,7 @@ export default function GamePage() {
         socket.close();
       }
     };
-  }, [gameStarted]);
+  }, [gameStarted, roomId]); // Include roomId to reconnect when room changes
 
   // Send player data to server
   useEffect(() => {
