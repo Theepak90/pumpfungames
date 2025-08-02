@@ -1528,6 +1528,49 @@ export default function GamePage() {
       // Just display the attracted food positions (server handles removal)
       setServerFood(processedServerFood);
 
+      // Check for collisions with other players' snakes
+      for (const otherPlayer of otherPlayers) {
+        if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
+        
+        for (const segment of otherPlayer.segments) {
+          const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
+          const collisionRadius = snake.getSegmentRadius() + 10; // Use standard segment radius
+          
+          if (dist < collisionRadius) {
+            // Player died - crash into another snake!
+            console.log(`💀 CRASHED into player ${otherPlayer.id}!`);
+            setGameOver(true);
+            
+            // Drop death food along snake body
+            dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+            
+            return; // Stop the game loop
+          }
+        }
+      }
+
+      // Check for collisions with server players' snakes
+      for (const serverPlayer of serverPlayers) {
+        if (!serverPlayer.segments || serverPlayer.segments.length === 0) continue;
+        if (serverPlayer.id === myPlayerId) continue; // Skip self
+        
+        for (const segment of serverPlayer.segments) {
+          const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
+          const collisionRadius = snake.getSegmentRadius() + (serverPlayer.segmentRadius || 10);
+          
+          if (dist < collisionRadius) {
+            // Player died - crash into another snake!
+            console.log(`💀 CRASHED into server player ${serverPlayer.id}!`);
+            setGameOver(true);
+            
+            // Drop death food along snake body
+            dropDeathFood(snake.head.x, snake.head.y, snake.totalMass);
+            
+            return; // Stop the game loop
+          }
+        }
+      }
+
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
       const maxSegmentZoom = 130;
