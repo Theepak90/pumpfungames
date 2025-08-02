@@ -11,7 +11,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### Fixed Snake Growth and Money Counter Positioning (Latest)
-- **Snake growth capped at 40 segments**: Snake stops growing completely after reaching 40 segments, preventing money counter from moving off-screen
+- **Snake growth FORCE capped at 40 segments**: Snake stops growing completely after reaching 40 segments with hard mass limit enforcement to prevent any bypass
 - **Money counter positioned closer**: Reduced offset from 35 to 20 scaleFactor units for much closer positioning to snake head
 - **Text size capped at 4 mass**: Money counter text stops growing at just 4 mass for very small, compact size
 - **Unified font styling**: All money counters now use Press Start 2P retro font instead of Arial
