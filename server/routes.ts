@@ -324,7 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 50ms for more responsive multiplayer
+  // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
       // No bots in multiplayer - keep empty array
@@ -344,11 +344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             client.send(worldMessage);
           } catch (error) {
             console.error('Broadcast error:', error);
+            // Remove disconnected clients
+            client.terminate();
           }
+        } else {
+          // Clean up disconnected clients
+          console.log('Removing disconnected client');
+          client.terminate();
         }
       });
     }
-  }, 50);
+  }, 100);
 
   return httpServer;
 }

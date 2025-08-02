@@ -917,6 +917,29 @@ export default function GamePage() {
       console.log("Close event:", event.code, event.reason);
       setConnectionStatus('Disconnected');
       wsRef.current = null;
+      
+      // Auto-reconnect after 2 seconds if not a normal closure
+      if (event.code !== 1000 && gameStarted) {
+        console.log("Attempting auto-reconnect in 2 seconds...");
+        setConnectionStatus('Reconnecting');
+        setTimeout(() => {
+          if (gameStarted && !wsRef.current) {
+            console.log("Auto-reconnecting to multiplayer server...");
+            // Create new WebSocket connection
+            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+            wsRef.current = newSocket;
+            
+            // Set up handlers for new connection
+            newSocket.onopen = () => {
+              console.log("Reconnected to multiplayer server!");
+              setConnectionStatus('Connected');
+            };
+            newSocket.onmessage = socket.onmessage;
+            newSocket.onclose = socket.onclose;
+            newSocket.onerror = socket.onerror;
+          }
+        }, 2000);
+      }
     };
 
     socket.onerror = (error) => {
@@ -1343,25 +1366,31 @@ export default function GamePage() {
       // });
 
       // Food gravitation toward snake head (50px radius, 2x faster)
-      const suctionRadius = 50;
-      const suctionStrength = 1.6;
-      
-      setFoods(prevFoods => {
-        return prevFoods.map(food => {
-          const dx = snake.head.x - food.x;
-          const dy = snake.head.y - food.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < suctionRadius && dist > 0) {
-            return {
-              ...food,
-              x: food.x + (dx / dist) * suctionStrength,
-              y: food.y + (dy / dist) * suctionStrength
-            };
-          }
-          return food;
-        });
-      });
+      // DISABLED - Server handles all food positions to prevent jittering
+      // const suctionRadius = 50;
+      // const suctionStrength = 1.6;
+      // 
+      // setFoods(prevFoods => {
+      //   return prevFoods.map(food => {
+      //     // Skip attraction for server-synchronized food to prevent jittering
+      //     if (food.id && food.id.startsWith('food_')) {
+      //       return food; // Server food - don't apply local physics
+      //     }
+      //     
+      //     const dx = snake.head.x - food.x;
+      //     const dy = snake.head.y - food.y;
+      //     const dist = Math.sqrt(dx * dx + dy * dy);
+      //     
+      //     if (dist < suctionRadius && dist > 0) {
+      //       return {
+      //         ...food,
+      //         x: food.x + (dx / dist) * suctionStrength,
+      //         y: food.y + (dy / dist) * suctionStrength
+      //       };
+      //     }
+      //     return food;
+      //   });
+      // });
 
       // Check for food collision and handle eating
       setFoods(prevFoods => {
