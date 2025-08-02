@@ -2233,9 +2233,7 @@ export default function GamePage() {
       ctx.globalAlpha = 1.0;
 
       // Only render snake if game is not over
-      console.log(`RENDER CHECK: gameOver = ${gameOver}, rendering snake = ${!gameOver}`);
       if (!gameOver) {
-        console.log(`🐍 RENDERING SNAKE because gameOver = ${gameOver}`);
         // Draw single glowing outline behind the whole snake when boosting
         if (snake.isBoosting && snake.visibleSegments.length > 0) {
           ctx.save();
@@ -2401,8 +2399,12 @@ export default function GamePage() {
       // No UI display needed
       
 
-
-      animationId = requestAnimationFrame(gameLoop);
+      // Only continue game loop if game is not over
+      if (!gameOver) {
+        animationId = requestAnimationFrame(gameLoop);
+      } else {
+        console.log(`🛑 GAME LOOP STOPPED - gameOver = ${gameOver}`);
+      }
     };
 
     animationId = requestAnimationFrame(gameLoop);

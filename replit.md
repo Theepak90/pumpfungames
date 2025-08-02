@@ -10,7 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Implemented Server-Authoritative Multiplayer (Latest)
+### Fixed Snake Death Rendering Issue (Latest)
+- **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players
+- **Fixed game loop continuation bug**: Game loop now stops completely when gameOver=true, preventing re-rendering of dead snake
+- **Immediate collision response**: Canvas clears instantly on collision with immediate visual feedback
+- **Proper death loot system**: Money crates and food drop correctly along snake body segments
+- **Clean visual transitions**: No more ghost snake appearing after death due to animation frame continuation
+
+### Implemented Server-Authoritative Multiplayer
 - **Real-time multiplayer functionality**: Players can see each other simultaneously on `/game`
 - **Server-controlled game state**: All bots completely removed, food managed centrally by server
 - **Synchronized game world**: Every player sees identical food in same locations
