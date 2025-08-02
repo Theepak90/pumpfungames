@@ -1427,19 +1427,9 @@ export default function GamePage() {
       // Smoothly interpolate toward target zoom
       setZoom(prevZoom => prevZoom + (targetZoom - prevZoom) * zoomSmoothing);
 
-      // Clear canvas with background image pattern or dark fallback
-      if (backgroundImage) {
-        // Create repeating pattern from background image
-        const pattern = ctx.createPattern(backgroundImage, 'repeat');
-        if (pattern) {
-          ctx.fillStyle = pattern;
-          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-        }
-      } else {
-        // Fallback to solid color if image not loaded
-        ctx.fillStyle = '#15161b';
-        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-      }
+      // Clear canvas with dark background
+      ctx.fillStyle = '#15161b';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
       // Save context for camera transform
       ctx.save();
@@ -1449,16 +1439,30 @@ export default function GamePage() {
       ctx.scale(zoom, zoom);
       ctx.translate(-snake.head.x, -snake.head.y);
 
-      // Draw background image across the full map area if loaded
-      if (backgroundImage) {
-        const mapSize = MAP_RADIUS * 2.5;
-        // Draw background image tiled across the entire game area
-        const pattern = ctx.createPattern(backgroundImage, 'repeat');
-        if (pattern) {
-          ctx.fillStyle = pattern;
-          ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
-        }
+      // RESTORED BACKGROUND: Draw scrolling grid pattern that follows the snake
+      const gridSize = 50;
+      const gridOffsetX = (-snake.head.x) % gridSize;
+      const gridOffsetY = (-snake.head.y) % gridSize;
+      
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      
+      // Draw vertical lines across the entire visible area
+      for (let x = gridOffsetX - canvasSize.width; x < canvasSize.width + gridSize; x += gridSize) {
+        ctx.moveTo(x + snake.head.x - canvasSize.width / 2 / zoom, snake.head.y - canvasSize.height / 2 / zoom);
+        ctx.lineTo(x + snake.head.x - canvasSize.width / 2 / zoom, snake.head.y + canvasSize.height / 2 / zoom);
       }
+      
+      // Draw horizontal lines across the entire visible area  
+      for (let y = gridOffsetY - canvasSize.height; y < canvasSize.height + gridSize; y += gridSize) {
+        ctx.moveTo(snake.head.x - canvasSize.width / 2 / zoom, y + snake.head.y - canvasSize.height / 2 / zoom);
+        ctx.lineTo(snake.head.x + canvasSize.width / 2 / zoom, y + snake.head.y - canvasSize.height / 2 / zoom);
+      }
+      
+      ctx.stroke();
+
+      // Skip background image - we're using the grid instead
       
       // Draw green overlay only outside the play area (death barrier region)
       ctx.save();
@@ -1483,9 +1487,19 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw server food first (shared across all players)
+      // FIXED: Draw only server food (synchronous for all players)
       serverFood.forEach(food => {
         ctx.save();
+        // Add glow effect like regular food
+        ctx.shadowColor = food.color;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = food.color;
+        ctx.beginPath();
+        ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw solid circle on top
+        ctx.shadowBlur = 0;
         ctx.fillStyle = food.color;
         ctx.beginPath();
         ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
@@ -1493,7 +1507,7 @@ export default function GamePage() {
         ctx.restore();
       });
 
-      // Draw food items
+      // Skip drawing local food - use only server food for multiplayer consistency  
       foods.forEach((food, index) => {
         if (food.type === 'money') {
           // Calculate fade effect for money crates (fade over last 5 seconds of 10 second lifetime)
@@ -1572,147 +1586,32 @@ export default function GamePage() {
         }
       });
 
-      // Draw only OTHER server players (exclude yourself) - always render immediately
+      // FIXED: Draw only OTHER server players (exclude yourself to prevent double rendering)
       const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
       console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
+      
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Use server segments directly to avoid position mismatch
-          const fullSnakeBody = serverPlayer.segments;
           
-          // Use all segments as-is since we're now sending many more segments
-          // No need for tail extension - just use the received segments with interpolation
+          // IMPROVED: Render remote snakes with EXACT same visuals as local snake
+          drawSnakeWithFullVisuals(ctx, serverPlayer.segments, serverPlayer.color, false, 1.0);
           
-          // Draw snake body with EXACT same styling as local snake
-          ctx.save();
-          
-          // Add drop shadow when not boosting (like local snake)
-          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-          ctx.shadowBlur = 6;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-          
-          // Draw each segment as a distinct round ball (no interpolation between segments)
-          fullSnakeBody.forEach((segment: any, segIndex: number) => {
-            const segmentRadius = 10; // Same as local snake
-            
-            ctx.fillStyle = serverPlayer.color || '#ff0000';
-            ctx.beginPath();
-            ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
-            ctx.fill();
-          });
-          
-          console.log(`Rendered snake ${serverPlayer.id} with ${fullSnakeBody.length} round ball segments`);
-          
-          ctx.restore();
-          
-          // Draw rotated square eyes exactly like local snake
-          if (fullSnakeBody.length > 0) {
-            const head = fullSnakeBody[0];
-            
-            // Calculate movement direction from first two segments
-            let movementAngle = 0;
-            if (fullSnakeBody.length > 1) {
-              const dx = head.x - fullSnakeBody[1].x;
-              const dy = head.y - fullSnakeBody[1].y;
-              movementAngle = Math.atan2(dy, dx);
-            }
-            
-            const eyeDistance = 5;
-            const eyeSize = 3;
-            const pupilSize = 1.5;
-            
-            // Eye positions perpendicular to movement direction
-            const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
-            const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
-            const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
-            const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
-            
-            // Draw first eye with rotation
-            ctx.save();
-            ctx.translate(eye1X, eye1Y);
-            ctx.rotate(movementAngle);
-            ctx.fillStyle = 'white';
-            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-            
-            // Draw first pupil looking forward
-            const pupilOffset = 1.2;
-            ctx.fillStyle = 'black';
-            ctx.fillRect(
-              pupilOffset - pupilSize,
-              0 - pupilSize,
-              pupilSize * 2, 
-              pupilSize * 2
-            );
-            ctx.restore();
-            
-            // Draw second eye with rotation
-            ctx.save();
-            ctx.translate(eye2X, eye2Y);
-            ctx.rotate(movementAngle);
-            ctx.fillStyle = 'white';
-            ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
-            
-            // Draw second pupil looking forward
-            ctx.fillStyle = 'black';
-            ctx.fillRect(
-              pupilOffset - pupilSize,
-              0 - pupilSize,
-              pupilSize * 2, 
-              pupilSize * 2
-            );
-            ctx.restore();
-          }
-          
-          // Draw player money above head
-          if (fullSnakeBody.length > 0) {
-            ctx.save();
-            ctx.fillStyle = '#fff';
-            ctx.font = `12px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText(`$${serverPlayer.money?.toFixed(2) || '1.00'}`, fullSnakeBody[0].x, fullSnakeBody[0].y - 25);
-            ctx.restore();
-          }
+          console.log(`Rendered remote snake ${serverPlayer.id} with ${serverPlayer.segments.length} segments`);
         }
       });
 
-      // Draw your own snake locally (with full detail and proper rendering)
+      // FIXED: Draw your own snake locally using the same helper function for consistency
       if (gameStarted && snake.visibleSegments.length > 0) {
-        snake.visibleSegments.forEach((segment, index) => {
-          ctx.save();
-          
-          // Your snake color
-          ctx.fillStyle = '#d55400';
-          
-          // Proper size gradient for your snake
-          const baseRadius = 8;
-          const headBonus = Math.max(0, (10 - index) * 0.5);
-          const radius = baseRadius + headBonus;
-          
-          ctx.beginPath();
-          ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // White outline for head
-          if (index === 0) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
-          
-          ctx.restore();
-        });
+        drawSnakeWithFullVisuals(ctx, snake.visibleSegments, '#d55400', isMouseDown, 1.0);
         
         // Draw your money above your head
-        if (snake.visibleSegments.length > 0) {
-          ctx.save();
-          ctx.fillStyle = '#fff';
-          ctx.font = `12px Arial`;
-          ctx.textAlign = 'center';
-          ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 25);
-          ctx.restore();
-        }
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.font = `12px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`$${snake.money.toFixed(2)}`, snake.visibleSegments[0].x, snake.visibleSegments[0].y - 25);
+        ctx.restore();
       }
 
       // Draw other players first (behind everything) - fallback (this should now be empty)
