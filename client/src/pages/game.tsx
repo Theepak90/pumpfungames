@@ -1434,15 +1434,17 @@ export default function GamePage() {
       // Save context for camera transform
       ctx.save();
 
-      // Apply zoom and camera following snake head
+      // FIXED: Apply zoom and camera following snake head (ensure snake.head is valid)
+      const cameraX = snake.head.x || 0;
+      const cameraY = snake.head.y || 0; 
       ctx.translate(canvasSize.width / 2, canvasSize.height / 2);
       ctx.scale(zoom, zoom);
-      ctx.translate(-snake.head.x, -snake.head.y);
+      ctx.translate(-cameraX, -cameraY);
 
       // RESTORED BACKGROUND: Draw scrolling grid pattern that follows the snake
       const gridSize = 50;
-      const gridOffsetX = (-snake.head.x) % gridSize;
-      const gridOffsetY = (-snake.head.y) % gridSize;
+      const gridOffsetX = (-cameraX) % gridSize;
+      const gridOffsetY = (-cameraY) % gridSize;
       
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
@@ -1450,42 +1452,23 @@ export default function GamePage() {
       
       // Draw vertical lines across the entire visible area
       for (let x = gridOffsetX - canvasSize.width; x < canvasSize.width + gridSize; x += gridSize) {
-        ctx.moveTo(x + snake.head.x - canvasSize.width / 2 / zoom, snake.head.y - canvasSize.height / 2 / zoom);
-        ctx.lineTo(x + snake.head.x - canvasSize.width / 2 / zoom, snake.head.y + canvasSize.height / 2 / zoom);
+        ctx.moveTo(x + cameraX - canvasSize.width / 2 / zoom, cameraY - canvasSize.height / 2 / zoom);
+        ctx.lineTo(x + cameraX - canvasSize.width / 2 / zoom, cameraY + canvasSize.height / 2 / zoom);
       }
       
       // Draw horizontal lines across the entire visible area  
       for (let y = gridOffsetY - canvasSize.height; y < canvasSize.height + gridSize; y += gridSize) {
-        ctx.moveTo(snake.head.x - canvasSize.width / 2 / zoom, y + snake.head.y - canvasSize.height / 2 / zoom);
-        ctx.lineTo(snake.head.x + canvasSize.width / 2 / zoom, y + snake.head.y - canvasSize.height / 2 / zoom);
+        ctx.moveTo(cameraX - canvasSize.width / 2 / zoom, y + cameraY - canvasSize.height / 2 / zoom);
+        ctx.lineTo(cameraX + canvasSize.width / 2 / zoom, y + cameraY - canvasSize.height / 2 / zoom);
       }
       
       ctx.stroke();
 
       // Skip background image - we're using the grid instead
       
-      // Draw green overlay only outside the play area (death barrier region)
-      ctx.save();
-      
-      // Create a clipping path for the area outside the safe zone
-      const mapSize = MAP_RADIUS * 2.5;
-      ctx.beginPath();
-      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
-      ctx.clip();
-      
-      // Fill only the clipped area (outside the circle) with green overlay
-      ctx.fillStyle = 'rgba(82, 164, 122, 0.4)'; // Semi-transparent green overlay
-      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
-      
-      ctx.restore();
+      // MOVED: Draw green death zone overlay AFTER everything else (not before!)
 
-      // Draw thin death barrier line
-      ctx.strokeStyle = '#53d392';
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
+      // MOVED: Draw death barrier line AFTER everything else
 
       // FIXED: Draw only server food (synchronous for all players)
       serverFood.forEach(food => {
@@ -1614,35 +1597,33 @@ export default function GamePage() {
         ctx.restore();
       }
 
-      // Draw other players first (behind everything) - fallback (this should now be empty)
-      otherPlayers.forEach(player => {
-        if (player.segments && player.segments.length > 0) {
-          player.segments.forEach((segment, index) => {
-            ctx.save();
-            
-            // Draw segment (world coordinates are already transformed)
-            const screenX = segment.x;
-            const screenY = segment.y;
-            
-            // Draw segment
-            ctx.fillStyle = player.color || '#4ecdc4';
-            ctx.beginPath();
-            const radius = (index === 0 ? 12 : 8); // Head is larger
-            ctx.arc(segment.x, segment.y, radius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw player money above head
-            if (index === 0) {
-              ctx.fillStyle = '#fff';
-              ctx.font = `12px Arial`;
-              ctx.textAlign = 'center';
-              ctx.fillText(`$${player.money.toFixed(2)}`, segment.x, segment.y - 25);
-            }
-            
-            ctx.restore();
-          });
-        }
-      });
+      // FIXED: Now draw the death zone AFTER everything else so it doesn't cover the snakes
+      
+      // Draw green overlay only outside the play area (death barrier region) 
+      ctx.save();
+      
+      // Create a clipping path for the area outside the safe zone
+      const mapSize = MAP_RADIUS * 2.5;
+      ctx.beginPath();
+      ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
+      ctx.clip();
+      
+      // Fill only the clipped area (outside the circle) with green overlay
+      ctx.fillStyle = 'rgba(82, 164, 122, 0.4)'; // Semi-transparent green overlay
+      ctx.fillRect(-mapSize, -mapSize, mapSize * 2, mapSize * 2);
+      
+      ctx.restore();
+
+      // Draw thin death barrier line on top
+      ctx.strokeStyle = '#53d392';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Clean up any remaining old player rendering code
+      // All old player rendering is now disabled - using server players only
 
       // Draw server bots first (shared across all players)
       serverBots.forEach(bot => {
