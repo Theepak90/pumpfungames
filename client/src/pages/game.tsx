@@ -1990,14 +1990,16 @@ export default function GamePage() {
             const head = fullSnakeBody[0];
             const segmentRadius = serverPlayer.segmentRadius || 10;
             
-            // Calculate scale factor based on segment radius (similar to local snake)
+            // Calculate scale factor based on segment radius, capped at 100 mass equivalent
             const baseRadius = 10;
-            const scaleFactor = Math.max(0.8, segmentRadius / baseRadius);
+            const maxRadius = 20; // Equivalent to ~100 mass
+            const cappedRadius = Math.min(segmentRadius, maxRadius);
+            const scaleFactor = Math.max(0.8, cappedRadius / baseRadius);
             
             ctx.save();
             ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
             ctx.fillStyle = "#ffffff";
-            ctx.strokeStyle = "#134242";
+            ctx.strokeStyle = "#53d493";
             ctx.lineWidth = 3 * scaleFactor;
             ctx.textAlign = "center";
             
@@ -2122,13 +2124,15 @@ export default function GamePage() {
             if (index === 0) {
               const segmentRadius = radius; // Use the radius we calculated above
               
-              // Calculate scale factor based on segment radius
+              // Calculate scale factor based on segment radius, capped at 100 mass equivalent
               const baseRadius = 10;
-              const scaleFactor = Math.max(0.8, segmentRadius / baseRadius);
+              const maxRadius = 20; // Equivalent to ~100 mass
+              const cappedRadius = Math.min(segmentRadius, maxRadius);
+              const scaleFactor = Math.max(0.8, cappedRadius / baseRadius);
               
               ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
               ctx.fillStyle = "#ffffff";
-              ctx.strokeStyle = "#134242";
+              ctx.strokeStyle = "#53d493";
               ctx.lineWidth = 3 * scaleFactor;
               ctx.textAlign = "center";
               
@@ -2339,11 +2343,16 @@ export default function GamePage() {
         // Draw money balance above snake head
         if (snake.visibleSegments.length > 0) {
           const snakeHead = snake.visibleSegments[0];
-          const scaleFactor = snake.getScaleFactor();
+          
+          // Cap the scaling at 100 mass equivalent (like other players)
+          const baseMass = 6; // Starting mass
+          const maxMass = 100; // Cap at 100 mass
+          const cappedMass = Math.min(snake.visibleSegments.length, maxMass);
+          const scaleFactor = Math.max(0.8, cappedMass / baseMass);
           
           ctx.font = `${Math.floor(10 * scaleFactor)}px 'Press Start 2P', monospace`;
           ctx.fillStyle = "#ffffff";
-          ctx.strokeStyle = "#134242";
+          ctx.strokeStyle = "#53d493";
           ctx.lineWidth = 3 * scaleFactor;
           ctx.textAlign = "center";
           
