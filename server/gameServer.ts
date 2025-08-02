@@ -152,8 +152,11 @@ export class MultiServerManager {
 
       ws.on("error", (error: any) => {
         console.error(`WebSocket error for player ${playerId}:`, error);
-        activePlayers.delete(playerId);
-        gameWorld.players.delete(playerId);
+        // Don't immediately close on protocol errors - let the client retry
+        if (!error.message?.includes('RSV1') && !error.message?.includes('Invalid WebSocket frame')) {
+          activePlayers.delete(playerId);
+          gameWorld.players.delete(playerId);
+        }
       });
     });
   }
