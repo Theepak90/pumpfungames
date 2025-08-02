@@ -268,6 +268,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Server received update from ${playerId}: ${data.segments?.length || 0} segments`);
           activePlayers.set(playerId, player);
           gameWorld.players.set(playerId, player);
+        } else if (data.type === 'eatFood') {
+          // Handle server-side food collision
+          const foodId = data.foodId;
+          const foodIndex = gameWorld.food.findIndex(f => f.id === foodId);
+          
+          if (foodIndex !== -1) {
+            // Remove eaten food from server
+            const eatenFood = gameWorld.food[foodIndex];
+            gameWorld.food.splice(foodIndex, 1);
+            
+            // Create new food to maintain count
+            const newFood = {
+              id: `food_${Date.now()}_${Math.random()}`,
+              x: Math.random() * 4000 - 2000,
+              y: Math.random() * 4000 - 2000,
+              size: 4 + Math.random() * 6,
+              color: ['#ff4444', '#44ff44', '#4444ff', '#ffff44'][Math.floor(Math.random() * 4)]
+            };
+            gameWorld.food.push(newFood);
+            
+            console.log(`Player ${playerId} ate food ${foodId}, spawned new food ${newFood.id}`);
+          }
         }
       } catch (error) {
         console.error("WebSocket message error:", error);

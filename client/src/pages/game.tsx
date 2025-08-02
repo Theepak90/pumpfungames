@@ -1417,7 +1417,7 @@ export default function GamePage() {
         return newFoods;
       });
 
-      // Process server food: smooth attraction + collision detection
+      // Process server food: smooth attraction + server-synchronized collision detection
       const processedServerFood = serverFood.map(food => {
         const dx = snake.head.x - food.x;
         const dy = snake.head.y - food.y;
@@ -1439,31 +1439,29 @@ export default function GamePage() {
         return food;
       });
       
-      // Check for collisions with attracted food positions
-      let scoreIncrease = 0;
-      const remainingFood = processedServerFood.filter(food => {
+      // Check for collisions with attracted food positions - send to server for synchronized removal
+      processedServerFood.forEach(food => {
         const dist = Math.sqrt((snake.head.x - food.x) ** 2 + (snake.head.y - food.y) ** 2);
         
         if (dist < snake.getSegmentRadius() + food.size) {
           // Eat server food - give decent mass increase
-          const massGain = food.size * 0.05; // Increased from 0.02 for better progression
+          const massGain = food.size * 0.05;
           snake.totalMass += massGain;
-          scoreIncrease += Math.floor(massGain * 10);
+          setScore(prev => prev + Math.floor(massGain * 10));
           
-          // Return false to filter out this food (eaten)
-          return false;
+          // Send food eating event to server for synchronized removal
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'eatFood',
+              foodId: food.id,
+              playerId: myPlayerId
+            }));
+          }
         }
-        
-        // Return true to keep this food
-        return true;
       });
       
-      if (scoreIncrease > 0) {
-        setScore(prev => prev + scoreIncrease);
-      }
-      
-      // Update server food with processed positions
-      setServerFood(remainingFood);
+      // Just display the attracted food positions (server handles removal)
+      setServerFood(processedServerFood);
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
