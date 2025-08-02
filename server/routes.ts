@@ -175,10 +175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const activePlayers = new Map();
   
-  // Shared game world state
+  // Shared game world state - pure snake-vs-snake gameplay
   const gameWorld = {
-    bots: [] as any[],
-    food: [] as any[],
     players: new Map() as Map<string, any>,
     initialized: false
   };
@@ -187,22 +185,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function initializeGameWorld() {
     if (gameWorld.initialized) return;
     
-    // Don't create bots - multiplayer is for human players only
-    gameWorld.bots = [];
-    
-    // Create shared food
-    for (let i = 0; i < 200; i++) {
-      gameWorld.food.push({
-        id: `food_${i}`,
-        x: Math.random() * 4000 - 2000,
-        y: Math.random() * 4000 - 2000,
-        size: 4 + Math.random() * 6,
-        color: ['#ff4444', '#44ff44', '#4444ff', '#ffff44'][Math.floor(Math.random() * 4)]
-      });
-    }
-    
     gameWorld.initialized = true;
-    console.log('Shared game world initialized (food only, no bots)');
+    console.log('Shared game world initialized (no food, no bots - pure multiplayer)');
   }
 
   wss.on("connection", function connection(ws: any) {
@@ -246,8 +230,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send shared game world state including all players
       ws.send(JSON.stringify({
         type: 'gameWorld',
-        bots: gameWorld.bots,
-        food: gameWorld.food,
         players: Array.from(gameWorld.players.values())
       }));
     }, 100);
@@ -329,69 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             activePlayers.set(playerId, player);
             gameWorld.players.set(playerId, player);
           }
-        } else if (data.type === 'eatFood') {
-          // Handle server-side food collision
-          const foodId = data.foodId;
-          const foodIndex = gameWorld.food.findIndex(f => f.id === foodId);
-          
-          if (foodIndex !== -1) {
-            // Remove eaten food from server
-            const eatenFood = gameWorld.food[foodIndex];
-            gameWorld.food.splice(foodIndex, 1);
-            
-            // Create new food to maintain count
-            const newFood = {
-              id: `food_${Date.now()}_${Math.random()}`,
-              x: Math.random() * 4000 - 2000,
-              y: Math.random() * 4000 - 2000,
-              size: 4 + Math.random() * 6,
-              color: ['#ff4444', '#44ff44', '#4444ff', '#ffff44'][Math.floor(Math.random() * 4)]
-            };
-            gameWorld.food.push(newFood);
-            
-            console.log(`Player ${playerId} ate food ${foodId}, spawned new food ${newFood.id}`);
-          }
-        } else if (data.type === 'dropFood') {
-          // Handle server-side food dropping from boosting
-          const droppedFood = data.food;
-          
-          // Add dropped food to server's food array with unique ID
-          const serverFood = {
-            id: `dropped_${Date.now()}_${Math.random()}`,
-            x: droppedFood.x,
-            y: droppedFood.y,
-            size: droppedFood.size,
-            color: droppedFood.color
-          };
-          gameWorld.food.push(serverFood);
-          
-          console.log(`Player ${playerId} dropped food at (${droppedFood.x.toFixed(1)}, ${droppedFood.y.toFixed(1)})`);
-        } else if (data.type === 'playerDeath') {
-          // Handle player death and death loot drops
-          const deathLoot = data.deathLoot;
-          
-          if (deathLoot && Array.isArray(deathLoot)) {
-            // Add all death loot items to server food
-            for (const loot of deathLoot) {
-              const serverLoot = {
-                id: `death_${Date.now()}_${Math.random()}`,
-                x: loot.x,
-                y: loot.y,
-                size: loot.size,
-                color: loot.color,
-                type: loot.type, // 'food' or 'money'
-                mass: loot.mass || 1,
-                value: loot.value || 0 // For money crates
-              };
-              gameWorld.food.push(serverLoot);
-            }
-            
-            console.log(`💀 Player ${playerId} died, added ${deathLoot.length} death loot items to server`);
-            
-            // Remove the dead player from active players
-            activePlayers.delete(playerId);
-            gameWorld.players.delete(playerId);
-          }
+          // All food systems removed - pure snake-vs-snake gameplay
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -414,12 +334,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
-      // No bots in multiplayer - keep empty array
-      
+      // Pure snake-vs-snake multiplayer
       const worldMessage = JSON.stringify({
         type: 'gameWorld',
-        bots: gameWorld.bots,
-        food: gameWorld.food,
         players: Array.from(gameWorld.players.values())
       });
       
