@@ -13,7 +13,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/game" component={Game} />
+      <Route path="/game/:roomId" component={Game} />
+      <Route path="/game">
+        {() => <Game />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

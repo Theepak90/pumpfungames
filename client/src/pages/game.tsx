@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
@@ -527,6 +527,8 @@ class SmoothSnake {
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setLocation] = useLocation();
+  const params = useParams<{ roomId?: string }>();
+  const [assignedRoom, setAssignedRoom] = useState<string>('1');
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
@@ -599,6 +601,47 @@ export default function GamePage() {
   // All death loot functions removed
 
 
+
+  // Room assignment and auto-redirect logic
+  useEffect(() => {
+    const checkRoomAvailability = async () => {
+      const targetRoom = params.roomId || '1';
+      
+      // Validate room number (1-20)
+      const roomNum = parseInt(targetRoom);
+      if (isNaN(roomNum) || roomNum < 1 || roomNum > 20) {
+        setLocation('/game/1');
+        return;
+      }
+      
+      try {
+        // Check room status to see if it's full
+        const response = await fetch(`/api/multiplayer/room-status/${targetRoom}`);
+        const roomStatus = await response.json();
+        
+        if (roomStatus.isFull) {
+          // Find next available room
+          for (let i = 1; i <= 20; i++) {
+            const checkResponse = await fetch(`/api/multiplayer/room-status/${i}`);
+            const checkStatus = await checkResponse.json();
+            if (!checkStatus.isFull) {
+              setLocation(`/game/${i}`);
+              return;
+            }
+          }
+          // All rooms full - stay in current room
+          setAssignedRoom(targetRoom);
+        } else {
+          setAssignedRoom(targetRoom);
+        }
+      } catch (error) {
+        console.error('Failed to check room status:', error);
+        setAssignedRoom(targetRoom);
+      }
+    };
+    
+    checkRoomAvailability();
+  }, [params.roomId, setLocation]);
 
   // Load background image
   useEffect(() => {
@@ -678,11 +721,11 @@ export default function GamePage() {
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Connecting to multiplayer server...");
+    console.log(`Connecting to multiplayer server room ${assignedRoom}...`);
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${assignedRoom}`);
     
     wsRef.current = socket;
 
@@ -788,7 +831,7 @@ export default function GamePage() {
         socket.close();
       }
     };
-  }, [gameStarted]);
+  }, [gameStarted, assignedRoom]);
 
   // Send player data to server
   useEffect(() => {
