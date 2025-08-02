@@ -283,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let collisionDetected = false;
             
             // Check collision with all other players
-            for (const [otherPlayerId, otherPlayer] of gameWorld.players) {
+            for (const [otherPlayerId, otherPlayer] of Array.from(gameWorld.players)) {
               if (otherPlayerId === playerId) continue; // Skip self
               if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
               
@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   activePlayers.delete(playerId);
                   gameWorld.players.delete(playerId);
                   
-                  // Send death notification to crashed player
+                  // Send death notification to crashed player (client will handle death loot)
                   if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                       type: 'death',
@@ -312,22 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }));
                   }
                   
-                  // Create death loot where the player died
-                  const deathFood = [];
-                  for (let i = 0; i < Math.min(data.segments.length, 10); i++) {
-                    const segment = data.segments[i];
-                    deathFood.push({
-                      id: `death_${Date.now()}_${Math.random()}`,
-                      x: segment.x + (Math.random() - 0.5) * 40,
-                      y: segment.y + (Math.random() - 0.5) * 40,
-                      mass: 0.5,
-                      color: player.color,
-                      glowIntensity: 0.8
-                    });
-                  }
-                  gameWorld.food.push(...deathFood);
-                  
-                  console.log(`💀 Player ${playerId} removed from server, ${deathFood.length} death food created`);
+                  console.log(`💀 Player ${playerId} removed from server (client will handle death loot)`);
                   break;
                 }
               }
