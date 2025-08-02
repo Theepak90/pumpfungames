@@ -2176,7 +2176,13 @@ export default function GamePage() {
           ctx.beginPath();
           
           const segmentRadius = snake.getSegmentRadius();
-          const scaleFactor = snake.getScaleFactor();
+          
+          // Cap glow scaling at 100 segments
+          const MAX_SEGMENTS = 100;
+          const currentSegments = Math.min(snake.visibleSegments.length, MAX_SEGMENTS);
+          const segmentProgress = currentSegments / MAX_SEGMENTS;
+          const maxGlowScale = 2.2; // Same cap as eyes
+          const glowScaleFactor = 1 + (segmentProgress * (maxGlowScale - 1));
           
           // Create a composite path for all segments
           for (let i = 0; i < snake.visibleSegments.length; i++) {
@@ -2185,11 +2191,11 @@ export default function GamePage() {
             ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
           }
           
-          // Apply single glow effect to the entire snake outline
+          // Apply single glow effect to the entire snake outline with capped scaling
           ctx.shadowColor = "white";
           ctx.shadowBlur = 15;
           ctx.strokeStyle = "white";
-          ctx.lineWidth = 3 * scaleFactor;
+          ctx.lineWidth = 3 * glowScaleFactor;
           ctx.stroke();
           ctx.restore();
         }
