@@ -684,8 +684,22 @@ export default function GamePage() {
         // Start polling for room state every 100ms for real-time updates
         const startPolling = () => {
           pollingIntervalRef.current = setInterval(() => {
-            fetch(`/api/multiplayer/state/${roomId}`)
-              .then(res => res.json())
+            fetch(`/api/multiplayer/state/${currentRoomId || roomId}`)
+              .then(res => {
+                if (res.status === 404) {
+                  console.log(`Room ${currentRoomId || roomId} cleaned up, getting new room...`);
+                  // Room was cleaned up, get a new one
+                  return fetch('/api/multiplayer/room')
+                    .then(res => res.json())
+                    .then(data => {
+                      const newRoomId = data.roomId;
+                      setCurrentRoomId(newRoomId);
+                      console.log(`🎯 Switched to new multiplayer room ${newRoomId}`);
+                      return { players: [] }; // Return empty for this cycle
+                    });
+                }
+                return res.json();
+              })
               .then(data => {
                 if (data.players) {
                   // Filter out our own player and update others
@@ -693,7 +707,7 @@ export default function GamePage() {
                     p.id !== playerId && p.segments.length > 0
                   );
                   setOtherPlayers(filteredPlayers);
-                  console.log(`Room ${roomId}: ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+                  console.log(`Room ${currentRoomId || roomId}: ${data.players.length} total players, showing ${filteredPlayers.length} others`);
                 }
               })
               .catch(err => {
@@ -722,7 +736,7 @@ export default function GamePage() {
 
   // Send player data to server via HTTP
   useEffect(() => {
-    if (!gameStarted || !myPlayerId || currentRoomId === 0) {
+    if (!gameStarted || !myPlayerId || currentRoomId === null) {
       console.log(`Not sending HTTP updates: gameStarted=${gameStarted}, playerId=${!!myPlayerId}, roomId=${currentRoomId}`);
       return;
     }
