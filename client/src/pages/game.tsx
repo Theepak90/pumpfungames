@@ -1027,7 +1027,7 @@ export default function GamePage() {
         currentPlayerCount = serverBarrierExpansion.currentPlayerCount;
         
         // Animate barrier radius smoothly towards target
-        const ANIMATION_SPEED = 0.02; // Smooth animation speed
+        const ANIMATION_SPEED = 0.002; // Smooth animation speed (10x slower)
         const radiusDiff = targetRadius - currentBarrierRadius;
         
         if (Math.abs(radiusDiff) > 1) {
