@@ -574,7 +574,8 @@ export default function GamePage() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
-  const wsRef = useRef<WebSocket | null>(null);
+  const [currentRoomId, setCurrentRoomId] = useState<number>(0);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Death food dropping removed
 
@@ -659,163 +660,86 @@ export default function GamePage() {
     console.log("Game started - waiting for server world data");
   }, [gameStarted]);
 
-  // WebSocket connection with server selection for scaling
+  // HTTP Polling-based multiplayer connection (replacing WebSocket due to protocol issues)
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log("Getting available server...");
+    console.log("Starting HTTP-based multiplayer...");
     setConnectionStatus('Connecting');
     
-    // First, get an available server
-    fetch('/api/server/available')
+    // Get an available multiplayer room
+    fetch('/api/multiplayer/room')
       .then(res => res.json())
       .then(data => {
-        const serverId = data.serverId;
-        console.log(`Connecting to server ${serverId}`);
+        const roomId = data.roomId;
+        setCurrentRoomId(roomId);
         
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
-        const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws/${serverId}`);
+        // Generate player ID
+        const playerId = `player_${Date.now()}_${Math.random()}`;
+        setMyPlayerId(playerId);
+        console.log(`Connected to room ${roomId} as player ${playerId}`);
+
+        setConnectionStatus('Connected');
         
-        wsRef.current = socket;
-
-        socket.onopen = () => {
-          console.log(`Connected to multiplayer server ${serverId}!`);
-          console.log("WebSocket readyState:", socket.readyState);
-          setConnectionStatus('Connected');
-        };
-
-        socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'players') {
-          // Filter out our own player data and update others
-          const filteredPlayers = data.players.filter((p: any) => 
-            p.id !== myPlayerId && p.segments.length > 0
-          );
-          // Use server data directly to avoid position mismatch
-          setOtherPlayers(filteredPlayers);
-          console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
-        } else if (data.type === 'welcome') {
-          setMyPlayerId(data.playerId);
-          console.log(`My player ID: ${data.playerId}`);
-          
-          // Handle initial state if provided
-          if (data.initialState) {
-            const { players, bots, gameWorld } = data.initialState;
-            setOtherPlayers((players || []).filter((p: any) => p.id !== data.playerId && p.segments.length > 0));
-            setServerBots(bots || []);
-            setServerPlayers(gameWorld || []);
-            console.log(`Received initial state: ${players?.length || 0} players, ${bots?.length || 0} bots`);
-          }
-        } else if (data.type === 'gameWorld') {
-          setServerBots(data.bots || []);
-          setServerPlayers(data.players || []);
-          console.log(`Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
-          if (data.players && data.players.length > 0) {
-            data.players.forEach((player: any, idx: number) => {
-              console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
-            });
-          }
-          
-          // Force immediate re-render for proper snake body display with eyes
-          if (canvasRef.current) {
-            // Trigger multiple renders to ensure eyes appear immediately
-            for (let i = 0; i < 3; i++) {
-              window.requestAnimationFrame(() => {
-                // Multiple redraws ensure all elements render properly
+        // Start polling for room state every 100ms for real-time updates
+        const startPolling = () => {
+          pollingIntervalRef.current = setInterval(() => {
+            fetch(`/api/multiplayer/state/${roomId}`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.players) {
+                  // Filter out our own player and update others
+                  const filteredPlayers = data.players.filter((p: any) => 
+                    p.id !== playerId && p.segments.length > 0
+                  );
+                  setOtherPlayers(filteredPlayers);
+                  console.log(`Room ${roomId}: ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+                }
+              })
+              .catch(err => {
+                console.error('Polling error:', err);
+                setConnectionStatus('Disconnected');
               });
-            }
-          }
-        } else if (data.type === 'death') {
-          console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
-          // Server detected our collision - immediately clear snake body and stop game
-          snake.visibleSegments = []; // Clear all body segments immediately
-          snake.segmentTrail = []; // Clear trail
-          snake.totalMass = 0; // Reset mass to 0
-          setGameOver(true);
-          gameOverRef.current = true;
-          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
-        }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
+          }, 100); // Poll every 100ms for smooth real-time updates
         };
-
-        socket.onclose = (event) => {
-          console.log(`Disconnected from server ${serverId}`);
-          console.log("Close event:", event.code, event.reason);
-          setConnectionStatus('Disconnected');
-          wsRef.current = null;
-          
-          // Auto-reconnect after 2 seconds if not a normal closure
-          if (event.code !== 1000 && gameStarted) {
-            console.log("Attempting auto-reconnect in 2 seconds...");
-            setConnectionStatus('Reconnecting');
-            setTimeout(() => {
-              if (gameStarted && !wsRef.current) {
-                console.log("Auto-reconnecting to multiplayer server...");
-                // Get a new available server and reconnect
-                fetch('/api/server/available')
-                  .then(res => res.json())
-                  .then(reconnectData => {
-                    const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws/${reconnectData.serverId}`);
-                    wsRef.current = newSocket;
-                    
-                    newSocket.onopen = () => {
-                      console.log(`Reconnected to server ${reconnectData.serverId}!`);
-                      setConnectionStatus('Connected');
-                    };
-                    newSocket.onmessage = socket.onmessage;
-                    newSocket.onclose = socket.onclose;
-                    newSocket.onerror = socket.onerror;
-                  })
-                  .catch(err => {
-                    console.error('Failed to get server for reconnect:', err);
-                    setConnectionStatus('Connection Error');
-                  });
-              }
-            }, 2000);
-          }
-        };
-
-        socket.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          setConnectionStatus('Connection Error');
-        };
-
-        return () => {
-          console.log("Cleaning up WebSocket connection...");
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.close();
-          }
-        };
+        
+        startPolling();
       })
       .catch(error => {
-        console.error('Failed to get available server:', error);
+        console.error('Failed to get multiplayer room:', error);
         setConnectionStatus('Connection Error');
       });
+
+    // Cleanup function
+    return () => {
+      console.log("Cleaning up HTTP multiplayer connection...");
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
   }, [gameStarted]);
 
-  // Send player data to server
+  // Send player data to server via HTTP
   useEffect(() => {
-    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log(`Not sending updates: gameStarted=${gameStarted}, wsRef=${!!wsRef.current}, readyState=${wsRef.current?.readyState}`);
+    if (!gameStarted || !myPlayerId || !currentRoomId) {
+      console.log(`Not sending HTTP updates: gameStarted=${gameStarted}, playerId=${!!myPlayerId}, roomId=${currentRoomId}`);
       return;
     }
 
-    console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
+    console.log(`Starting HTTP position updates - snake has ${snake.visibleSegments.length} segments`);
     
     const sendInterval = setInterval(() => {
       // Stop sending updates immediately if game is over
       if (gameOverRef.current) {
-        console.log(`🛑 Stopped sending updates: gameOver=${gameOverRef.current}`);
+        console.log(`🛑 Stopped sending HTTP updates: gameOver=${gameOverRef.current}`);
         return;
       }
       
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
+      if (snake.visibleSegments.length > 0) {
         const updateData = {
-          type: 'update',
+          roomId: currentRoomId,
+          playerId: myPlayerId,
           segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
           color: '#d55400',
           money: snake.money,
@@ -823,18 +747,23 @@ export default function GamePage() {
           segmentRadius: snake.getSegmentRadius(),
           visibleSegmentCount: snake.visibleSegments.length
         };
-        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
-        wsRef.current.send(JSON.stringify(updateData));
-      } else {
-        console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
+        
+        // Send update via HTTP POST
+        fetch('/api/multiplayer/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        }).catch(err => {
+          console.error('Failed to send player update:', err);
+        });
       }
-    }, 50); // Send updates every 50ms for more responsive multiplayer
+    }, 100); // Send updates every 100ms for HTTP polling
 
     return () => {
-      console.log('Clearing position update interval');
+      console.log('Clearing HTTP position update interval');
       clearInterval(sendInterval);
     };
-  }, [gameStarted, wsRef.current?.readyState, gameOver]);
+  }, [gameStarted, myPlayerId, currentRoomId, gameOver]);
 
   // Mouse tracking
   useEffect(() => {

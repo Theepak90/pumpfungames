@@ -6,7 +6,7 @@ import {
   insertGameSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { MultiServerManager } from "./gameServer";
+import { HttpMultiplayerManager } from "./httpMultiplayer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -156,14 +156,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Initialize multi-server manager
-  const multiServerManager = new MultiServerManager(httpServer);
-  multiServerManager.initialize();
+  // Initialize HTTP-based multiplayer (replacing WebSocket due to protocol issues)
+  const httpMultiplayer = new HttpMultiplayerManager();
+  httpMultiplayer.setupRoutes(app);
 
-  // Setup routing endpoint to get available server
+  // Legacy WebSocket server selection endpoint for backward compatibility
   app.get('/api/server/available', (req, res) => {
-    const server = multiServerManager.getAvailableServer();
-    res.json({ serverId: server.serverId });
+    res.json({ serverId: 0 }); // Single room system
   });
 
   return httpServer;

@@ -25,7 +25,10 @@ export class MultiServerManager {
     const wss = new WebSocketServer({ 
       server: this.httpServer, 
       path: `/ws/${serverId}`,
-      perMessageDeflate: false // Disable compression to fix RSV1 frame errors
+      perMessageDeflate: false, // Disable compression
+      maxPayload: 1024 * 1024, // 1MB max payload
+      skipUTF8Validation: false, // Keep UTF8 validation
+      clientTracking: true
     });
     
     const activePlayers = new Map<string, any>();
@@ -127,7 +130,25 @@ export class MultiServerManager {
           }
         };
         
-        ws.send(JSON.stringify(welcomeMessage));
+        // Send smaller welcome message to avoid frame issues
+        const simpleWelcome = {
+          type: 'welcome',
+          playerId: playerId
+        };
+        
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(simpleWelcome));
+          
+          // Send other data separately with delay
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'initial_players', 
+                players: Array.from(activePlayers.values())
+              }));
+            }
+          }, 50);
+        }
       } catch (error) {
         console.error(`Error sending welcome message to ${playerId}:`, error);
       }
