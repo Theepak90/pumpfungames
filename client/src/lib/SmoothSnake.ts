@@ -44,7 +44,7 @@ export class SmoothSnake {
     this.boostCooldown = 0;
     
     // Snake system constants
-    this.START_MASS = 25; // Start with 25 segments for a proper snake length
+    this.START_MASS = 6; // Start with exactly 6 segments for consistent multiplayer
     this.MASS_PER_SEGMENT = 1;
     this.SEGMENT_SPACING = 10; // Heavy overlap (radius=10, so 10px overlap for maximum density)
     this.SEGMENT_RADIUS = 10;
@@ -61,11 +61,11 @@ export class SmoothSnake {
     }
     this.visibleSegments = [];
     this.totalMass = this.START_MASS;
-    console.log(`Snake constructor: START_MASS=${this.START_MASS}, totalMass=${this.totalMass}`);
+    console.log(`NEW SNAKE CREATED: mass=${this.totalMass}, visibleSegments=${this.visibleSegments.length}, trail=${this.segmentTrail.length}`);
     this.growthRemaining = 0;
     this.partialGrowth = 0; // Initialize partialGrowth for faster mass conversion
     this.distanceBuffer = 0;
-    this.currentSegmentCount = this.START_MASS; // Start with initial segment count
+    this.currentSegmentCount = this.START_MASS; // Start with exactly START_MASS segments
     
     // Force immediate segment generation
     console.log(`Before updateVisibleSegments: currentSegmentCount=${this.currentSegmentCount}`);
