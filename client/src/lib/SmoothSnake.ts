@@ -78,18 +78,20 @@ export class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    // Calculate target segment count - segments cap at 100, but mass can continue growing
+    // HARD CAP: Segments absolutely cannot exceed 100 under any circumstances
     const MAX_SEGMENTS = 100;
     const massBasedSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     const targetSegmentCount = Math.min(massBasedSegments, MAX_SEGMENTS);
     
-    // Smoothly animate currentSegmentCount toward target, but cap at MAX_SEGMENTS
-    const transitionSpeed = 0.08; // Slightly slower for more stability
+    // Smoothly animate currentSegmentCount toward target, but ENFORCE cap at MAX_SEGMENTS
+    const transitionSpeed = 0.08;
     if (this.currentSegmentCount < targetSegmentCount && this.currentSegmentCount < MAX_SEGMENTS) {
       this.currentSegmentCount += transitionSpeed;
     } else if (this.currentSegmentCount > targetSegmentCount) {
       this.currentSegmentCount -= transitionSpeed;
     }
+    
+    // CRITICAL: Absolute hard cap - no segments beyond 100 ever
     this.currentSegmentCount = Math.max(1, Math.min(this.currentSegmentCount, MAX_SEGMENTS));
     
     // Use floor for solid segments, check if we need a fading segment
@@ -99,7 +101,8 @@ export class SmoothSnake {
     this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
-    let totalSegmentsToPlace = Math.min(Math.ceil(this.currentSegmentCount), MAX_SEGMENTS); // Cap at 100 segments max
+    // ABSOLUTE CAP: Never place more than 100 segments regardless of any other calculation
+    let totalSegmentsToPlace = Math.min(Math.ceil(this.currentSegmentCount), MAX_SEGMENTS);
     
     // Process all segments in one pass to avoid distance calculation issues
     for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < totalSegmentsToPlace; i++) {
@@ -111,9 +114,11 @@ export class SmoothSnake {
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
       // Check if we need to place segments in this trail section
+      // TRIPLE CHECK: Enforce 100 segment limit at every placement
       while (distanceSoFar + this.SEGMENT_SPACING <= (distanceSoFar + segmentDist) && 
              this.visibleSegments.length < totalSegmentsToPlace && 
-             this.visibleSegments.length < MAX_SEGMENTS) {
+             this.visibleSegments.length < MAX_SEGMENTS &&
+             segmentIndex < MAX_SEGMENTS) {
         
         const progress = distanceSoFar / (distanceSoFar + segmentDist);
         const segmentX = a.x + (b.x - a.x) * progress;

@@ -364,17 +364,21 @@ class SmoothSnake {
   }
   
   updateVisibleSegments() {
-    // Calculate target segment count based on mass
-    const targetSegmentCount = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    // HARD CAP: Segments absolutely cannot exceed 100 under any circumstances
+    const MAX_SEGMENTS = 100;
+    const massBasedSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
+    const targetSegmentCount = Math.min(massBasedSegments, MAX_SEGMENTS);
     
-    // Smoothly animate currentSegmentCount toward target
-    const transitionSpeed = 0.08; // Slightly slower for more stability
-    if (this.currentSegmentCount < targetSegmentCount) {
+    // Smoothly animate currentSegmentCount toward target, but ENFORCE cap at MAX_SEGMENTS
+    const transitionSpeed = 0.08;
+    if (this.currentSegmentCount < targetSegmentCount && this.currentSegmentCount < MAX_SEGMENTS) {
       this.currentSegmentCount += transitionSpeed;
     } else if (this.currentSegmentCount > targetSegmentCount) {
       this.currentSegmentCount -= transitionSpeed;
     }
-    this.currentSegmentCount = Math.max(1, this.currentSegmentCount);
+    
+    // CRITICAL: Absolute hard cap - no segments beyond 100 ever
+    this.currentSegmentCount = Math.max(1, Math.min(this.currentSegmentCount, MAX_SEGMENTS));
     
     // Use floor for solid segments, check if we need a fading segment
     const solidSegmentCount = Math.floor(this.currentSegmentCount);
@@ -383,7 +387,8 @@ class SmoothSnake {
     this.visibleSegments = [];
     let distanceSoFar = 0;
     let segmentIndex = 0;
-    let totalSegmentsToPlace = Math.ceil(this.currentSegmentCount); // Include potential fading segment
+    // ABSOLUTE CAP: Never place more than 100 segments regardless of any other calculation
+    let totalSegmentsToPlace = Math.min(Math.ceil(this.currentSegmentCount), MAX_SEGMENTS);
     
     // Process all segments in one pass to avoid distance calculation issues
     for (let i = 1; i < this.segmentTrail.length && this.visibleSegments.length < totalSegmentsToPlace; i++) {
@@ -395,7 +400,11 @@ class SmoothSnake {
       const segmentDist = Math.sqrt(dx * dx + dy * dy);
       
       // Check if we need to place segments in this trail section
-      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && this.visibleSegments.length < totalSegmentsToPlace) {
+      // TRIPLE CHECK: Enforce 100 segment limit at every placement
+      while (distanceSoFar + segmentDist >= segmentIndex * this.SEGMENT_SPACING && 
+             this.visibleSegments.length < totalSegmentsToPlace &&
+             this.visibleSegments.length < MAX_SEGMENTS &&
+             segmentIndex < MAX_SEGMENTS) {
         const targetDistance = segmentIndex * this.SEGMENT_SPACING;
         const overshoot = targetDistance - distanceSoFar;
         const t = segmentDist > 0 ? overshoot / segmentDist : 0;
@@ -557,12 +566,15 @@ class SmoothSnake {
   eatFood(food: Food) {
     const mass = food.mass || 1;
     
-    // Cap both segments and mass at 100 - no growth beyond this point
+    // HARD CAP: Both segments and mass at 100 - absolutely no growth beyond this point
     const MAX_MASS = 100;
+    const MAX_SEGMENTS = 100;
     const currentMass = this.totalMass;
+    const currentSegments = this.visibleSegments.length;
     
-    if (currentMass >= MAX_MASS) {
-      return 0; // No growth if already at max mass/strength
+    // Don't eat food if at either mass OR segment limit
+    if (currentMass >= MAX_MASS || currentSegments >= MAX_SEGMENTS) {
+      return 0; // No growth if already at max mass/strength OR max segments
     }
     
     const actualMassToAdd = Math.min(mass, MAX_MASS - currentMass);
