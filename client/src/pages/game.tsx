@@ -1828,8 +1828,8 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                cx={48 + ((snake.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                cy={48 + ((snake.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
                 r="2"
                 fill="#ff4444"
               />
@@ -1840,8 +1840,8 @@ export default function GamePage() {
               player.segments && player.segments.length > 0 && (
                 <circle
                   key={player.id}
-                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
-                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                  cx={48 + ((player.segments[0].x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                  cy={48 + ((player.segments[0].y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
                   r="2"
                   fill={player.color}
                 />
@@ -1852,8 +1852,8 @@ export default function GamePage() {
             {botSnakes.map(bot => (
               <circle
                 key={bot.id}
-                cx={48 + ((bot.head.x - MAP_CENTER_X) / BASE_MAP_RADIUS) * 44}
-                cy={48 + ((bot.head.y - MAP_CENTER_Y) / BASE_MAP_RADIUS) * 44}
+                cx={48 + ((bot.head.x - MAP_CENTER_X) / currentBarrierRadius) * 44}
+                cy={48 + ((bot.head.y - MAP_CENTER_Y) / currentBarrierRadius) * 44}
                 r="1.5"
                 fill={bot.color}
               />
