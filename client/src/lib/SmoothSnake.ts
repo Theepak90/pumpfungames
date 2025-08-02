@@ -229,8 +229,8 @@ export class SmoothSnake {
   }
   
   grow(mass: number) {
-    // Add constant for max segments (170 segments)
-    const MAX_SEGMENTS = 170;
+    // Add constant for max segments (100 segments)
+    const MAX_SEGMENTS = 100;
     const currentSegments = Math.floor(this.totalMass / this.MASS_PER_SEGMENT);
     
     // Only grow if under segment limit

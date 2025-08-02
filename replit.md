@@ -10,16 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Enhanced Snake Growth and Money Counter System (Latest)
-- **Snake growth increased to 170 segments**: Dramatically increased growth limit from 40 to 170 segments allowing much larger snakes
-- **Complete growth stop at 170**: Snake stops growing entirely after reaching 170 mass and segments - no further growth whatsoever
+### Snake Growth and Money Counter System (Latest)
+- **Snake growth capped at 100 segments**: Set growth limit to exactly 100 mass and 100 segments for balanced gameplay
+- **Complete growth stop at 100**: Snake stops growing entirely after reaching 100 mass and segments - no further growth whatsoever
 - **Money counter positioned closer**: Reduced offset from 35 to 20 scaleFactor units for much closer positioning to snake head
 - **Text size capped at 4 mass**: Money counter text stops growing at just 4 mass for very small, compact size throughout the game
 - **Unified font styling**: All money counters now use Press Start 2P retro font instead of Arial
 - **Complete visual consistency**: Local player and other players' money counters now look identical
 - **Black outline color #000000**: All money counter text uses consistent black outline for better visibility
-- **Growth limit applied everywhere**: Both regular food eating and money pickup respect the 170-segment limit
-- **Updated SmoothSnake class**: Modified grow() method to enforce new 170-segment maximum in SmoothSnake.ts
+- **Growth limit applied everywhere**: Both regular food eating and money pickup respect the 100-segment limit
+- **Updated SmoothSnake class**: Modified grow() method to enforce new 100-segment maximum in SmoothSnake.ts
 
 ### Fixed Snake Death Rendering Issue
 - **Complete snake disappearance on death**: Snake body now fully disappears immediately when crashing into other players
