@@ -1742,9 +1742,11 @@ export default function GamePage() {
               movementAngle = Math.atan2(dy, dx);
             }
             
-            const eyeDistance = 5;
-            const eyeSize = 3;
-            const pupilSize = 1.5;
+            // Scale eyes with snake size
+            const segmentRadius = serverPlayer.segmentRadius || 10;
+            const eyeDistance = segmentRadius * 0.5; // Scale eye distance with snake size
+            const eyeSize = segmentRadius * 0.3; // Scale eye size with snake size
+            const pupilSize = segmentRadius * 0.15; // Scale pupil with snake size
             
             // Eye positions perpendicular to movement direction
             const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
@@ -1760,7 +1762,7 @@ export default function GamePage() {
             ctx.fillRect(-eyeSize, -eyeSize, eyeSize * 2, eyeSize * 2);
             
             // Draw first pupil looking forward
-            const pupilOffset = 1.2;
+            const pupilOffset = eyeSize * 0.4; // Scale pupil offset with eye size
             ctx.fillStyle = 'black';
             ctx.fillRect(
               pupilOffset - pupilSize,
