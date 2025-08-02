@@ -469,27 +469,7 @@ class SmoothSnake {
     }
   }
   
-  eatFood(food: Food) {
-    const mass = food.mass || 1;
-    
-    // HARD CAP: Both segments and mass at 100 - absolutely no growth beyond this point
-    const MAX_MASS = 100;
-    const MAX_SEGMENTS = 100;
-    const currentMass = this.totalMass;
-    const currentSegments = this.visibleSegments.length;
-    
-    // Don't eat food if at either mass OR segment limit
-    if (currentMass >= MAX_MASS || currentSegments >= MAX_SEGMENTS) {
-      return 0; // No growth if already at max mass/strength OR max segments
-    }
-    
-    const actualMassToAdd = Math.min(mass, MAX_MASS - currentMass);
-    if (actualMassToAdd > 0) {
-      this.growthRemaining += actualMassToAdd * 0.5; // 1 mass = 0.5 segments worth of growth
-    }
-    
-    return actualMassToAdd; // Return actual mass added
-  }
+  // Food system completely removed - snakes grow through other mechanics
   
   // Process growth at 10 mass per second rate
   processGrowth(deltaTime: number) {
@@ -732,10 +712,13 @@ export default function GamePage() {
           }
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
-          // Server detected our collision - immediately stop game
+          // Server detected our collision - immediately clear snake body and stop game
+          snake.visibleSegments = []; // Clear all body segments immediately
+          snake.segmentTrail = []; // Clear trail
+          snake.totalMass = 0; // Reset mass to 0
           setGameOver(true);
           gameOverRef.current = true;
-          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}`);
+          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1025,9 +1008,14 @@ export default function GamePage() {
       }
       
       if (hitBoundary) {
-        // Death loot removed
+        // Clear snake body completely when hitting death barrier
+        snake.visibleSegments = []; // Clear all body segments immediately
+        snake.segmentTrail = []; // Clear trail
+        snake.totalMass = 0; // Reset mass to 0
         snake.money = 0; // Reset snake's money on death
         setGameOver(true);
+        gameOverRef.current = true;
+        console.log(`💀 BOUNDARY DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
         return;
       }
 
@@ -1057,9 +1045,14 @@ export default function GamePage() {
       }
       
       if (hitBot) {
-        // Death loot removed
+        // Clear snake body completely when hitting bot
+        snake.visibleSegments = []; // Clear all body segments immediately
+        snake.segmentTrail = []; // Clear trail
+        snake.totalMass = 0; // Reset mass to 0
         snake.money = 0; // Reset snake's money on death
         setGameOver(true);
+        gameOverRef.current = true;
+        console.log(`💀 BOT COLLISION DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
         return;
       }
 
@@ -1085,8 +1078,10 @@ export default function GamePage() {
         }
         
         if (headOnCollision) {
-          // Both snakes die in head-on collision
-          // Death loot removed
+          // Both snakes die in head-on collision - clear snake body completely
+          snake.visibleSegments = []; // Clear all body segments immediately
+          snake.segmentTrail = []; // Clear trail
+          snake.totalMass = 0; // Reset mass to 0
           snake.money = 0;
           
           // Remove the bot
@@ -1098,6 +1093,8 @@ export default function GamePage() {
           }, 3000);
           
           setGameOver(true);
+          gameOverRef.current = true;
+          console.log(`💀 HEAD-ON COLLISION DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
           return;
         }
       }
@@ -1398,6 +1395,7 @@ export default function GamePage() {
       });
 
       // Draw your own snake locally using EXACT same rendering as remote players
+      // Only render if game is active AND snake has segments (disappears completely on death)
       if (gameStarted && snake.visibleSegments.length > 0 && !gameOver) {
         const fullSnakeBody = snake.visibleSegments;
         
