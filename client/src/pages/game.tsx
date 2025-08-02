@@ -2033,7 +2033,7 @@ export default function GamePage() {
             ctx.textAlign = "center";
             
             const moneyText = `$${serverPlayer.money?.toFixed(2) || '1.00'}`;
-            const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+            const offsetY = 20 * scaleFactor; // Scale the offset with snake size
             
             // Draw text outline for better visibility
             ctx.strokeText(moneyText, head.x, head.y - offsetY);
@@ -2166,7 +2166,7 @@ export default function GamePage() {
               ctx.textAlign = "center";
               
               const moneyText = `$${player.money.toFixed(2)}`;
-              const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+              const offsetY = 20 * scaleFactor; // Scale the offset with snake size
               
               // Draw text outline for better visibility
               ctx.strokeText(moneyText, segment.x, segment.y - offsetY);
@@ -2386,7 +2386,7 @@ export default function GamePage() {
           ctx.textAlign = "center";
           
           const moneyText = `$${snake.money.toFixed(2)}`;
-          const offsetY = 35 * scaleFactor; // Scale the offset with snake size
+          const offsetY = 20 * scaleFactor; // Scale the offset with snake size
           
           // Draw text outline for better visibility
           ctx.strokeText(moneyText, snakeHead.x, snakeHead.y - offsetY);
