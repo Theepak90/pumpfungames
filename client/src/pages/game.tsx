@@ -1631,7 +1631,13 @@ export default function GamePage() {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
             setGameOver(true);
-            console.log(`💀 Game over state set, gameOver should now be: true`);
+            
+            // FORCE immediate re-render by clearing canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#15161b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            console.log(`💀 Game over state set and canvas cleared!`);
             
             // Drop death food and money crates along snake body
             dropMultiplayerDeathLoot(snake.visibleSegments, snake.totalMass, snake.money);
@@ -2227,8 +2233,9 @@ export default function GamePage() {
       ctx.globalAlpha = 1.0;
 
       // Only render snake if game is not over
+      console.log(`RENDER CHECK: gameOver = ${gameOver}, rendering snake = ${!gameOver}`);
       if (!gameOver) {
-        // DEBUG: Snake is being rendered because gameOver = false
+        console.log(`🐍 RENDERING SNAKE because gameOver = ${gameOver}`);
         // Draw single glowing outline behind the whole snake when boosting
         if (snake.isBoosting && snake.visibleSegments.length > 0) {
           ctx.save();
