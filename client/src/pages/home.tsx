@@ -318,33 +318,52 @@ export default function Home() {
     }
   };
 
-  // Start game handler
-  const handleStartGame = async () => {
+  // Region selection state
+  const [selectedRegion, setSelectedRegion] = useState<'us' | 'eu' | null>(null);
+  const [isDetectingRegion, setIsDetectingRegion] = useState(false);
+
+  // Start game handler with region selection
+  const handleStartGameWithRegion = async (manualRegion?: 'us' | 'eu') => {
     try {
+      let gameRegion = manualRegion;
+      
+      if (!gameRegion) {
+        // Auto-detect region
+        setIsDetectingRegion(true);
+        toast({
+          title: "Detecting Best Region...",
+          description: "Finding nearest server for optimal performance",
+        });
+        
+        const { detectBestRegion } = await import('@/lib/regionDetection');
+        gameRegion = await detectBestRegion();
+        setIsDetectingRegion(false);
+      }
+      
       toast({
-        title: "Finding Game Room...",
+        title: `Connecting to ${gameRegion.toUpperCase()} Server...`,
         description: "Looking for available room.",
       });
       
-      // Get best available room from server
-      const response = await fetch('/api/room/join');
+      // Get best available room from server with region
+      const response = await fetch(`/api/room/join?region=${gameRegion}`);
       const roomData = await response.json();
       
       toast({
         title: "Joining Game!",
-        description: `Entering room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
+        description: `Entering ${gameRegion.toUpperCase()} room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
       });
       
-      // Navigate to room-specific game
-      setLocation(`/snake/${roomData.roomId}`);
+      // Navigate to regional room-specific game
+      setLocation(`/snake/${gameRegion}/${roomData.roomId}`);
     } catch (error) {
       toast({
         title: "Error",
         description: "Could not find available room. Trying backup...",
         variant: "destructive",
       });
-      // Fallback to room 1
-      setLocation('/snake/1');
+      // Fallback to US room 1
+      setLocation('/snake/us/1');
     }
   };
 
@@ -627,15 +646,45 @@ export default function Home() {
                 </div>
               </div>
               
+              {/* Region Selection */}
+              <div className="mb-3">
+                <div className="text-white text-xs mb-2 font-retro text-center">Server Region</div>
+                <div className="grid grid-cols-3 gap-1">
+                  <button 
+                    onClick={() => handleStartGameWithRegion('us')}
+                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
+                    disabled={isDetectingRegion}
+                  >
+                    🇺🇸 US
+                  </button>
+                  <button 
+                    onClick={() => handleStartGameWithRegion('eu')}
+                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
+                    disabled={isDetectingRegion}
+                  >
+                    🇪🇺 EU
+                  </button>
+                  <button 
+                    onClick={() => handleStartGameWithRegion()}
+                    className="py-2 px-2 text-xs border-2 font-retro border-gray-600 hover:bg-gray-600 transition-colors"
+                    style={{backgroundColor: '#53d493', borderColor: '#53d493', color: 'white'}}
+                    disabled={isDetectingRegion}
+                  >
+                    🌍 Auto
+                  </button>
+                </div>
+              </div>
+
               {/* Play Button */}
               <button 
-                onClick={handleStartGame}
+                onClick={() => handleStartGameWithRegion()}
                 className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
                 style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
                 onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
                 onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
+                disabled={isDetectingRegion}
               >
-                PLAY
+                {isDetectingRegion ? 'DETECTING...' : 'PLAY'}
               </button>
               
 

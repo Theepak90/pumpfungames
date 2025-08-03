@@ -167,9 +167,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Room management system
+  // Room management system with regional support
   interface GameRoom {
     id: number;
+    region: string;
     players: Map<string, any>;
     bots: any[];
     maxPlayers: number;
@@ -177,46 +178,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     lastActivity: number;
   }
 
-  const gameRooms = new Map<number, GameRoom>();
-  const playerToRoom = new Map<string, number>();
+  const gameRooms = new Map<string, GameRoom>(); // Key format: "region:roomId"
+  const playerToRoom = new Map<string, string>(); // Maps playerId to "region:roomId"
 
-  // Initialize first room
-  function createRoom(roomId: number): GameRoom {
+  // Initialize room with region support
+  function createRoom(region: string, roomId: number): GameRoom {
     const room: GameRoom = {
       id: roomId,
+      region: region,
       players: new Map(),
       bots: [],
       maxPlayers: 8,
       initialized: true,
       lastActivity: Date.now()
     };
-    gameRooms.set(roomId, room);
-    console.log(`Created room ${roomId}`);
+    const roomKey = `${region}:${roomId}`;
+    gameRooms.set(roomKey, room);
+    console.log(`Created room ${region}/${roomId}`);
     return room;
   }
 
-  // Find best available room (prioritize filling existing rooms)
-  function findBestRoom(): GameRoom {
+  // Find best available room in specified region (prioritize filling existing rooms)
+  function findBestRoom(region: string = 'us'): GameRoom {
+    // Get rooms for this region only
+    const regionRooms = Array.from(gameRooms.entries())
+      .filter(([key, room]) => room.region === region)
+      .sort((a, b) => a[1].id - b[1].id); // Sort by room ID
+    
     // First, try to find a room with space (prioritize lower room numbers)
-    const sortedRooms = Array.from(gameRooms.entries()).sort((a, b) => a[0] - b[0]);
-    for (const [roomId, room] of sortedRooms) {
+    for (const [roomKey, room] of regionRooms) {
       if (room.players.size < room.maxPlayers) {
-        console.log(`Found available space in room ${roomId} (${room.players.size}/${room.maxPlayers})`);
+        console.log(`Found available space in room ${region}/${room.id} (${room.players.size}/${room.maxPlayers})`);
         return room;
       }
     }
     
     // If all rooms are full, create a new one
-    const newRoomId = gameRooms.size + 1;
-    console.log(`All rooms full, creating new room ${newRoomId}`);
-    return createRoom(newRoomId);
+    const newRoomId = regionRooms.length + 1;
+    console.log(`All ${region} rooms full, creating new room ${region}/${newRoomId}`);
+    return createRoom(region, newRoomId);
   }
 
-  // API endpoint to get best available room
+  // API endpoint to get best available room with region support
   app.get("/api/room/join", (req, res) => {
-    const room = findBestRoom();
+    const region = (req.query.region as string) || 'us';
+    
+    // Validate region
+    if (region !== 'us' && region !== 'eu') {
+      return res.status(400).json({ error: 'Invalid region. Must be "us" or "eu"' });
+    }
+    
+    const room = findBestRoom(region);
     res.json({ 
       roomId: room.id,
+      region: room.region,
       currentPlayers: room.players.size,
       maxPlayers: room.maxPlayers
     });
@@ -228,23 +243,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     path: '/ws'
   });
 
-  // Create initial room if none exist
+  // Create initial rooms for both regions if none exist
   if (gameRooms.size === 0) {
-    createRoom(1);
+    createRoom('us', 1);
+    createRoom('eu', 1);
   }
 
   wss.on("connection", function connection(ws: any, req: any) {
     const playerId = `player_${Date.now()}_${Math.random()}`;
     console.log(`Player ${playerId} attempting to join. Total WebSocket connections: ${wss.clients.size}`);
     
-    // Extract room ID from query parameters
+    // Extract room ID and region from query parameters
     const url = new URL(req.url, `http://${req.headers.host}`);
     const requestedRoomId = parseInt(url.searchParams.get('room') || '1');
+    const requestedRegion = url.searchParams.get('region') || 'us';
     
-    // Find the requested room or best available room
-    let targetRoom = gameRooms.get(requestedRoomId);
+    // Validate region
+    if (requestedRegion !== 'us' && requestedRegion !== 'eu') {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Invalid region'
+      }));
+      ws.close();
+      return;
+    }
+    
+    // Find the requested room or best available room in region
+    const roomKey = `${requestedRegion}:${requestedRoomId}`;
+    let targetRoom = gameRooms.get(roomKey);
     if (!targetRoom || targetRoom.players.size >= targetRoom.maxPlayers) {
-      targetRoom = findBestRoom();
+      targetRoom = findBestRoom(requestedRegion);
     }
     
     // Check if room is full
@@ -259,9 +287,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     ws.playerId = playerId;
     ws.roomId = targetRoom.id;
-    playerToRoom.set(playerId, targetRoom.id);
+    ws.region = targetRoom.region;
+    const finalRoomKey = `${targetRoom.region}:${targetRoom.id}`;
+    playerToRoom.set(playerId, finalRoomKey);
     
-    console.log(`Player ${playerId} joined room ${targetRoom.id}. Room players: ${targetRoom.players.size + 1}/${targetRoom.maxPlayers}`);
+    console.log(`Player ${playerId} joined room ${targetRoom.region}/${targetRoom.id}. Room players: ${targetRoom.players.size + 1}/${targetRoom.maxPlayers}`);
     console.log(`WebSocket readyState: ${ws.readyState}`);
     
     // Assign different colors to different players
@@ -281,11 +311,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     targetRoom.players.set(playerId, player);
     targetRoom.lastActivity = Date.now();
 
-    // Send welcome message with player ID and room info
+    // Send welcome message with player ID, room, and region info
     ws.send(JSON.stringify({
       type: 'welcome',
       playerId: playerId,
       roomId: targetRoom.id,
+      region: targetRoom.region,
       currentPlayers: targetRoom.players.size,
       maxPlayers: targetRoom.maxPlayers
     }));
@@ -310,8 +341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = JSON.parse(message.toString());
         if (data.type === 'update') {
           // Get player's room
-          const roomId = playerToRoom.get(playerId);
-          const room = gameRooms.get(roomId!);
+          const roomKey = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomKey!);
           if (!room) return;
           
           // Update player data in room
@@ -334,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastUpdate: Date.now(),
             roomId: room.id
           };
-          console.log(`Room ${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
@@ -355,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const collisionRadius = data.segmentRadius + (otherPlayer.segmentRadius || 10);
                 
                 if (dist < collisionRadius) {
-                  console.log(`💀 SERVER Room ${room.id}: Player ${playerId} crashed into ${otherPlayerId}!`);
+                  console.log(`💀 SERVER Room ${room.region}/${room.id}: Player ${playerId} crashed into ${otherPlayerId}!`);
                   collisionDetected = true;
                   
                   // Remove crashed player immediately from room
@@ -371,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }));
                   }
                   
-                  console.log(`💀 Player ${playerId} removed from room ${room.id}`);
+                  console.log(`💀 Player ${playerId} removed from room ${room.region}/${room.id}`);
                   break;
                 }
               }
@@ -395,21 +426,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     ws.on("close", (code: number, reason: Buffer) => {
-      const roomId = playerToRoom.get(playerId);
-      const room = gameRooms.get(roomId!);
-      console.log(`Player ${playerId} left room ${roomId}. Code: ${code}, Reason: ${reason.toString()}`);
+      const roomKey = playerToRoom.get(playerId);
+      const room = gameRooms.get(roomKey!);
+      console.log(`Player ${playerId} left room ${roomKey}. Code: ${code}, Reason: ${reason.toString()}`);
       
       if (room) {
         room.players.delete(playerId);
-        console.log(`Room ${roomId} now has ${room.players.size}/${room.maxPlayers} players`);
+        console.log(`Room ${room.region}/${room.id} now has ${room.players.size}/${room.maxPlayers} players`);
       }
       playerToRoom.delete(playerId);
     });
 
     ws.on("error", (error: any) => {
-      const roomId = playerToRoom.get(playerId);
-      const room = gameRooms.get(roomId!);
-      console.error(`WebSocket error for player ${playerId} in room ${roomId}:`, error);
+      const roomKey = playerToRoom.get(playerId);
+      const room = gameRooms.get(roomKey!);
+      console.error(`WebSocket error for player ${playerId} in room ${roomKey}:`, error);
       
       if (room) {
         room.players.delete(playerId);
@@ -422,23 +453,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Broadcast to each room separately
-      for (const [roomId, room] of gameRooms) {
+      for (const [roomKey, room] of gameRooms) {
         if (room.players.size === 0) continue;
         
         const worldMessage = JSON.stringify({
           type: 'gameWorld',
           bots: room.bots,
           players: Array.from(room.players.values()),
-          roomId: roomId
+          roomId: room.id,
+          region: room.region
         });
         
         // Find clients in this room and broadcast to them
         wss.clients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+          if (client.readyState === WebSocket.OPEN && 
+              client.roomId === room.id && 
+              client.region === room.region) {
             try {
               client.send(worldMessage);
             } catch (error) {
-              console.error(`Broadcast error to room ${roomId}:`, error);
+              console.error(`Broadcast error to room ${room.region}/${room.id}:`, error);
               client.terminate();
             }
           }

@@ -527,6 +527,7 @@ export default function GamePage() {
   const [, setLocation] = useLocation();
   const params = useParams();
   const roomId = params?.roomId || '1'; // Default to room 1 if no room specified
+  const region = params?.region || 'us'; // Default to US region if no region specified
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
     const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
@@ -669,7 +670,7 @@ export default function GamePage() {
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`);
     
     wsRef.current = socket;
 
