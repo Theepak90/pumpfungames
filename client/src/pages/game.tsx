@@ -1275,37 +1275,22 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food items with glow effect
-      food.forEach(foodItem => {
-        ctx.save();
-        
-        // Create glowing effect
-        ctx.shadowColor = foodItem.color;
-        ctx.shadowBlur = foodItem.radius * 3 * (foodItem.glowIntensity || 1);
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        
-        // Draw food circle
-        ctx.fillStyle = foodItem.color;
-        ctx.beginPath();
-        ctx.arc(foodItem.x, foodItem.y, foodItem.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add inner bright core
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
-        ctx.beginPath();
-        ctx.arc(foodItem.x, foodItem.y, foodItem.radius * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
-      });
-      
-      // Debug food count
+      // TEST: Draw simple red dots to prove food system works
       if (food.length > 0) {
-        console.log(`🍎 Rendering ${food.length} food items at positions:`, food.slice(0, 3).map(f => `(${f.x?.toFixed(0)},${f.y?.toFixed(0)})`));
+        console.log(`🍎 DRAWING ${food.length} FOOD ITEMS!`);
+        food.forEach((foodItem, index) => {
+          // Make food very obvious - large red circles
+          ctx.fillStyle = '#ff0000'; // Bright red
+          ctx.beginPath();
+          ctx.arc(foodItem.x, foodItem.y, 20, 0, Math.PI * 2); // Large radius
+          ctx.fill();
+          
+          if (index < 5) {
+            console.log(`Food ${index}: x=${foodItem.x}, y=${foodItem.y}, radius=${foodItem.radius}`);
+          }
+        });
       } else {
-        console.log(`🔍 No food to render - food state is empty`);
+        console.log(`❌ NO FOOD TO DRAW - food array is empty`);
       }
 
       // All food rendering removed
