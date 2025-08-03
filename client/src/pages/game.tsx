@@ -707,6 +707,22 @@ export default function GamePage() {
             setFood(data.food);
           }
           
+          // Synchronize our snake's mass with server data when food is consumed
+          if (data.players && myPlayerId) {
+            const myServerData = data.players.find((p: any) => p.id === myPlayerId);
+            if (myServerData && myServerData.totalMass !== undefined) {
+              const currentMass = snake.totalMass;
+              const serverMass = myServerData.totalMass;
+              
+              // If server mass is higher, snake grew by eating food
+              if (serverMass > currentMass) {
+                const massGain = serverMass - currentMass;
+                snake.grow(massGain);
+                console.log(`🍎 Snake grew by ${massGain.toFixed(2)} mass (server sync), new total: ${snake.totalMass.toFixed(2)}`);
+              }
+            }
+          }
+          
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${data.food?.length || 0} food`);
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
