@@ -409,7 +409,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ws.send(JSON.stringify({
         type: 'gameWorld',
         bots: targetRoom.bots,
-        players: Array.from(targetRoom.players.values())
+        players: Array.from(targetRoom.players.values()),
+        food: targetRoom.food, // Include synchronized food
+        roomId: targetRoom.id,
+        region: targetRoom.region
       }));
     }, 100);
 
