@@ -1452,13 +1452,29 @@ export default function GamePage() {
           );
           const isAttracted = distanceToPlayer < FOOD_ATTRACTION_RADIUS;
           
-          // Yellow circles removed as requested
+          // Draw food with glow effect
+          ctx.save();
           
-          // Draw as solid colored circle
+          // Create glowing effect with shadow
+          ctx.shadowColor = food.color;
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw main food circle
           ctx.fillStyle = food.color;
           ctx.beginPath();
           ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Add inner bright glow for more intensity
+          ctx.shadowBlur = 4;
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.radius * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
           
           // Show velocity vector for testing (red line)
           if (isAttracted && (Math.abs(food.vx) > 0.1 || Math.abs(food.vy) > 0.1)) {
