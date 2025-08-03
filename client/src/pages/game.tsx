@@ -387,6 +387,9 @@ class SmoothSnake {
   // Money system
   money: number;
   
+  // Callback for dropping boost food
+  onDropFood?: (food: any) => void;
+  
   constructor(x: number, y: number) {
     // Movement properties
     this.head = { x, y };
@@ -572,7 +575,29 @@ class SmoothSnake {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Food dropping removed - no mass loss during boosting
+      // Lose mass and drop food while boosting (every ~4-5 frames = 3-4 times per second)
+      if (this.boostCooldown % 4 === 0) {
+        this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.05);
+        
+        // Drop tiny food particle behind snake
+        const dropX = this.head.x - Math.cos(this.currentAngle) * 20; // Drop behind head
+        const dropY = this.head.y - Math.sin(this.currentAngle) * 20;
+        
+        // Create small food particle
+        const boostFood = {
+          id: `boost_${Date.now()}_${Math.random()}`,
+          x: dropX,
+          y: dropY,
+          radius: 2, // Smaller than regular food
+          mass: 0.05,
+          color: '#ffff99', // Light yellow for boost food
+          vx: 0,
+          vy: 0
+        };
+        
+        // Add to foods array (will need to be passed from game loop)
+        this.onDropFood?.(boostFood);
+      }
     } else {
       this.speed = this.baseSpeed;
       this.isBoosting = false;
@@ -649,6 +674,13 @@ export default function GamePage() {
     console.log(`NEW SNAKE CREATED: mass=${newSnake.totalMass}, visibleSegments=${newSnake.visibleSegments.length}, trail=${newSnake.segmentTrail.length}`);
     return newSnake;
   });
+
+  // Set up callback for boost food dropping
+  useEffect(() => {
+    snake.onDropFood = (boostFood: any) => {
+      setFoods(currentFoods => [...currentFoods, boostFood]);
+    };
+  }, [snake]);
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
