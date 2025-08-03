@@ -206,24 +206,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const x = MAP_CENTER_X + Math.cos(angle) * radius;
     const y = MAP_CENTER_Y + Math.sin(angle) * radius;
     
-    // Random food size with different probabilities
+    // All food now gives same mass (0.33) but different visual sizes
     const sizeRandom = Math.random();
     let size: 'small' | 'medium' | 'large';
     let foodRadius: number;
-    let mass: number;
+    const mass = 0.33; // All food gives 0.33 mass
     
     if (sizeRandom < 0.6) {
       size = 'small';
       foodRadius = 3;
-      mass = 0.2;
     } else if (sizeRandom < 0.9) {
       size = 'medium'; 
       foodRadius = 5;
-      mass = 0.4;
     } else {
       size = 'large';
       foodRadius = 7;
-      mass = 0.6;
     }
     
     // Random bright colors
