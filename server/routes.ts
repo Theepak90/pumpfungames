@@ -168,11 +168,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Room management system with regional support
+  interface Food {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+    mass: number;
+    size: 'small' | 'medium' | 'large';
+    color: string;
+    glowIntensity: number;
+  }
+
   interface GameRoom {
     id: number;
     region: string;
     players: Map<string, any>;
     bots: any[];
+    food: Food[];
     maxPlayers: number;
     initialized: boolean;
     lastActivity: number;
@@ -181,6 +193,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const gameRooms = new Map<string, GameRoom>(); // Key format: "region:roomId"
   const playerToRoom = new Map<string, string>(); // Maps playerId to "region:roomId"
 
+  // Food creation utility functions
+  const FOOD_COUNT = 150;
+  const MAP_RADIUS = 2000;
+  const MAP_CENTER_X = 4000;
+  const MAP_CENTER_Y = 4000;
+
+  function createFood(id: string): Food {
+    // Generate random position within map boundaries
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * (MAP_RADIUS - 100); // Stay away from boundary
+    const x = MAP_CENTER_X + Math.cos(angle) * radius;
+    const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+    
+    // Random food size with different probabilities
+    const sizeRandom = Math.random();
+    let size: 'small' | 'medium' | 'large';
+    let foodRadius: number;
+    let mass: number;
+    
+    if (sizeRandom < 0.6) {
+      size = 'small';
+      foodRadius = 3;
+      mass = 0.2;
+    } else if (sizeRandom < 0.9) {
+      size = 'medium'; 
+      foodRadius = 5;
+      mass = 0.4;
+    } else {
+      size = 'large';
+      foodRadius = 7;
+      mass = 0.6;
+    }
+    
+    // Random bright colors
+    const colors = [
+      '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', 
+      '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43',
+      '#ffeaa7', '#fab1a0', '#e17055', '#81ecec', '#74b9ff'
+    ];
+    
+    return {
+      id,
+      x,
+      y,
+      radius: foodRadius,
+      mass,
+      size,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      glowIntensity: 0.8 + Math.random() * 0.4 // Random glow between 0.8-1.2
+    };
+  }
+
+  function initializeRoomFood(room: GameRoom): void {
+    room.food = [];
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      room.food.push(createFood(`${room.region}_${room.id}_food_${i}`));
+    }
+    console.log(`Initialized ${FOOD_COUNT} food items for room ${room.region}/${room.id}`);
+  }
+
   // Initialize room with region support
   function createRoom(region: string, roomId: number): GameRoom {
     const room: GameRoom = {
@@ -188,10 +260,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       region: region,
       players: new Map(),
       bots: [],
+      food: [],
       maxPlayers: 8,
       initialized: true,
       lastActivity: Date.now()
     };
+    
+    // Initialize food for the room
+    initializeRoomFood(room);
+    
     const roomKey = `${region}:${roomId}`;
     gameRooms.set(roomKey, room);
     console.log(`Created room ${region}/${roomId}`);
@@ -419,7 +496,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             room.players.set(playerId, updatedPlayer);
             room.lastActivity = Date.now();
           }
-        } // Food system completely removed from multiplayer
+        }
+
+        // Server-side food consumption system
+        if (!collisionDetected && currentPlayerHead && room.food.length > 0) {
+          const MAGNETIC_RANGE = 50;
+          const consumedFoodIds: string[] = [];
+          
+          // Check food consumption
+          for (let i = room.food.length - 1; i >= 0; i--) {
+            const foodItem = room.food[i];
+            const distance = Math.sqrt(
+              (currentPlayerHead.x - foodItem.x) ** 2 + 
+              (currentPlayerHead.y - foodItem.y) ** 2
+            );
+            
+            // Check if food is consumed (collision with snake head)
+            if (distance < (data.segmentRadius || 8) + foodItem.radius) {
+              // Add mass to player (will be capped at MAX_MASS)
+              const newMass = Math.min((updatedPlayer.totalMass || 0) + foodItem.mass, MAX_MASS);
+              updatedPlayer.totalMass = newMass;
+              
+              console.log(`Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}`);
+              
+              // Remove consumed food and create replacement
+              consumedFoodIds.push(foodItem.id);
+              room.food.splice(i, 1);
+              
+              // Spawn new food to maintain count
+              const newFoodId = `${room.region}_${room.id}_food_${Date.now()}_${Math.random()}`;
+              room.food.push(createFood(newFoodId));
+            }
+          }
+          
+          // Update player with new mass if food was consumed
+          if (consumedFoodIds.length > 0) {
+            room.players.set(playerId, updatedPlayer);
+            console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
+          }
+        }
       } catch (error) {
         console.error("WebSocket message error:", error);
       }
@@ -460,6 +575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'gameWorld',
           bots: room.bots,
           players: Array.from(room.players.values()),
+          food: room.food, // Include synchronized food
           roomId: room.id,
           region: room.region
         });

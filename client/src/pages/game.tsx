@@ -51,71 +51,7 @@ interface BotSnake {
   aggroTarget: SmoothSnake | BotSnake | null;
 }
 
-// Food creation and management functions
-function createFood(id: string): Food {
-  // Random position within map bounds
-  const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 100);
-  const x = MAP_CENTER_X + Math.cos(angle) * radius;
-  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
-  
-  // Random food size
-  const sizeRandom = Math.random();
-  let size: 'small' | 'medium' | 'large';
-  let mass: number;
-  let foodRadius: number;
-  
-  if (sizeRandom < 0.6) {
-    size = 'small';
-    mass = 0.2;
-    foodRadius = 4;
-  } else if (sizeRandom < 0.85) {
-    size = 'medium'; 
-    mass = 0.4;
-    foodRadius = 6;
-  } else {
-    size = 'large';
-    mass = 0.6;
-    foodRadius = 8;
-  }
-  
-  return {
-    id,
-    x,
-    y,
-    size,
-    mass,
-    color: getRandomFoodColor(),
-    radius: foodRadius,
-    glowIntensity: 0.8 + Math.random() * 0.4 // Random glow intensity
-  };
-}
-
-function getRandomFoodColor(): string {
-  const colors = [
-    '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', 
-    '#ff9ff3', '#54a0ff', '#5f27cd', '#fd79a8', '#fdcb6e',
-    '#6c5ce7', '#a29bfe', '#74b9ff', '#0984e3', '#00b894',
-    '#00cec9', '#55a3ff', '#ff7675', '#e84393', '#a0e4cb',
-    '#ffeaa7', '#fab1a0', '#e17055', '#81ecec', '#74b9ff'
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
-}
-
-function applyMagneticAttraction(food: Food, playerHead: Position): void {
-  const dx = playerHead.x - food.x;
-  const dy = playerHead.y - food.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  
-  if (distance < MAGNETIC_RANGE && distance > 0) {
-    // Attraction strength increases as distance decreases
-    const attraction = (MAGNETIC_RANGE - distance) / MAGNETIC_RANGE;
-    const speed = attraction * 2; // Max speed of 2 pixels per frame
-    
-    food.x += (dx / distance) * speed;
-    food.y += (dy / distance) * speed;
-  }
-}
+// Food system now server-side - client only renders received food data
 
 // Bot snake utility functions
 function createBotSnake(id: string): BotSnake {
@@ -719,22 +655,15 @@ export default function GamePage() {
 
 
 
-  // Initialize food when game starts
+  // Game initialization - server provides all data
   useEffect(() => {
     if (!gameStarted) return;
     
     // Clear any local game state - server provides everything
     setBotSnakes([]);
-    
-    // Initialize food items
-    const initialFood: Food[] = [];
-    for (let i = 0; i < FOOD_COUNT; i++) {
-      initialFood.push(createFood(`food_${i}`));
-    }
-    setFood(initialFood);
+    setFood([]); // Server will provide synchronized food
     
     console.log("Game started - waiting for server world data");
-    console.log(`Initialized ${FOOD_COUNT} food items`);
   }, [gameStarted]);
 
   // WebSocket connection for real multiplayer
@@ -772,7 +701,13 @@ export default function GamePage() {
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
-          console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
+          
+          // Update food from server (synchronized across all players)
+          if (data.food) {
+            setFood(data.food);
+          }
+          
+          console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${data.food?.length || 0} food`);
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -1069,36 +1004,8 @@ export default function GamePage() {
         setCashOutStartTime(null);
       }
 
-      // Food system - magnetic attraction and consumption
-      setFood(prevFood => {
-        const updatedFood = [...prevFood];
-        const playerHead = { x: snake.head.x, y: snake.head.y };
-        
-        // Apply magnetic attraction and check for consumption
-        for (let i = updatedFood.length - 1; i >= 0; i--) {
-          const foodItem = updatedFood[i];
-          
-          // Apply magnetic attraction
-          applyMagneticAttraction(foodItem, playerHead);
-          
-          // Check if food is consumed
-          const distance = Math.sqrt(
-            (foodItem.x - playerHead.x) ** 2 + (foodItem.y - playerHead.y) ** 2
-          );
-          
-          if (distance < snake.getScaleFactor() * 12 + foodItem.radius) {
-            // Food consumed - add mass and remove food
-            snake.totalMass += foodItem.mass;
-            console.log(`Consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${snake.totalMass}`);
-            
-            // Remove consumed food and spawn new one
-            updatedFood.splice(i, 1);
-            updatedFood.push(createFood(`food_${Date.now()}_${Math.random()}`));
-          }
-        }
-        
-        return updatedFood;
-      });
+      // Food system now handled server-side for synchronization
+      // Client only renders food received from server
 
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
