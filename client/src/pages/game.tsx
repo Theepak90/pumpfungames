@@ -389,10 +389,13 @@ class SmoothSnake {
   // Money system
   money: number;
   
+  // Snake appearance
+  color: string;
+  
   // Callback for dropping boost food
   onDropFood?: (food: any) => void;
   
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, color: string = '#d55400') {
     // Movement properties
     this.head = { x, y };
     this.currentAngle = 0;
@@ -402,6 +405,9 @@ class SmoothSnake {
     this.speed = this.baseSpeed;
     this.isBoosting = false;
     this.boostCooldown = 0;
+    
+    // Set snake color
+    this.color = color;
     
     // Snake system constants
     this.START_MASS = 6; // Start with just 6 segments instead of 30
@@ -676,6 +682,18 @@ class SmoothSnake {
       { x: eye2X, y: eye2Y, size: eyeSize }
     ];
   }
+  
+  // Method to completely clear snake when it dies
+  clearSnakeOnDeath() {
+    this.visibleSegments = []; // Clear all body segments immediately
+    this.segmentTrail = []; // Clear trail
+    this.totalMass = 0; // Reset mass to 0
+    this.money = 0; // Reset snake's money on death
+    this.growthRemaining = 0;
+    this.partialGrowth = 0;
+    this.currentSegmentCount = 0;
+    console.log(`💀 SNAKE DEATH: All segments cleared, body completely invisible`);
+  }
 }
 
 export default function GamePage() {
@@ -685,11 +703,17 @@ export default function GamePage() {
   const roomId = params?.roomId || '1'; // Default to room 1 if no room specified
   const region = params?.region || 'us'; // Default to US region if no region specified
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
+  const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const [snake] = useState(() => {
-    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
+    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y, '#d55400');
     console.log(`NEW SNAKE CREATED: mass=${newSnake.totalMass}, visibleSegments=${newSnake.visibleSegments.length}, trail=${newSnake.segmentTrail.length}`);
     return newSnake;
   });
+  
+  // Update snake color when myPlayerColor changes
+  useEffect(() => {
+    snake.color = myPlayerColor;
+  }, [myPlayerColor, snake]);
 
   // Set up callback for boost food dropping
   useEffect(() => {
@@ -749,7 +773,6 @@ export default function GamePage() {
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
-  const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const wsRef = useRef<WebSocket | null>(null);
 
   // Death food dropping removed
@@ -1274,13 +1297,9 @@ export default function GamePage() {
       
       if (hitBoundary) {
         // Clear snake body completely when hitting death barrier
-        snake.visibleSegments = []; // Clear all body segments immediately
-        snake.segmentTrail = []; // Clear trail
-        snake.totalMass = 0; // Reset mass to 0
-        snake.money = 0; // Reset snake's money on death
+        snake.clearSnakeOnDeath();
         setGameOver(true);
         gameOverRef.current = true;
-        console.log(`💀 BOUNDARY DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
         return;
       }
 
@@ -1311,13 +1330,9 @@ export default function GamePage() {
       
       if (hitBot) {
         // Clear snake body completely when hitting bot
-        snake.visibleSegments = []; // Clear all body segments immediately
-        snake.segmentTrail = []; // Clear trail
-        snake.totalMass = 0; // Reset mass to 0
-        snake.money = 0; // Reset snake's money on death
+        snake.clearSnakeOnDeath();
         setGameOver(true);
         gameOverRef.current = true;
-        console.log(`💀 BOT COLLISION DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
         return;
       }
 
@@ -1344,10 +1359,7 @@ export default function GamePage() {
         
         if (headOnCollision) {
           // Both snakes die in head-on collision - clear snake body completely
-          snake.visibleSegments = []; // Clear all body segments immediately
-          snake.segmentTrail = []; // Clear trail
-          snake.totalMass = 0; // Reset mass to 0
-          snake.money = 0;
+          snake.clearSnakeOnDeath();
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1359,7 +1371,6 @@ export default function GamePage() {
           
           setGameOver(true);
           gameOverRef.current = true;
-          console.log(`💀 HEAD-ON COLLISION DEATH: Snake body cleared, segments=${snake.visibleSegments.length}`);
           return;
         }
       }
@@ -1416,8 +1427,9 @@ export default function GamePage() {
           const collisionRadius = snake.getSegmentRadius() + 10; // Use standard segment radius
           
           if (dist < collisionRadius) {
-            // Player died - crash into another snake!
+            // Player died - crash into another snake! Clear snake body completely
             console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
+            snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
@@ -1427,8 +1439,6 @@ export default function GamePage() {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             console.log(`💀 Game over state set and canvas cleared!`);
-            
-            // Death loot removed
             
             return; // Stop the game loop
           }
