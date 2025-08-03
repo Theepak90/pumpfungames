@@ -389,13 +389,10 @@ class SmoothSnake {
   // Money system
   money: number;
   
-  // Snake color
-  color: string;
-  
   // Callback for dropping boost food
   onDropFood?: (food: any) => void;
   
-  constructor(x: number, y: number, color: string = '#d55400') {
+  constructor(x: number, y: number) {
     // Movement properties
     this.head = { x, y };
     this.currentAngle = 0;
@@ -424,9 +421,6 @@ class SmoothSnake {
     
     // Initialize money
     this.money = 1.00;
-    
-    // Initialize color
-    this.color = color;
     
     this.updateVisibleSegments();
   }
@@ -692,7 +686,7 @@ export default function GamePage() {
   const region = params?.region || 'us'; // Default to US region if no region specified
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [snake] = useState(() => {
-    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y, myPlayerColor);
+    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y);
     console.log(`NEW SNAKE CREATED: mass=${newSnake.totalMass}, visibleSegments=${newSnake.visibleSegments.length}, trail=${newSnake.segmentTrail.length}`);
     return newSnake;
   });
