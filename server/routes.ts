@@ -449,7 +449,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let collisionDetected = false;
           
           if (currentPlayerHead && data.segmentRadius) {
-            
             // Check collision with all other players in same room
             for (const [otherPlayerId, otherPlayer] of Array.from(room.players)) {
               if (otherPlayerId === playerId) continue; // Skip self
@@ -491,6 +490,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!collisionDetected) {
               room.players.set(playerId, updatedPlayer);
               room.lastActivity = Date.now();
+              
+              // Server-side food consumption system
+              if (room.food.length > 0) {
+                const MAGNETIC_RANGE = 50;
+                const consumedFoodIds: string[] = [];
+                
+                // Check food consumption
+                for (let i = room.food.length - 1; i >= 0; i--) {
+                  const foodItem = room.food[i];
+                  const distance = Math.sqrt(
+                    (currentPlayerHead.x - foodItem.x) ** 2 + 
+                    (currentPlayerHead.y - foodItem.y) ** 2
+                  );
+                  
+                  // Check if food is consumed (collision with snake head)
+                  if (distance < (data.segmentRadius || 8) + foodItem.radius) {
+                    // Add mass to player (will be capped at MAX_MASS)
+                    const newMass = Math.min((updatedPlayer.totalMass || 0) + foodItem.mass, MAX_MASS);
+                    updatedPlayer.totalMass = newMass;
+                    
+                    console.log(`Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}`);
+                    
+                    // Remove consumed food and create replacement
+                    consumedFoodIds.push(foodItem.id);
+                    room.food.splice(i, 1);
+                    
+                    // Spawn new food to maintain count
+                    const newFoodId = `${room.region}_${room.id}_food_${Date.now()}_${Math.random()}`;
+                    room.food.push(createFood(newFoodId));
+                  }
+                }
+                
+                // Update player with new mass if food was consumed
+                if (consumedFoodIds.length > 0) {
+                  room.players.set(playerId, updatedPlayer);
+                  console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
+                }
+              }
             }
           } else {
             // No collision check needed if no head position
@@ -499,43 +536,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Server-side food consumption system
-        if (!collisionDetected && currentPlayerHead && room.food.length > 0) {
-          const MAGNETIC_RANGE = 50;
-          const consumedFoodIds: string[] = [];
-          
-          // Check food consumption
-          for (let i = room.food.length - 1; i >= 0; i--) {
-            const foodItem = room.food[i];
-            const distance = Math.sqrt(
-              (currentPlayerHead.x - foodItem.x) ** 2 + 
-              (currentPlayerHead.y - foodItem.y) ** 2
-            );
-            
-            // Check if food is consumed (collision with snake head)
-            if (distance < (data.segmentRadius || 8) + foodItem.radius) {
-              // Add mass to player (will be capped at MAX_MASS)
-              const newMass = Math.min((updatedPlayer.totalMass || 0) + foodItem.mass, MAX_MASS);
-              updatedPlayer.totalMass = newMass;
-              
-              console.log(`Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}`);
-              
-              // Remove consumed food and create replacement
-              consumedFoodIds.push(foodItem.id);
-              room.food.splice(i, 1);
-              
-              // Spawn new food to maintain count
-              const newFoodId = `${room.region}_${room.id}_food_${Date.now()}_${Math.random()}`;
-              room.food.push(createFood(newFoodId));
-            }
-          }
-          
-          // Update player with new mass if food was consumed
-          if (consumedFoodIds.length > 0) {
-            room.players.set(playerId, updatedPlayer);
-            console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
-          }
-        }
       } catch (error) {
         console.error("WebSocket message error:", error);
       }
