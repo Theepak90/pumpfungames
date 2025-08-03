@@ -1278,7 +1278,7 @@ export default function GamePage() {
         
         // Create glowing effect
         ctx.shadowColor = foodItem.color;
-        ctx.shadowBlur = foodItem.radius * 3 * foodItem.glowIntensity;
+        ctx.shadowBlur = foodItem.radius * 3 * (foodItem.glowIntensity || 1);
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
         
@@ -1297,6 +1297,11 @@ export default function GamePage() {
         
         ctx.restore();
       });
+      
+      // Debug food count
+      if (food.length > 0) {
+        console.log(`🍎 Rendering ${food.length} food items`);
+      }
 
       // All food rendering removed
 
