@@ -112,8 +112,8 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance > 0) {
-      // Stronger, more direct attraction without mass dependency
-      const force = FOOD_GRAVITY / distance; // Linear attraction based on distance
+      // Stronger, more direct attraction with better force
+      const force = FOOD_GRAVITY * 2; // Increased force for more noticeable attraction
       updated.vx += (dx / distance) * force;
       updated.vy += (dy / distance) * force;
       
@@ -122,6 +122,11 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
       if (speed > FOOD_MAX_SPEED) {
         updated.vx = (updated.vx / speed) * FOOD_MAX_SPEED;
         updated.vy = (updated.vy / speed) * FOOD_MAX_SPEED;
+      }
+      
+      // Debug logging for food attraction (limited)
+      if (Math.random() < 0.001) { // Log 0.1% of the time to avoid spam
+        console.log(`Food ${food.id.slice(-3)} attracted to snake: distance=${distance.toFixed(1)}px, force=${force.toFixed(2)}, velocity=${speed.toFixed(2)}`);
       }
     }
   } else {
@@ -1120,39 +1125,37 @@ export default function GamePage() {
         }))
       ].filter(s => s.head.x !== undefined && s.head.y !== undefined);
 
-      // Update food gravitational physics (only every 3rd frame for performance)
-      if (currentTime % 3 === 0) {
-        setFoods(currentFoods => {
-          const updatedFoods = currentFoods.map(food => 
-            updateFoodGravity(food, allSnakes)
+      // Update food gravitational physics every frame for better responsiveness
+      setFoods(currentFoods => {
+        const updatedFoods = currentFoods.map(food => 
+          updateFoodGravity(food, allSnakes)
+        );
+        
+        // Check food consumption by player snake only
+        const consumedFoodIds: string[] = [];
+        for (const food of updatedFoods) {
+          const distToSnake = Math.sqrt(
+            (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
           );
           
-          // Check food consumption by player snake only
-          const consumedFoodIds: string[] = [];
-          for (const food of updatedFoods) {
-            const distToSnake = Math.sqrt(
-              (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
-            );
-            
-            if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
-              // Snake eats food
-              snake.eatFood(food.mass);
-              consumedFoodIds.push(food.id);
-            }
+          if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
+            // Snake eats food
+            snake.eatFood(food.mass);
+            consumedFoodIds.push(food.id);
           }
-          
-          // Remove consumed food and create new ones
-          let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
-          
-          // Spawn new food to maintain constant count
-          const newFoodCount = FOOD_COUNT - filteredFoods.length;
-          for (let i = 0; i < newFoodCount; i++) {
-            filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
-          }
-          
-          return filteredFoods;
-        });
-      }
+        }
+        
+        // Remove consumed food and create new ones
+        let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
+        
+        // Spawn new food to maintain constant count
+        const newFoodCount = FOOD_COUNT - filteredFoods.length;
+        for (let i = 0; i < newFoodCount; i++) {
+          filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
+        }
+        
+        return filteredFoods;
+      });
 
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
