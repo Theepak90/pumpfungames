@@ -575,8 +575,8 @@ class SmoothSnake {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Lose mass and drop food while boosting (every ~4-5 frames = 3-4 times per second)
-      if (this.boostCooldown % 4 === 0) {
+      // Lose mass and drop food while boosting (every ~8 frames = 1.5-2 times per second)
+      if (this.boostCooldown % 8 === 0) {
         this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.05);
         
         // Drop tiny food particle behind snake
