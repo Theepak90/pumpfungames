@@ -9,15 +9,26 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
-// Food system removed
+// Food system configuration
 const BOT_COUNT = 5;
+const FOOD_COUNT = 150; // Total food items on map
+const MAGNETIC_RANGE = 50; // Distance at which food attracts to snake
 
 interface Position {
   x: number;
   y: number;
 }
 
-// Food interface removed - all food systems eliminated
+interface Food {
+  id: string;
+  x: number;
+  y: number;
+  size: 'small' | 'medium' | 'large';
+  mass: number;
+  color: string;
+  radius: number;
+  glowIntensity: number;
+}
 
 interface BotSnake {
   id: string;
@@ -31,16 +42,55 @@ interface BotSnake {
   color: string;
   targetAngle: number;
   lastDirectionChange: number;
-  // targetFood removed
   money: number; // Bot's money balance
   state: 'wander' | 'foodHunt' | 'avoid' | 'aggro'; // Bot behavior state
+  targetFood: Food | null;
   isBoosting: boolean;
   boostTime: number;
   lastStateChange: number;
   aggroTarget: SmoothSnake | BotSnake | null;
 }
 
-// Utility function to generate random food colors
+// Food creation and management functions
+function createFood(id: string): Food {
+  // Random position within map bounds
+  const angle = Math.random() * Math.PI * 2;
+  const radius = Math.random() * (MAP_RADIUS - 100);
+  const x = MAP_CENTER_X + Math.cos(angle) * radius;
+  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+  
+  // Random food size
+  const sizeRandom = Math.random();
+  let size: 'small' | 'medium' | 'large';
+  let mass: number;
+  let foodRadius: number;
+  
+  if (sizeRandom < 0.6) {
+    size = 'small';
+    mass = 0.2;
+    foodRadius = 4;
+  } else if (sizeRandom < 0.85) {
+    size = 'medium'; 
+    mass = 0.4;
+    foodRadius = 6;
+  } else {
+    size = 'large';
+    mass = 0.6;
+    foodRadius = 8;
+  }
+  
+  return {
+    id,
+    x,
+    y,
+    size,
+    mass,
+    color: getRandomFoodColor(),
+    radius: foodRadius,
+    glowIntensity: 0.8 + Math.random() * 0.4 // Random glow intensity
+  };
+}
+
 function getRandomFoodColor(): string {
   const colors = [
     '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', 
@@ -50,6 +100,21 @@ function getRandomFoodColor(): string {
     '#ffeaa7', '#fab1a0', '#e17055', '#81ecec', '#74b9ff'
   ];
   return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function applyMagneticAttraction(food: Food, playerHead: Position): void {
+  const dx = playerHead.x - food.x;
+  const dy = playerHead.y - food.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  if (distance < MAGNETIC_RANGE && distance > 0) {
+    // Attraction strength increases as distance decreases
+    const attraction = (MAGNETIC_RANGE - distance) / MAGNETIC_RANGE;
+    const speed = attraction * 2; // Max speed of 2 pixels per frame
+    
+    food.x += (dx / distance) * speed;
+    food.y += (dy / distance) * speed;
+  }
 }
 
 // Bot snake utility functions
@@ -78,6 +143,7 @@ function createBotSnake(id: string): BotSnake {
 
     money: 1.00, // All bots start with exactly $1.00
     state: 'wander',
+    targetFood: null,
     isBoosting: false,
     boostTime: 0,
     lastStateChange: Date.now(),
@@ -535,6 +601,7 @@ export default function GamePage() {
     return newSnake;
   });
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
+  const [food, setFood] = useState<Food[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
@@ -652,14 +719,22 @@ export default function GamePage() {
 
 
 
-  // Local game initialization disabled - everything comes from server
+  // Initialize food when game starts
   useEffect(() => {
     if (!gameStarted) return;
     
     // Clear any local game state - server provides everything
     setBotSnakes([]);
     
+    // Initialize food items
+    const initialFood: Food[] = [];
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      initialFood.push(createFood(`food_${i}`));
+    }
+    setFood(initialFood);
+    
     console.log("Game started - waiting for server world data");
+    console.log(`Initialized ${FOOD_COUNT} food items`);
   }, [gameStarted]);
 
   // WebSocket connection for real multiplayer
@@ -994,7 +1069,36 @@ export default function GamePage() {
         setCashOutStartTime(null);
       }
 
-      // Food system removed
+      // Food system - magnetic attraction and consumption
+      setFood(prevFood => {
+        const updatedFood = [...prevFood];
+        const playerHead = { x: snake.head.x, y: snake.head.y };
+        
+        // Apply magnetic attraction and check for consumption
+        for (let i = updatedFood.length - 1; i >= 0; i--) {
+          const foodItem = updatedFood[i];
+          
+          // Apply magnetic attraction
+          applyMagneticAttraction(foodItem, playerHead);
+          
+          // Check if food is consumed
+          const distance = Math.sqrt(
+            (foodItem.x - playerHead.x) ** 2 + (foodItem.y - playerHead.y) ** 2
+          );
+          
+          if (distance < snake.getScaleFactor() * 12 + foodItem.radius) {
+            // Food consumed - add mass and remove food
+            snake.totalMass += foodItem.mass;
+            console.log(`Consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${snake.totalMass}`);
+            
+            // Remove consumed food and spawn new one
+            updatedFood.splice(i, 1);
+            updatedFood.push(createFood(`food_${Date.now()}_${Math.random()}`));
+          }
+        }
+        
+        return updatedFood;
+      });
 
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
@@ -1260,6 +1364,32 @@ export default function GamePage() {
       ctx.beginPath();
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
+
+      // Draw food items with glow effect
+      food.forEach(foodItem => {
+        ctx.save();
+        
+        // Create glowing effect
+        ctx.shadowColor = foodItem.color;
+        ctx.shadowBlur = foodItem.radius * 3 * foodItem.glowIntensity;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw food circle
+        ctx.fillStyle = foodItem.color;
+        ctx.beginPath();
+        ctx.arc(foodItem.x, foodItem.y, foodItem.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add inner bright core
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
+        ctx.beginPath();
+        ctx.arc(foodItem.x, foodItem.y, foodItem.radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      });
 
       // All food rendering removed
 
