@@ -33,6 +33,7 @@ interface Food {
   mass: number;
   wobbleOffset: number;
   expiresAt?: number; // Optional expiration timestamp for boost food
+  opacity?: number; // Optional opacity for fading boost food
 }
 
 interface BotSnake {
@@ -899,7 +900,8 @@ export default function GamePage() {
           // Ensure the boost food has an expiration time if not already set
           const boostFood = { 
             ...data.food, 
-            expiresAt: data.food.expiresAt || (Date.now() + 10000) 
+            expiresAt: data.food.expiresAt || (Date.now() + 10000),
+            opacity: data.food.opacity || 1.0 // Start with full opacity
           };
           setFoods(currentFoods => [...currentFoods, boostFood]);
         } else if (data.type === 'death') {
@@ -1207,7 +1209,7 @@ export default function GamePage() {
         // Focus only on player snake for attraction (ignore multiplayer snakes for now)
         const playerOnlySnakes = [{ head: snake.head, totalMass: snake.totalMass }];
         
-        // Remove expired boost food (10-second expiration)
+        // Update opacity for boost food and remove expired ones
         const currentTime = Date.now();
         const nonExpiredFoods = currentFoods.filter(food => {
           if (food.expiresAt && currentTime > food.expiresAt) {
@@ -1215,6 +1217,15 @@ export default function GamePage() {
             return false;
           }
           return true;
+        }).map(food => {
+          // Calculate fading opacity for boost food
+          if (food.expiresAt) {
+            const timeRemaining = food.expiresAt - currentTime;
+            const totalLifetime = 10000; // 10 seconds
+            const opacity = Math.max(0.1, timeRemaining / totalLifetime); // Fade from 1.0 to 0.1
+            return { ...food, opacity };
+          }
+          return food;
         });
         
         const updatedFoods = nonExpiredFoods.map(food => 
@@ -1527,8 +1538,13 @@ export default function GamePage() {
           );
           const isAttracted = distanceToPlayer < FOOD_ATTRACTION_RADIUS;
           
-          // Draw food with glow effect
+          // Draw food with glow effect and optional opacity for fading boost food
           ctx.save();
+          
+          // Apply opacity for boost food fading
+          if (food.opacity !== undefined) {
+            ctx.globalAlpha = food.opacity;
+          }
           
           // Create glowing effect with shadow
           ctx.shadowColor = food.color;
