@@ -405,11 +405,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         players: Array.from(targetRoom.players.values())
       }));
       
-      // Send shared game world state including all players in this room
+      // Send shared game world state including all players and food in this room
       ws.send(JSON.stringify({
         type: 'gameWorld',
         bots: targetRoom.bots,
-        players: Array.from(targetRoom.players.values())
+        players: Array.from(targetRoom.players.values()),
+        food: targetRoom.food, // Include room's food data
+        roomId: targetRoom.id,
+        region: targetRoom.region
       }));
     }, 100);
 
@@ -580,6 +583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           roomId: room.id,
           region: room.region
         });
+        
+        // Debug log food count every 50 broadcasts
+        if (Math.random() < 0.02) { // ~2% chance
+          console.log(`DEBUG: Broadcasting ${room.food.length} food items to ${room.players.size} players in room ${room.region}/${room.id}`);
+        }
         
         // Find clients in this room and broadcast to them
         wss.clients.forEach(client => {
