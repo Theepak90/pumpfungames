@@ -504,13 +504,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     (currentPlayerHead.y - foodItem.y) ** 2
                   );
                   
-                  // Check if food is consumed (collision with snake head)
-                  if (distance < (data.segmentRadius || 8) + foodItem.radius) {
+                  // Check if food is consumed (collision with snake head) - increased collision radius
+                  const collisionRadius = (data.segmentRadius || 10) + foodItem.radius + 5; // Bigger collision area
+                  if (distance < collisionRadius) {
                     // Add mass to player (will be capped at MAX_MASS)
                     const newMass = Math.min((updatedPlayer.totalMass || 0) + foodItem.mass, MAX_MASS);
                     updatedPlayer.totalMass = newMass;
                     
-                    console.log(`Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}`);
+                    console.log(`🍎 Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}, distance: ${distance.toFixed(1)}, collision radius: ${collisionRadius.toFixed(1)}`);
                     
                     // Remove consumed food and create replacement
                     consumedFoodIds.push(foodItem.id);
