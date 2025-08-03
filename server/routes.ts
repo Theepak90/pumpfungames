@@ -500,9 +500,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Force debug log every 10 updates to see what's happening
             if (Math.random() < 0.1) {
               console.log(`DEBUG: Player head at (${currentPlayerHead.x.toFixed(1)}, ${currentPlayerHead.y.toFixed(1)}), checking ${room.food.length} foods, segmentRadius: ${data.segmentRadius || 'undefined'}`);
-              if (room.food.length > 0) {
-                console.log(`DEBUG: First food at (${room.food[0].x.toFixed(1)}, ${room.food[0].y.toFixed(1)}), radius: ${room.food[0].radius}`);
-              }
+              
+              // Find closest food items to debug
+              const nearbyFood = room.food
+                .map(food => ({
+                  ...food,
+                  distance: Math.sqrt((currentPlayerHead.x - food.x) ** 2 + (currentPlayerHead.y - food.y) ** 2)
+                }))
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 3);
+                
+              console.log(`DEBUG: Closest 3 foods:`, nearbyFood.map(f => `(${f.x.toFixed(1)}, ${f.y.toFixed(1)}) dist: ${f.distance.toFixed(1)}`));
             }
             
             // Check food consumption
@@ -513,8 +521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 (currentPlayerHead.y - foodItem.y) ** 2
               );
               
-              // Check if food is consumed (collision with snake head) - MASSIVE collision radius
-              const collisionRadius = 30; // Fixed large collision area
+              // Check if food is consumed (collision with snake head) - VERY LARGE collision radius
+              const collisionRadius = 100; // HUGE collision area to guarantee detection
               if (distance < collisionRadius) {
                 // Add mass to player (will be capped at MAX_MASS)
                 const newMass = Math.min((updatedPlayer.totalMass || 6) + foodItem.mass, MAX_MASS);
