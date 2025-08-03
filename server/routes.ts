@@ -193,11 +193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const gameRooms = new Map<string, GameRoom>(); // Key format: "region:roomId"
   const playerToRoom = new Map<string, string>(); // Maps playerId to "region:roomId"
 
-  // Food creation utility functions
+  // Food creation utility functions - match client coordinates
   const FOOD_COUNT = 150;
-  const MAP_RADIUS = 2000;
-  const MAP_CENTER_X = 4000;
-  const MAP_CENTER_Y = 4000;
+  const MAP_RADIUS = 1800;
+  const MAP_CENTER_X = 2000;
+  const MAP_CENTER_Y = 2000;
 
   function createFood(id: string): Food {
     // Generate random position within map boundaries
