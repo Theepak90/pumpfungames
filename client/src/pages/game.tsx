@@ -10,9 +10,9 @@ const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 160; // Doubled food count for more abundant gameplay
-const FOOD_GRAVITY = 2.0; // Increased attraction force for more noticeable movement
-const FOOD_MAX_SPEED = 3.0; // Increased maximum food movement speed
-const FOOD_ATTRACTION_RADIUS = 25; // Distance within which food is attracted
+const FOOD_GRAVITY = 0.8; // Slower attraction force for gentler movement
+const FOOD_MAX_SPEED = 1.2; // Slower maximum food movement speed
+const FOOD_ATTRACTION_RADIUS = 100; // Increased to 100px attraction range
 const FOOD_CONSUMPTION_RADIUS = 15; // Distance to consume food
 const BOT_COUNT = 5;
 
@@ -112,8 +112,8 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance > 0) {
-      // Very strong attraction for testing
-      const force = FOOD_GRAVITY * 3; // Much stronger force for obvious attraction
+      // Gentle attraction force
+      const force = FOOD_GRAVITY; // Use base gravity for slower movement
       updated.vx += (dx / distance) * force;
       updated.vy += (dy / distance) * force;
       
@@ -124,9 +124,9 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
         updated.vy = (updated.vy / speed) * FOOD_MAX_SPEED;
       }
       
-      // Debug logging for food attraction - more frequent for testing
-      if (Math.random() < 0.05) { // Log 5% of the time for testing
-        console.log(`🍎 FOOD ATTRACTION: ${food.id.slice(-3)} -> distance=${distance.toFixed(1)}px, force=${force.toFixed(2)}, velocity=${speed.toFixed(2)}, newPos=(${(food.x + updated.vx).toFixed(1)}, ${(food.y + updated.vy).toFixed(1)})`);
+      // Reduced debug logging
+      if (Math.random() < 0.001) { // Much less frequent logging
+        console.log(`🍎 Food ${food.id.slice(-3)} attracted: ${distance.toFixed(1)}px away, moving at ${speed.toFixed(2)} speed`);
       }
     }
   } else {
@@ -1134,9 +1134,9 @@ export default function GamePage() {
 
       // Update food gravitational physics every frame for better responsiveness
       setFoods(currentFoods => {
-        // Debug: Log food update frequency
-        if (Math.random() < 0.01) {
-          console.log(`🔄 Updating ${currentFoods.length} food particles. Player snake head at (${snake.head.x.toFixed(1)}, ${snake.head.y.toFixed(1)})`);
+        // Reduced debug frequency
+        if (Math.random() < 0.001) {
+          console.log(`🔄 Updating ${currentFoods.length} food particles`);
         }
         
         // Focus only on player snake for attraction (ignore multiplayer snakes for now)
@@ -1452,14 +1452,7 @@ export default function GamePage() {
           );
           const isAttracted = distanceToPlayer < FOOD_ATTRACTION_RADIUS;
           
-          // Draw attraction circle if within range
-          if (isAttracted) {
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(food.x, food.y, food.radius + 3, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          // Yellow circles removed as requested
           
           // Draw as solid colored circle
           ctx.fillStyle = food.color;
