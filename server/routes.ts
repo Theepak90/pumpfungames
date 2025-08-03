@@ -198,14 +198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return room;
   }
 
-  // Find best available room in specified region (prioritize filling existing rooms)
+  // Find best available room in specified region (sequential filling - only create higher rooms when lower ones are full)
   function findBestRoom(region: string = 'us'): GameRoom {
-    // Get rooms for this region only
+    // Get rooms for this region only, sorted by room ID
     const regionRooms = Array.from(gameRooms.entries())
       .filter(([key, room]) => room.region === region)
       .sort((a, b) => a[1].id - b[1].id); // Sort by room ID
     
-    // First, try to find a room with space (prioritize lower room numbers)
+    // Always try to fill the lowest numbered room first
     for (const [roomKey, room] of regionRooms) {
       if (room.players.size < room.maxPlayers) {
         console.log(`Found available space in room ${region}/${room.id} (${room.players.size}/${room.maxPlayers})`);
@@ -213,9 +213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
-    // If all rooms are full, create a new one
+    // Only create a new room if ALL existing rooms are completely full
     const newRoomId = regionRooms.length + 1;
-    console.log(`All ${region} rooms full, creating new room ${region}/${newRoomId}`);
+    console.log(`All ${region} rooms (${regionRooms.length}) are full, creating new room ${region}/${newRoomId}`);
     return createRoom(region, newRoomId);
   }
 
@@ -268,12 +268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Find the requested room or best available room in region
-    const roomKey = `${requestedRegion}:${requestedRoomId}`;
-    let targetRoom = gameRooms.get(roomKey);
-    if (!targetRoom || targetRoom.players.size >= targetRoom.maxPlayers) {
-      targetRoom = findBestRoom(requestedRegion);
-    }
+    // Always find the best available room (ignore requested room ID for sequential filling)
+    let targetRoom = findBestRoom(requestedRegion);
     
     // Check if room is full
     if (targetRoom.players.size >= targetRoom.maxPlayers) {
