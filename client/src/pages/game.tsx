@@ -83,7 +83,7 @@ function createFood(id: string): Food {
     vy: 0,
     color: getRandomFoodColor(),
     radius: 6 + Math.random() * 4, // Size varies from 6-10px
-    mass: 1 + Math.random() * 2, // Mass varies from 1-3
+    mass: 0.3, // Fixed mass value of 0.3 points each
     wobbleOffset: Math.random() * Math.PI * 2
   };
 }
