@@ -703,8 +703,11 @@ export default function GamePage() {
           setServerPlayers(data.players || []);
           
           // Update food from server (synchronized across all players)
-          if (data.food) {
+          if (data.food && Array.isArray(data.food) && data.food.length > 0) {
+            console.log(`🍎 Setting food state with ${data.food.length} items:`, data.food.slice(0, 3));
             setFood(data.food);
+          } else {
+            console.log(`⚠️ No food data in gameWorld message`, data.food);
           }
           
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${data.food?.length || 0} food`);
@@ -745,14 +748,14 @@ export default function GamePage() {
       wsRef.current = null;
       
       // Auto-reconnect after 2 seconds if not a normal closure
-      if (event.code !== 1000 && gameStarted) {
+      if (event.code !== 1000 && gameStarted && !gameOverRef.current) {
         console.log("Attempting auto-reconnect in 2 seconds...");
         setConnectionStatus('Reconnecting');
         setTimeout(() => {
-          if (gameStarted && !wsRef.current) {
+          if (gameStarted && !wsRef.current && !gameOverRef.current) {
             console.log("Auto-reconnecting to multiplayer server...");
-            // Create new WebSocket connection
-            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
+            // Recreate the WebSocket connection
+            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`);
             wsRef.current = newSocket;
             
             // Set up handlers for new connection
@@ -1300,7 +1303,9 @@ export default function GamePage() {
       
       // Debug food count
       if (food.length > 0) {
-        console.log(`🍎 Rendering ${food.length} food items`);
+        console.log(`🍎 Rendering ${food.length} food items at positions:`, food.slice(0, 3).map(f => `(${f.x?.toFixed(0)},${f.y?.toFixed(0)})`));
+      } else {
+        console.log(`🔍 No food to render - food state is empty`);
       }
 
       // All food rendering removed
