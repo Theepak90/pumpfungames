@@ -490,52 +490,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!collisionDetected) {
               room.players.set(playerId, updatedPlayer);
               room.lastActivity = Date.now();
-              
-              // Server-side food consumption system
+            }
+          }
+          
+          // MOVED OUTSIDE: Server-side food consumption system (ALWAYS runs)
+          if (room.food.length > 0 && currentPlayerHead && !collisionDetected) {
+            const consumedFoodIds: string[] = [];
+            
+            // Force debug log every 10 updates to see what's happening
+            if (Math.random() < 0.1) {
+              console.log(`DEBUG: Player head at (${currentPlayerHead.x.toFixed(1)}, ${currentPlayerHead.y.toFixed(1)}), checking ${room.food.length} foods, segmentRadius: ${data.segmentRadius || 'undefined'}`);
               if (room.food.length > 0) {
-                const consumedFoodIds: string[] = [];
-                
-                // Debug: Log head position and first few food positions every 50 updates
-                if (Math.random() < 0.02) {
-                  console.log(`DEBUG: Player head at (${currentPlayerHead.x.toFixed(1)}, ${currentPlayerHead.y.toFixed(1)}), checking ${room.food.length} foods`);
-                  if (room.food.length > 0) {
-                    console.log(`DEBUG: First food at (${room.food[0].x.toFixed(1)}, ${room.food[0].y.toFixed(1)}), radius: ${room.food[0].radius}`);
-                  }
-                }
-                
-                // Check food consumption
-                for (let i = room.food.length - 1; i >= 0; i--) {
-                  const foodItem = room.food[i];
-                  const distance = Math.sqrt(
-                    (currentPlayerHead.x - foodItem.x) ** 2 + 
-                    (currentPlayerHead.y - foodItem.y) ** 2
-                  );
-                  
-                  // Check if food is consumed (collision with snake head) - much larger collision radius
-                  const collisionRadius = (data.segmentRadius || 10) + foodItem.radius + 15; // Much bigger collision area
-                  if (distance < collisionRadius) {
-                    // Add mass to player (will be capped at MAX_MASS)
-                    const newMass = Math.min((updatedPlayer.totalMass || 6) + foodItem.mass, MAX_MASS);
-                    updatedPlayer.totalMass = newMass;
-                    
-                    console.log(`🍎 FOOD EATEN! Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}, distance: ${distance.toFixed(1)}, collision radius: ${collisionRadius.toFixed(1)}`);
-                    
-                    // Remove consumed food and create replacement
-                    consumedFoodIds.push(foodItem.id);
-                    room.food.splice(i, 1);
-                    
-                    // Spawn new food to maintain count
-                    const newFoodId = `${room.region}_${room.id}_food_${Date.now()}_${Math.random()}`;
-                    room.food.push(createFood(newFoodId));
-                  }
-                }
-                
-                // Update player with new mass if food was consumed
-                if (consumedFoodIds.length > 0) {
-                  room.players.set(playerId, updatedPlayer);
-                  console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
-                }
+                console.log(`DEBUG: First food at (${room.food[0].x.toFixed(1)}, ${room.food[0].y.toFixed(1)}), radius: ${room.food[0].radius}`);
               }
+            }
+            
+            // Check food consumption
+            for (let i = room.food.length - 1; i >= 0; i--) {
+              const foodItem = room.food[i];
+              const distance = Math.sqrt(
+                (currentPlayerHead.x - foodItem.x) ** 2 + 
+                (currentPlayerHead.y - foodItem.y) ** 2
+              );
+              
+              // Check if food is consumed (collision with snake head) - MASSIVE collision radius
+              const collisionRadius = 30; // Fixed large collision area
+              if (distance < collisionRadius) {
+                // Add mass to player (will be capped at MAX_MASS)
+                const newMass = Math.min((updatedPlayer.totalMass || 6) + foodItem.mass, MAX_MASS);
+                updatedPlayer.totalMass = newMass;
+                
+                console.log(`🍎 FOOD EATEN! Player ${playerId} consumed ${foodItem.size} food (+${foodItem.mass} mass), new mass: ${newMass}, distance: ${distance.toFixed(1)}, collision radius: ${collisionRadius}`);
+                
+                // Remove consumed food and create replacement
+                consumedFoodIds.push(foodItem.id);
+                room.food.splice(i, 1);
+                
+                // Spawn new food to maintain count
+                const newFoodId = `${room.region}_${room.id}_food_${Date.now()}_${Math.random()}`;
+                room.food.push(createFood(newFoodId));
+              }
+            }
+            
+            // Update player with new mass if food was consumed
+            if (consumedFoodIds.length > 0) {
+              room.players.set(playerId, updatedPlayer);
+              console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items, new mass: ${updatedPlayer.totalMass}`);
             }
           } else {
             // No collision check needed if no head position
