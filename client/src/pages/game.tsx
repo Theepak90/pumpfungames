@@ -85,7 +85,7 @@ function createFood(id: string): Food {
     vy: 0,
     color: getRandomFoodColor(),
     radius: 6 + Math.random() * 4, // Size varies from 6-10px
-    mass: 0.3, // Fixed mass value of 0.3 points each
+    mass: 0.9, // 3x mass value (0.3 * 3)
     wobbleOffset: Math.random() * Math.PI * 2
   };
 }
@@ -579,7 +579,7 @@ class SmoothSnake {
       
       // Lose mass and drop food while boosting (every ~16 frames = 0.75-1 times per second)
       if (this.boostCooldown % 16 === 0) {
-        this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.025);
+        this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.075); // 3x faster mass drain (0.025 * 3)
         
         // Get tail position for food drop
         let dropX = this.head.x;
@@ -604,7 +604,7 @@ class SmoothSnake {
           y: dropY,
           radius: 2, // Smaller than regular food
           mass: 0.025, // Half the previous value
-          color: '#ffff99', // Light yellow for boost food - will be overridden in game loop
+          color: this.color, // Use snake's color
           vx: 0,
           vy: 0,
           wobbleOffset: Math.random() * Math.PI * 2,
@@ -694,21 +694,18 @@ export default function GamePage() {
   // Set up callback for boost food dropping
   useEffect(() => {
     snake.onDropFood = (boostFood: any) => {
-      // Override the color with player's color
-      const coloredBoostFood = { ...boostFood, color: myPlayerColor };
-      
       // Add boost food to local food array
-      setFoods(currentFoods => [...currentFoods, coloredBoostFood]);
+      setFoods(currentFoods => [...currentFoods, boostFood]);
       
       // Send boost food to server for broadcasting to other players
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'boostFood',
-          food: coloredBoostFood
+          food: boostFood
         }));
       }
     };
-  }, [snake, myPlayerColor]);
+  }, [snake]);
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
