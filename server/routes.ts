@@ -415,6 +415,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             room.players.set(playerId, updatedPlayer);
             room.lastActivity = Date.now();
           }
+        } else if (data.type === 'boostFood') {
+          // Handle boost food drops - broadcast to all players in room
+          const roomKey = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomKey!);
+          if (!room) return;
+          
+          // Broadcast boost food to all other players in room
+          const boostFoodMessage = JSON.stringify({
+            type: 'boostFood',
+            food: data.food,
+            playerId: playerId
+          });
+          
+          wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN && 
+                client.roomId === room.id && 
+                client.region === room.region &&
+                client.playerId !== playerId) { // Don't send back to the sender
+              try {
+                client.send(boostFoodMessage);
+              } catch (error) {
+                console.error(`Error broadcasting boost food to room ${room.region}/${room.id}:`, error);
+              }
+            }
+          });
         } // Food system completely removed from multiplayer
       } catch (error) {
         console.error("WebSocket message error:", error);

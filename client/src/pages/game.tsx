@@ -678,7 +678,16 @@ export default function GamePage() {
   // Set up callback for boost food dropping
   useEffect(() => {
     snake.onDropFood = (boostFood: any) => {
+      // Add boost food to local food array
       setFoods(currentFoods => [...currentFoods, boostFood]);
+      
+      // Send boost food to server for broadcasting to other players
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'boostFood',
+          food: boostFood
+        }));
+      }
     };
   }, [snake]);
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
@@ -869,6 +878,10 @@ export default function GamePage() {
               });
             }
           }
+        } else if (data.type === 'boostFood') {
+          // Received boost food from another player - add it to our local food array
+          console.log(`🍕 Received boost food from player ${data.playerId}`);
+          setFoods(currentFoods => [...currentFoods, data.food]);
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
