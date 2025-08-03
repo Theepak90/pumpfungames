@@ -10,8 +10,9 @@ const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 150; // Number of food particles
-const FOOD_GRAVITY = 0.3; // How strongly food is attracted to snakes
-const FOOD_MAX_SPEED = 2.0; // Maximum speed food can move
+const FOOD_GRAVITY = 0.5; // How strongly food is attracted to snakes
+const FOOD_MAX_SPEED = 1.5; // Maximum speed food can move
+const FOOD_ATTRACTION_RADIUS = 50; // Distance within which food is attracted
 const FOOD_CONSUMPTION_RADIUS = 15; // Distance to consume food
 const BOT_COUNT = 5;
 
@@ -105,13 +106,14 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
     }
   }
   
-  if (nearestSnake && nearestDistance < 200) { // Only attract within 200px
+  if (nearestSnake && nearestDistance < FOOD_ATTRACTION_RADIUS) { // Only attract within 50px
     const dx = nearestSnake.head.x - food.x;
     const dy = nearestSnake.head.y - food.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance > 0) {
-      const force = (FOOD_GRAVITY * nearestSnake.totalMass) / (distance * distance);
+      // Stronger, more direct attraction without mass dependency
+      const force = FOOD_GRAVITY / distance; // Linear attraction based on distance
       updated.vx += (dx / distance) * force;
       updated.vy += (dy / distance) * force;
       
@@ -122,13 +124,15 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
         updated.vy = (updated.vy / speed) * FOOD_MAX_SPEED;
       }
     }
+  } else {
+    // When not being attracted, gradually slow down
+    updated.vx *= 0.8;
+    updated.vy *= 0.8;
   }
   
-  // Apply velocity with friction
+  // Apply velocity
   updated.x += updated.vx;
   updated.y += updated.vy;
-  updated.vx *= 0.95; // Friction
-  updated.vy *= 0.95;
   
   // Keep food within map bounds
   const distanceFromCenter = Math.sqrt(
@@ -1410,16 +1414,9 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food particles with gravitational animation
+      // Draw food particles as static glowing orbs
       foods.forEach(food => {
-        // Add slight wobble effect for visual appeal
-        const wobbleX = Math.sin(Date.now() * 0.003 + food.wobbleOffset) * 2;
-        const wobbleY = Math.cos(Date.now() * 0.004 + food.wobbleOffset * 1.5) * 2;
-        
-        const finalX = food.x + wobbleX;
-        const finalY = food.y + wobbleY;
-        
-        // Draw food as glowing orb
+        // Draw food as glowing orb without wobble
         ctx.save();
         
         // Glow effect
@@ -1431,13 +1428,13 @@ export default function GamePage() {
         // Main food body
         ctx.fillStyle = food.color;
         ctx.beginPath();
-        ctx.arc(finalX, finalY, food.radius, 0, Math.PI * 2);
+        ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
         ctx.fill();
         
         // Inner highlight
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.beginPath();
-        ctx.arc(finalX - food.radius * 0.3, finalY - food.radius * 0.3, food.radius * 0.4, 0, Math.PI * 2);
+        ctx.arc(food.x - food.radius * 0.3, food.y - food.radius * 0.3, food.radius * 0.4, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
