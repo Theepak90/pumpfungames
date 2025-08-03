@@ -10,9 +10,9 @@ const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 160; // Doubled food count for more abundant gameplay
-const FOOD_GRAVITY = 0.8; // Slower attraction force for gentler movement
-const FOOD_MAX_SPEED = 1.2; // Slower maximum food movement speed
-const FOOD_ATTRACTION_RADIUS = 100; // Increased to 100px attraction range
+const FOOD_GRAVITY = 0.3; // Much gentler force for smooth movement
+const FOOD_MAX_SPEED = 0.8; // Slower speed for smoother attraction
+const FOOD_ATTRACTION_RADIUS = 50; // Reduced to 50px attraction range
 const FOOD_CONSUMPTION_RADIUS = 15; // Distance to consume food
 const BOT_COUNT = 5;
 
@@ -130,9 +130,9 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
       }
     }
   } else {
-    // When not being attracted, gradually slow down
-    updated.vx *= 0.8;
-    updated.vy *= 0.8;
+    // When not being attracted, gradually slow down more smoothly
+    updated.vx *= 0.95;
+    updated.vy *= 0.95;
   }
   
   // Apply velocity to update position
