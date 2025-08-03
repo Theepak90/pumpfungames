@@ -1566,16 +1566,6 @@ export default function GamePage() {
           ctx.fill();
           
           ctx.restore();
-          
-          // Show velocity vector for testing (red line)
-          if (isAttracted && (Math.abs(food.vx) > 0.1 || Math.abs(food.vy) > 0.1)) {
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(food.x, food.y);
-            ctx.lineTo(food.x + food.vx * 10, food.y + food.vy * 10);
-            ctx.stroke();
-          }
         }
       });
       ctx.restore();
