@@ -409,10 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ws.send(JSON.stringify({
         type: 'gameWorld',
         bots: targetRoom.bots,
-        players: Array.from(targetRoom.players.values()),
-        food: targetRoom.food, // Include synchronized food
-        roomId: targetRoom.id,
-        region: targetRoom.region
+        players: Array.from(targetRoom.players.values())
       }));
     }, 100);
 
@@ -452,6 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let collisionDetected = false;
           
           if (currentPlayerHead && data.segmentRadius) {
+            
             // Check collision with all other players in same room
             for (const [otherPlayerId, otherPlayer] of Array.from(room.players)) {
               if (otherPlayerId === playerId) continue; // Skip self
@@ -488,15 +486,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               if (collisionDetected) break;
             }
-          }
-          
-          // Update player if no collision detected
-          if (!collisionDetected) {
+            
+            // Only update player if no collision detected
+            if (!collisionDetected) {
+              room.players.set(playerId, updatedPlayer);
+              room.lastActivity = Date.now();
+            }
+          } else {
+            // No collision check needed if no head position
             room.players.set(playerId, updatedPlayer);
             room.lastActivity = Date.now();
-            
-            // Server-side food consumption system
-            if (currentPlayerHead && room.food.length > 0) {
+          }
+        }
+
+        // Server-side food consumption system
+        if (!collisionDetected && currentPlayerHead && room.food.length > 0) {
           const MAGNETIC_RANGE = 50;
           const consumedFoodIds: string[] = [];
           
@@ -526,12 +530,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-              // Update player with new mass if food was consumed
-              if (consumedFoodIds.length > 0) {
-                room.players.set(playerId, updatedPlayer);
-                console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
-              }
-            }
+          // Update player with new mass if food was consumed
+          if (consumedFoodIds.length > 0) {
+            room.players.set(playerId, updatedPlayer);
+            console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items`);
           }
         }
       } catch (error) {

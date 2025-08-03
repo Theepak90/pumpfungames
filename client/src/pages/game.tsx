@@ -703,11 +703,8 @@ export default function GamePage() {
           setServerPlayers(data.players || []);
           
           // Update food from server (synchronized across all players)
-          if (data.food && Array.isArray(data.food) && data.food.length > 0) {
-            console.log(`🍎 Setting food state with ${data.food.length} items:`, data.food.slice(0, 3));
+          if (data.food) {
             setFood(data.food);
-          } else {
-            console.log(`⚠️ No food data in gameWorld message`, data.food);
           }
           
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${data.food?.length || 0} food`);
@@ -748,14 +745,14 @@ export default function GamePage() {
       wsRef.current = null;
       
       // Auto-reconnect after 2 seconds if not a normal closure
-      if (event.code !== 1000 && gameStarted && !gameOverRef.current) {
+      if (event.code !== 1000 && gameStarted) {
         console.log("Attempting auto-reconnect in 2 seconds...");
         setConnectionStatus('Reconnecting');
         setTimeout(() => {
-          if (gameStarted && !wsRef.current && !gameOverRef.current) {
+          if (gameStarted && !wsRef.current) {
             console.log("Auto-reconnecting to multiplayer server...");
-            // Recreate the WebSocket connection
-            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`);
+            // Create new WebSocket connection
+            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
             wsRef.current = newSocket;
             
             // Set up handlers for new connection
@@ -1275,23 +1272,31 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // TEST: Draw simple red dots to prove food system works
-      if (food.length > 0) {
-        console.log(`🍎 DRAWING ${food.length} FOOD ITEMS!`);
-        food.forEach((foodItem, index) => {
-          // Make food very obvious - large red circles
-          ctx.fillStyle = '#ff0000'; // Bright red
-          ctx.beginPath();
-          ctx.arc(foodItem.x, foodItem.y, 20, 0, Math.PI * 2); // Large radius
-          ctx.fill();
-          
-          if (index < 5) {
-            console.log(`Food ${index}: x=${foodItem.x}, y=${foodItem.y}, radius=${foodItem.radius}`);
-          }
-        });
-      } else {
-        console.log(`❌ NO FOOD TO DRAW - food array is empty`);
-      }
+      // Draw food items with glow effect
+      food.forEach(foodItem => {
+        ctx.save();
+        
+        // Create glowing effect
+        ctx.shadowColor = foodItem.color;
+        ctx.shadowBlur = foodItem.radius * 3 * foodItem.glowIntensity;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw food circle
+        ctx.fillStyle = foodItem.color;
+        ctx.beginPath();
+        ctx.arc(foodItem.x, foodItem.y, foodItem.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add inner bright core
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
+        ctx.beginPath();
+        ctx.arc(foodItem.x, foodItem.y, foodItem.radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      });
 
       // All food rendering removed
 
