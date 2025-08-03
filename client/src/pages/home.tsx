@@ -37,7 +37,7 @@ class DecorativeSnake {
     this.head = { x, y };
     this.currentAngle = Math.random() * Math.PI * 2;
     this.segmentTrail = [{ x, y }];
-    this.speed = 1.5;
+    this.speed = 0.5;
     this.turnSpeed = 0.02;
     this.targetAngle = this.currentAngle;
     this.nextTurnTime = Date.now() + 2000;

@@ -61,7 +61,7 @@ function createBotSnake(id: string): BotSnake {
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-  const baseSpeed = 1.8 + Math.random() * 0.8; // Slightly slower than player
+  const baseSpeed = 0.9 + Math.random() * 0.4; // Slightly slower than player
   
   return {
     id,
