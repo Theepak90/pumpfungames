@@ -446,8 +446,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
+          let collisionDetected = false;
+          
           if (currentPlayerHead && data.segmentRadius) {
-            let collisionDetected = false;
             
             // Check collision with all other players in same room
             for (const [otherPlayerId, otherPlayer] of Array.from(room.players)) {
