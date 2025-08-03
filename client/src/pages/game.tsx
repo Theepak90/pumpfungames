@@ -604,7 +604,7 @@ class SmoothSnake {
           y: dropY,
           radius: 2, // Smaller than regular food
           mass: 0.025, // Half the previous value
-          color: '#ffff99', // Light yellow for boost food
+          color: this.color, // Use snake's color for boost food
           vx: 0,
           vy: 0,
           wobbleOffset: Math.random() * Math.PI * 2,
