@@ -69,9 +69,9 @@ function getRandomFoodColor(): string {
 }
 
 function createFood(id: string): Food {
-  // Spawn food at random location within map
+  // Spawn food evenly distributed across the entire map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 50);
+  const radius = Math.sqrt(Math.random()) * (MAP_RADIUS - 50); // Square root for even distribution
   const x = MAP_CENTER_X + Math.cos(angle) * radius;
   const y = MAP_CENTER_Y + Math.sin(angle) * radius;
   
