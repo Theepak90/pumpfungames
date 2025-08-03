@@ -521,8 +521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 (currentPlayerHead.y - foodItem.y) ** 2
               );
               
-              // Check if food is consumed (collision with snake head) - VERY LARGE collision radius
-              const collisionRadius = 100; // HUGE collision area to guarantee detection
+              // Check if food is consumed (collision with snake head) - MASSIVE collision radius
+              const collisionRadius = 250; // ENORMOUS collision area to guarantee detection
               if (distance < collisionRadius) {
                 // Add mass to player (will be capped at MAX_MASS)
                 const newMass = Math.min((updatedPlayer.totalMass || 6) + foodItem.mass, MAX_MASS);
@@ -544,6 +544,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (consumedFoodIds.length > 0) {
               room.players.set(playerId, updatedPlayer);
               console.log(`Room ${room.region}/${room.id}: Player ${playerId} consumed ${consumedFoodIds.length} food items, new mass: ${updatedPlayer.totalMass}`);
+            }
+            
+            // EMERGENCY FIX: Spawn food directly on player if no consumption detected
+            if (consumedFoodIds.length === 0 && Math.random() < 0.05) {
+              console.log(`EMERGENCY: Spawning food directly on player at (${currentPlayerHead.x}, ${currentPlayerHead.y})`);
+              const emergencyFoodId = `emergency_${Date.now()}_${Math.random()}`;
+              const emergencyFood = {
+                id: emergencyFoodId,
+                x: currentPlayerHead.x + (Math.random() - 0.5) * 20, // Very close to player
+                y: currentPlayerHead.y + (Math.random() - 0.5) * 20,
+                radius: 4,
+                mass: 0.33,
+                size: 'medium',
+                color: '#00ff00'
+              };
+              room.food.push(emergencyFood);
             }
           } else {
             // No collision check needed if no head position
