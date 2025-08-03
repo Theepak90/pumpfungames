@@ -9,7 +9,10 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
-// Food system removed
+const FOOD_COUNT = 150; // Number of food particles
+const FOOD_GRAVITY = 0.3; // How strongly food is attracted to snakes
+const FOOD_MAX_SPEED = 2.0; // Maximum speed food can move
+const FOOD_CONSUMPTION_RADIUS = 15; // Distance to consume food
 const BOT_COUNT = 5;
 
 interface Position {
@@ -17,7 +20,18 @@ interface Position {
   y: number;
 }
 
-// Food interface removed - all food systems eliminated
+// Food interface with gravitational physics
+interface Food {
+  id: string;
+  x: number;
+  y: number;
+  vx: number; // velocity x
+  vy: number; // velocity y
+  color: string;
+  radius: number;
+  mass: number;
+  wobbleOffset: number;
+}
 
 interface BotSnake {
   id: string;
@@ -34,13 +48,14 @@ interface BotSnake {
   // targetFood removed
   money: number; // Bot's money balance
   state: 'wander' | 'foodHunt' | 'avoid' | 'aggro'; // Bot behavior state
+  targetFood: Food | null; // Food the bot is targeting
   isBoosting: boolean;
   boostTime: number;
   lastStateChange: number;
   aggroTarget: SmoothSnake | BotSnake | null;
 }
 
-// Utility function to generate random food colors
+// Utility functions for food system
 function getRandomFoodColor(): string {
   const colors = [
     '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', 
@@ -50,6 +65,84 @@ function getRandomFoodColor(): string {
     '#ffeaa7', '#fab1a0', '#e17055', '#81ecec', '#74b9ff'
   ];
   return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function createFood(id: string): Food {
+  // Spawn food at random location within map
+  const angle = Math.random() * Math.PI * 2;
+  const radius = Math.random() * (MAP_RADIUS - 50);
+  const x = MAP_CENTER_X + Math.cos(angle) * radius;
+  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+  
+  return {
+    id,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    color: getRandomFoodColor(),
+    radius: 6 + Math.random() * 4, // Size varies from 6-10px
+    mass: 1 + Math.random() * 2, // Mass varies from 1-3
+    wobbleOffset: Math.random() * Math.PI * 2
+  };
+}
+
+function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalMass: number }>): Food {
+  const updated = { ...food };
+  
+  // Find nearest snake
+  let nearestSnake = null;
+  let nearestDistance = Infinity;
+  
+  for (const snake of allSnakes) {
+    const dx = snake.head.x - food.x;
+    const dy = snake.head.y - food.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestSnake = snake;
+    }
+  }
+  
+  if (nearestSnake && nearestDistance < 200) { // Only attract within 200px
+    const dx = nearestSnake.head.x - food.x;
+    const dy = nearestSnake.head.y - food.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance > 0) {
+      const force = (FOOD_GRAVITY * nearestSnake.totalMass) / (distance * distance);
+      updated.vx += (dx / distance) * force;
+      updated.vy += (dy / distance) * force;
+      
+      // Cap velocity
+      const speed = Math.sqrt(updated.vx * updated.vx + updated.vy * updated.vy);
+      if (speed > FOOD_MAX_SPEED) {
+        updated.vx = (updated.vx / speed) * FOOD_MAX_SPEED;
+        updated.vy = (updated.vy / speed) * FOOD_MAX_SPEED;
+      }
+    }
+  }
+  
+  // Apply velocity with friction
+  updated.x += updated.vx;
+  updated.y += updated.vy;
+  updated.vx *= 0.95; // Friction
+  updated.vy *= 0.95;
+  
+  // Keep food within map bounds
+  const distanceFromCenter = Math.sqrt(
+    (updated.x - MAP_CENTER_X) ** 2 + (updated.y - MAP_CENTER_Y) ** 2
+  );
+  if (distanceFromCenter > MAP_RADIUS - 50) {
+    const angle = Math.atan2(updated.y - MAP_CENTER_Y, updated.x - MAP_CENTER_X);
+    updated.x = MAP_CENTER_X + Math.cos(angle) * (MAP_RADIUS - 50);
+    updated.y = MAP_CENTER_Y + Math.sin(angle) * (MAP_RADIUS - 50);
+    updated.vx = 0;
+    updated.vy = 0;
+  }
+  
+  return updated;
 }
 
 // Bot snake utility functions
@@ -78,6 +171,7 @@ function createBotSnake(id: string): BotSnake {
 
     money: 1.00, // All bots start with exactly $1.00
     state: 'wander',
+    targetFood: null,
     isBoosting: false,
     boostTime: 0,
     lastStateChange: Date.now(),
@@ -282,7 +376,7 @@ class SmoothSnake {
     this.head = { x, y };
     this.currentAngle = 0;
     this.turnSpeed = 0.032; // Reduced by 20% (0.04 * 0.8) for smoother turning
-    this.baseSpeed = 2.4;
+    this.baseSpeed = 1.2;
     this.boostMultiplier = 2.0;
     this.speed = this.baseSpeed;
     this.isBoosting = false;
@@ -469,7 +563,12 @@ class SmoothSnake {
     }
   }
   
-  // Food system completely removed - snakes grow through other mechanics
+  // Food consumption mechanic - grow when eating food
+  eatFood(foodMass: number) {
+    // Add growth based on food mass consumed
+    this.growthRemaining += foodMass;
+    console.log(`Snake ate food worth ${foodMass} mass, growth remaining: ${this.growthRemaining}`);
+  }
   
   // Process growth at 10 mass per second rate
   processGrowth(deltaTime: number) {
@@ -537,6 +636,7 @@ export default function GamePage() {
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
+  const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const gameOverRef = useRef(false);
 
@@ -652,14 +752,21 @@ export default function GamePage() {
 
 
 
-  // Local game initialization disabled - everything comes from server
+  // Initialize food system when game starts
   useEffect(() => {
     if (!gameStarted) return;
     
-    // Clear any local game state - server provides everything
+    // Clear any local game state - server provides everything except food (client-side)
     setBotSnakes([]);
     
-    console.log("Game started - waiting for server world data");
+    // Initialize food particles
+    const initialFoods: Food[] = [];
+    for (let i = 0; i < FOOD_COUNT; i++) {
+      initialFoods.push(createFood(`food_${i}`));
+    }
+    setFoods(initialFoods);
+    
+    console.log("Game started - initialized", FOOD_COUNT, "food particles");
   }, [gameStarted]);
 
   // WebSocket connection for real multiplayer
@@ -697,7 +804,8 @@ export default function GamePage() {
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           setServerPlayers(data.players || []);
-          console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players`);
+          // Food is handled client-side, not synced across players
+          console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${foods.length} food`);
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -994,7 +1102,48 @@ export default function GamePage() {
         setCashOutStartTime(null);
       }
 
-      // Food system removed
+      // Update food physics and check consumption
+      const allSnakes = [
+        { head: snake.head, totalMass: snake.totalMass },
+        ...botSnakes.map(bot => ({ head: bot.head, totalMass: bot.totalMass })),
+        ...serverBots.map(bot => ({ head: bot.head, totalMass: bot.totalMass || 10 })),
+        ...serverPlayers.map(player => ({ 
+          head: player.segments?.[0] || { x: 0, y: 0 }, 
+          totalMass: player.totalMass || 10 
+        }))
+      ].filter(s => s.head.x !== undefined && s.head.y !== undefined);
+
+      // Update food gravitational physics
+      setFoods(currentFoods => {
+        const updatedFoods = currentFoods.map(food => 
+          updateFoodGravity(food, allSnakes)
+        );
+        
+        // Check food consumption by player snake
+        const consumedFoodIds: string[] = [];
+        for (const food of updatedFoods) {
+          const distToSnake = Math.sqrt(
+            (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
+          );
+          
+          if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
+            // Snake eats food
+            snake.eatFood(food.mass);
+            consumedFoodIds.push(food.id);
+          }
+        }
+        
+        // Remove consumed food and create new ones
+        let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
+        
+        // Spawn new food to maintain constant count
+        const newFoodCount = FOOD_COUNT - filteredFoods.length;
+        for (let i = 0; i < newFoodCount; i++) {
+          filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
+        }
+        
+        return filteredFoods;
+      });
 
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
@@ -1261,7 +1410,38 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // All food rendering removed
+      // Draw food particles with gravitational animation
+      foods.forEach(food => {
+        // Add slight wobble effect for visual appeal
+        const wobbleX = Math.sin(Date.now() * 0.003 + food.wobbleOffset) * 2;
+        const wobbleY = Math.cos(Date.now() * 0.004 + food.wobbleOffset * 1.5) * 2;
+        
+        const finalX = food.x + wobbleX;
+        const finalY = food.y + wobbleY;
+        
+        // Draw food as glowing orb
+        ctx.save();
+        
+        // Glow effect
+        ctx.shadowColor = food.color;
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Main food body
+        ctx.fillStyle = food.color;
+        ctx.beginPath();
+        ctx.arc(finalX, finalY, food.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(finalX - food.radius * 0.3, finalY - food.radius * 0.3, food.radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      });
 
       // Draw only OTHER server players (exclude yourself) - always render immediately
       const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
