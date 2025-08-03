@@ -318,45 +318,41 @@ export default function Home() {
     }
   };
 
-  // Region selection state
-  const [selectedRegion, setSelectedRegion] = useState<'us' | 'eu' | null>(null);
+  // Auto-detection state
   const [isDetectingRegion, setIsDetectingRegion] = useState(false);
 
-  // Start game handler with region selection
-  const handleStartGameWithRegion = async (manualRegion?: 'us' | 'eu') => {
+  // Start game handler with automatic region detection
+  const handleStartGame = async () => {
     try {
-      let gameRegion = manualRegion;
-      
-      if (!gameRegion) {
-        // Auto-detect region
-        setIsDetectingRegion(true);
-        toast({
-          title: "Detecting Best Region...",
-          description: "Finding nearest server for optimal performance",
-        });
-        
-        const { detectBestRegion } = await import('@/lib/regionDetection');
-        gameRegion = await detectBestRegion();
-        setIsDetectingRegion(false);
-      }
-      
+      // Always auto-detect region
+      setIsDetectingRegion(true);
       toast({
-        title: `Connecting to ${gameRegion.toUpperCase()} Server...`,
-        description: "Looking for available room.",
+        title: "Finding Best Server...",
+        description: "Detecting your location for optimal performance",
       });
       
-      // Get best available room from server with region
+      const { detectBestRegion } = await import('@/lib/regionDetection');
+      const gameRegion = await detectBestRegion();
+      setIsDetectingRegion(false);
+      
+      toast({
+        title: "Connecting to Game...",
+        description: "Finding available room",
+      });
+      
+      // Get best available room from server with detected region
       const response = await fetch(`/api/room/join?region=${gameRegion}`);
       const roomData = await response.json();
       
       toast({
         title: "Joining Game!",
-        description: `Entering ${gameRegion.toUpperCase()} room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
+        description: `Room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
       });
       
       // Navigate to regional room-specific game
       setLocation(`/snake/${gameRegion}/${roomData.roomId}`);
     } catch (error) {
+      setIsDetectingRegion(false);
       toast({
         title: "Error",
         description: "Could not find available room. Trying backup...",
@@ -646,45 +642,16 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Region Selection */}
-              <div className="mb-3">
-                <div className="text-white text-xs mb-2 font-retro text-center">Server Region</div>
-                <div className="grid grid-cols-3 gap-1">
-                  <button 
-                    onClick={() => handleStartGameWithRegion('us')}
-                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
-                    disabled={isDetectingRegion}
-                  >
-                    🇺🇸 US
-                  </button>
-                  <button 
-                    onClick={() => handleStartGameWithRegion('eu')}
-                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
-                    disabled={isDetectingRegion}
-                  >
-                    🇪🇺 EU
-                  </button>
-                  <button 
-                    onClick={() => handleStartGameWithRegion()}
-                    className="py-2 px-2 text-xs border-2 font-retro border-gray-600 hover:bg-gray-600 transition-colors"
-                    style={{backgroundColor: '#53d493', borderColor: '#53d493', color: 'white'}}
-                    disabled={isDetectingRegion}
-                  >
-                    🌍 Auto
-                  </button>
-                </div>
-              </div>
-
               {/* Play Button */}
               <button 
-                onClick={() => handleStartGameWithRegion()}
+                onClick={handleStartGame}
                 className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
                 style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
                 onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
                 onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
                 disabled={isDetectingRegion}
               >
-                {isDetectingRegion ? 'DETECTING...' : 'PLAY'}
+                {isDetectingRegion ? 'FINDING SERVER...' : 'PLAY'}
               </button>
               
 
