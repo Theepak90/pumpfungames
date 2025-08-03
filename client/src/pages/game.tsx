@@ -604,7 +604,7 @@ class SmoothSnake {
           y: dropY,
           radius: 2, // Smaller than regular food
           mass: 0.025, // Half the previous value
-          color: this.color, // Use snake's color for boost food
+          color: '#ffff99', // Light yellow for boost food - will be overridden in game loop
           vx: 0,
           vy: 0,
           wobbleOffset: Math.random() * Math.PI * 2,
@@ -694,18 +694,21 @@ export default function GamePage() {
   // Set up callback for boost food dropping
   useEffect(() => {
     snake.onDropFood = (boostFood: any) => {
+      // Override the color with player's color
+      const coloredBoostFood = { ...boostFood, color: myPlayerColor };
+      
       // Add boost food to local food array
-      setFoods(currentFoods => [...currentFoods, boostFood]);
+      setFoods(currentFoods => [...currentFoods, coloredBoostFood]);
       
       // Send boost food to server for broadcasting to other players
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'boostFood',
-          food: boostFood
+          food: coloredBoostFood
         }));
       }
     };
-  }, [snake]);
+  }, [snake, myPlayerColor]);
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
