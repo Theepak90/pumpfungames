@@ -9,7 +9,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 const MAP_CENTER_X = 2000;
 const MAP_CENTER_Y = 2000;
 const MAP_RADIUS = 1800; // Circular map radius
-const FOOD_COUNT = 150; // Number of food particles
+const FOOD_COUNT = 80; // Reduced food count for better performance
 const FOOD_GRAVITY = 0.5; // How strongly food is attracted to snakes
 const FOOD_MAX_SPEED = 1.5; // Maximum speed food can move
 const FOOD_ATTRACTION_RADIUS = 50; // Distance within which food is attracted
@@ -909,12 +909,15 @@ export default function GamePage() {
           segmentRadius: snake.getSegmentRadius(),
           visibleSegmentCount: snake.visibleSegments.length
         };
-        console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+        // Reduced logging for performance - only log every 30th update
+        if (Date.now() % 2000 < 67) {
+          console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+        }
         wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
-    }, 50); // Send updates every 50ms for more responsive multiplayer
+    }, 67); // Send updates every 67ms (~15 FPS) for better performance
 
     return () => {
       console.log('Clearing position update interval');
@@ -1064,7 +1067,7 @@ export default function GamePage() {
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
       const currentTime = Date.now();
-      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.033); // Cap at 33ms (30fps minimum)
+      const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.05); // Cap at 50ms (20fps minimum)
       setLastFrameTime(currentTime);
       
       // Process growth at 10 mass per second rate
@@ -1117,37 +1120,39 @@ export default function GamePage() {
         }))
       ].filter(s => s.head.x !== undefined && s.head.y !== undefined);
 
-      // Update food gravitational physics
-      setFoods(currentFoods => {
-        const updatedFoods = currentFoods.map(food => 
-          updateFoodGravity(food, allSnakes)
-        );
-        
-        // Check food consumption by player snake
-        const consumedFoodIds: string[] = [];
-        for (const food of updatedFoods) {
-          const distToSnake = Math.sqrt(
-            (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
+      // Update food gravitational physics (only every 3rd frame for performance)
+      if (currentTime % 3 === 0) {
+        setFoods(currentFoods => {
+          const updatedFoods = currentFoods.map(food => 
+            updateFoodGravity(food, allSnakes)
           );
           
-          if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
-            // Snake eats food
-            snake.eatFood(food.mass);
-            consumedFoodIds.push(food.id);
+          // Check food consumption by player snake only
+          const consumedFoodIds: string[] = [];
+          for (const food of updatedFoods) {
+            const distToSnake = Math.sqrt(
+              (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
+            );
+            
+            if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
+              // Snake eats food
+              snake.eatFood(food.mass);
+              consumedFoodIds.push(food.id);
+            }
           }
-        }
-        
-        // Remove consumed food and create new ones
-        let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
-        
-        // Spawn new food to maintain constant count
-        const newFoodCount = FOOD_COUNT - filteredFoods.length;
-        for (let i = 0; i < newFoodCount; i++) {
-          filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
-        }
-        
-        return filteredFoods;
-      });
+          
+          // Remove consumed food and create new ones
+          let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
+          
+          // Spawn new food to maintain constant count
+          const newFoodCount = FOOD_COUNT - filteredFoods.length;
+          for (let i = 0; i < newFoodCount; i++) {
+            filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
+          }
+          
+          return filteredFoods;
+        });
+      }
 
       // Check circular map boundaries (death barrier) - using eye positions
       const eyePositions = snake.getEyePositions();
@@ -1414,37 +1419,37 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food particles as static glowing orbs
+      // Draw food particles with optimized rendering
+      ctx.save();
       foods.forEach(food => {
-        // Draw food as glowing orb without wobble
-        ctx.save();
+        // Only draw food within view distance for performance
+        const distanceToCamera = Math.sqrt(
+          (food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2
+        );
         
-        // Glow effect
-        ctx.shadowColor = food.color;
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        
-        // Main food body
-        ctx.fillStyle = food.color;
-        ctx.beginPath();
-        ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Inner highlight
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.beginPath();
-        ctx.arc(food.x - food.radius * 0.3, food.y - food.radius * 0.3, food.radius * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
+        if (distanceToCamera < 800) { // Only render food within 800px of snake
+          // Main food body without glow for performance
+          ctx.fillStyle = food.color;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Simple inner highlight without shadow for performance
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.beginPath();
+          ctx.arc(food.x - food.radius * 0.2, food.y - food.radius * 0.2, food.radius * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
+      ctx.restore();
 
-      // Draw only OTHER server players (exclude yourself) - always render immediately
+      // Draw only OTHER server players (exclude yourself) - limit rendering for performance
       const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
-      console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
+      // Only log every 30th frame to reduce console spam
+      if (currentTime % 30 === 0) {
+        console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
+      }
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
-        console.log(`Other Player ${playerIndex}:`, serverPlayer.id, serverPlayer.segments?.length, serverPlayer.color);
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
           // Use server segments exactly as sent - no spacing modifications
           // This ensures other players see your snake exactly as you see it on your screen
@@ -1474,7 +1479,10 @@ export default function GamePage() {
             ctx.fill();
           }
           
-          console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} exact server segments`);
+          // Reduced logging for performance
+          if (currentTime % 60 === 0) {
+            console.log(`Rendered snake ${serverPlayer.id} with ${segmentsToRender}/${fullSnakeBody.length} exact server segments`);
+          }
           
           ctx.restore();
           
