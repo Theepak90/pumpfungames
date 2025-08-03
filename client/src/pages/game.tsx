@@ -106,7 +106,7 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
     }
   }
   
-  if (nearestSnake && nearestDistance < FOOD_ATTRACTION_RADIUS) { // Only attract within 50px
+  if (nearestSnake && nearestDistance < FOOD_ATTRACTION_RADIUS) { // Only attract within 25px
     const dx = nearestSnake.head.x - food.x;
     const dy = nearestSnake.head.y - food.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1419,7 +1419,7 @@ export default function GamePage() {
       ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw food particles with optimized rendering
+      // Draw food particles as solid circles
       ctx.save();
       foods.forEach(food => {
         // Only draw food within view distance for performance
@@ -1428,16 +1428,10 @@ export default function GamePage() {
         );
         
         if (distanceToCamera < 800) { // Only render food within 800px of snake
-          // Main food body without glow for performance
+          // Draw as solid colored circle
           ctx.fillStyle = food.color;
           ctx.beginPath();
           ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Simple inner highlight without shadow for performance
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-          ctx.beginPath();
-          ctx.arc(food.x - food.radius * 0.2, food.y - food.radius * 0.2, food.radius * 0.3, 0, Math.PI * 2);
           ctx.fill();
         }
       });
