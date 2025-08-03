@@ -32,6 +32,7 @@ interface Food {
   radius: number;
   mass: number;
   wobbleOffset: number;
+  expiresAt?: number; // Optional expiration timestamp for boost food
 }
 
 interface BotSnake {
@@ -579,11 +580,23 @@ class SmoothSnake {
       if (this.boostCooldown % 16 === 0) {
         this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.025);
         
-        // Drop tiny food particle behind snake
-        const dropX = this.head.x - Math.cos(this.currentAngle) * 20; // Drop behind head
-        const dropY = this.head.y - Math.sin(this.currentAngle) * 20;
+        // Get tail position for food drop
+        let dropX = this.head.x;
+        let dropY = this.head.y;
         
-        // Create small food particle
+        // Drop from the last visible segment (tail) if available
+        if (this.visibleSegments.length > 0) {
+          const tailSegment = this.visibleSegments[this.visibleSegments.length - 1];
+          dropX = tailSegment.x;
+          dropY = tailSegment.y;
+        } else if (this.segmentTrail.length > 10) {
+          // Fallback to trail position if no visible segments
+          const tailIndex = Math.min(this.segmentTrail.length - 1, 20);
+          dropX = this.segmentTrail[tailIndex].x;
+          dropY = this.segmentTrail[tailIndex].y;
+        }
+        
+        // Create small food particle with 10-second expiration
         const boostFood = {
           id: `boost_${Date.now()}_${Math.random()}`,
           x: dropX,
@@ -592,7 +605,9 @@ class SmoothSnake {
           mass: 0.025, // Half the previous value
           color: '#ffff99', // Light yellow for boost food
           vx: 0,
-          vy: 0
+          vy: 0,
+          wobbleOffset: Math.random() * Math.PI * 2,
+          expiresAt: Date.now() + 10000 // Expires after 10 seconds
         };
         
         // Add to foods array (will need to be passed from game loop)
@@ -881,7 +896,12 @@ export default function GamePage() {
         } else if (data.type === 'boostFood') {
           // Received boost food from another player - add it to our local food array
           console.log(`🍕 Received boost food from player ${data.playerId}`);
-          setFoods(currentFoods => [...currentFoods, data.food]);
+          // Ensure the boost food has an expiration time if not already set
+          const boostFood = { 
+            ...data.food, 
+            expiresAt: data.food.expiresAt || (Date.now() + 10000) 
+          };
+          setFoods(currentFoods => [...currentFoods, boostFood]);
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
@@ -1187,7 +1207,17 @@ export default function GamePage() {
         // Focus only on player snake for attraction (ignore multiplayer snakes for now)
         const playerOnlySnakes = [{ head: snake.head, totalMass: snake.totalMass }];
         
-        const updatedFoods = currentFoods.map(food => 
+        // Remove expired boost food (10-second expiration)
+        const currentTime = Date.now();
+        const nonExpiredFoods = currentFoods.filter(food => {
+          if (food.expiresAt && currentTime > food.expiresAt) {
+            console.log(`🕒 Boost food ${food.id} expired and removed`);
+            return false;
+          }
+          return true;
+        });
+        
+        const updatedFoods = nonExpiredFoods.map(food => 
           updateFoodGravity(food, playerOnlySnakes)
         );
         
