@@ -575,9 +575,9 @@ class SmoothSnake {
       this.speed = this.baseSpeed * this.boostMultiplier;
       this.boostCooldown++;
       
-      // Lose mass and drop food while boosting (every ~8 frames = 1.5-2 times per second)
-      if (this.boostCooldown % 8 === 0) {
-        this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.05);
+      // Lose mass and drop food while boosting (every ~16 frames = 0.75-1 times per second)
+      if (this.boostCooldown % 16 === 0) {
+        this.totalMass = Math.max(this.MIN_MASS_TO_BOOST, this.totalMass - 0.025);
         
         // Drop tiny food particle behind snake
         const dropX = this.head.x - Math.cos(this.currentAngle) * 20; // Drop behind head
@@ -589,7 +589,7 @@ class SmoothSnake {
           x: dropX,
           y: dropY,
           radius: 2, // Smaller than regular food
-          mass: 0.05,
+          mass: 0.025, // Half the previous value
           color: '#ffff99', // Light yellow for boost food
           vx: 0,
           vy: 0
