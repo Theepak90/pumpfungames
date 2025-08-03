@@ -12,7 +12,7 @@ const MAP_RADIUS = 1800; // Circular map radius
 const FOOD_COUNT = 80; // Reduced food count for better performance
 const FOOD_GRAVITY = 0.5; // How strongly food is attracted to snakes
 const FOOD_MAX_SPEED = 1.5; // Maximum speed food can move
-const FOOD_ATTRACTION_RADIUS = 50; // Distance within which food is attracted
+const FOOD_ATTRACTION_RADIUS = 25; // Distance within which food is attracted
 const FOOD_CONSUMPTION_RADIUS = 15; // Distance to consume food
 const BOT_COUNT = 5;
 
