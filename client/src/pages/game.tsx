@@ -815,6 +815,9 @@ export default function GamePage() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  
+  // Service Worker for background sync
+  const serviceWorkerRef = useRef<ServiceWorker | null>(null);
 
   // Function to drop money crates when snake dies (1 crate per mass unit)
   const dropMoneyCrates = (playerMoney: number, snakeMass: number) => {
@@ -942,6 +945,62 @@ export default function GamePage() {
 
 
 
+  // Service Worker registration for background sync
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('🔧 Service Worker registered:', registration);
+          serviceWorkerRef.current = registration.active || registration.installing || registration.waiting;
+        })
+        .catch((error) => {
+          console.error('🚨 Service Worker registration failed:', error);
+        });
+    }
+  }, []);
+
+  // Initialize Service Worker with game data when game starts
+  useEffect(() => {
+    if (!gameStarted || !navigator.serviceWorker.controller || !myPlayerId) return;
+    
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`;
+    
+    navigator.serviceWorker.controller.postMessage({
+      type: 'GAME_START',
+      data: {
+        playerId: myPlayerId,
+        roomId: roomId,
+        wsUrl: wsUrl,
+        snakePosition: snake.head,
+        snakeAngle: snake.currentAngle,
+        snakeSpeed: snake.speed
+      }
+    });
+    
+    console.log('🎮 Service Worker initialized with game state');
+  }, [gameStarted, myPlayerId, roomId, region]);
+
+  // Send periodic updates to Service Worker
+  useEffect(() => {
+    if (!gameStarted || !navigator.serviceWorker.controller) return;
+    
+    const updateServiceWorker = setInterval(() => {
+      navigator.serviceWorker.controller!.postMessage({
+        type: 'GAME_UPDATE',
+        data: {
+          snakePosition: snake.head,
+          snakeAngle: snake.currentAngle,
+          snakeSpeed: snake.speed,
+          isBoosting: isBoosting
+        }
+      });
+    }, 200); // Update Service Worker every 200ms
+    
+    return () => clearInterval(updateServiceWorker);
+  }, [gameStarted, snake, isBoosting]);
+
   // Initialize food system when game starts
   useEffect(() => {
     if (!gameStarted) return;
@@ -1039,28 +1098,6 @@ export default function GamePage() {
             console.log(`💰 Removed money crate ${data.crateId}. Foods count: ${currentFoods.length} -> ${filtered.length}`);
             return filtered;
           });
-        } else if (data.type === 'serverUpdate') {
-          // Receive server-authoritative positions for all players
-          const serverPlayers = data.players || [];
-          
-          // Update our own snake position from server
-          const myServerData = serverPlayers.find((p: any) => p.id === myPlayerId);
-          if (myServerData && myServerData.segments && myServerData.segments.length > 0) {
-            // Apply server position to our snake
-            snake.head = { x: myServerData.segments[0].x, y: myServerData.segments[0].y };
-            snake.visibleSegments = myServerData.segments.map((seg: any) => ({ 
-              x: seg.x, 
-              y: seg.y, 
-              opacity: 1 
-            }));
-            snake.totalMass = myServerData.totalMass || snake.totalMass;
-          }
-          
-          // Update other players
-          const filteredPlayers = serverPlayers.filter((p: any) => 
-            p.id !== myPlayerId && p.segments && p.segments.length > 0
-          );
-          setOtherPlayers(filteredPlayers);
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - instantly return to home screen
@@ -1069,6 +1106,14 @@ export default function GamePage() {
           // Hide snake first
           snakeVisibleRef.current = false;
           setSnakeVisible(false);
+          
+          // Notify Service Worker that game stopped
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'GAME_STOP',
+              data: {}
+            });
+          }
           
           // Instantly return to home screen - no fade, no game over screen
           console.log(`🏠 Instantly returning to home screen after server death`);
@@ -1138,55 +1183,47 @@ export default function GamePage() {
     };
   }, [gameStarted, roomId]); // Include roomId to reconnect when room changes
 
-  // Send initial player data to server
+  // Send player data to server
   useEffect(() => {
     if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-    
-    // Send initial snake data once
-    const initMessage = {
-      type: 'init',
-      segments: snake.visibleSegments,
-      currentAngle: snake.currentAngle,
-      speed: snake.speed,
-      totalMass: snake.totalMass,
-      segmentRadius: snake.segmentRadius
-    };
-    
-    wsRef.current.send(JSON.stringify(initMessage));
-    console.log(`Sent initial player data: ${snake.visibleSegments.length} segments`);
-  }, [gameStarted, myPlayerId]);
-
-  // Send input commands to server
-  useEffect(() => {
-    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log(`Not sending updates: gameStarted=${gameStarted}, wsRef=${!!wsRef.current}, readyState=${wsRef.current?.readyState}`);
       return;
     }
 
-    // Send input commands based on mouse direction and boost state
-    const sendInputInterval = setInterval(() => {
-      if (gameOverRef.current) return;
-      
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        // Calculate target angle from mouse direction
-        const targetAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
-        
-        const inputData = {
-          type: 'input',
-          targetAngle: targetAngle,
-          isBoosting: isBoosting,
-          speed: isBoosting ? 3.5 : 2.0
-        };
-        
-        wsRef.current.send(JSON.stringify(inputData));
+    console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
+    
+    const sendInterval = setInterval(() => {
+      // Stop sending updates immediately if game is over
+      if (gameOverRef.current) {
+        console.log(`🛑 Stopped sending updates: gameOver=${gameOverRef.current}`);
+        return;
       }
-    }, 33); // Send input updates at 30 FPS
+      
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
+        const updateData = {
+          type: 'update',
+          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
+          color: '#d55400',
+          money: snake.money,
+          totalMass: snake.totalMass,
+          segmentRadius: snake.getSegmentRadius(),
+          visibleSegmentCount: snake.visibleSegments.length
+        };
+        // Reduced logging for performance - only log every 30th update
+        if (Date.now() % 2000 < 67) {
+          console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+        }
+        wsRef.current.send(JSON.stringify(updateData));
+      } else {
+        console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
+      }
+    }, 67); // Send updates every 67ms (~15 FPS) for better performance
 
     return () => {
-      clearInterval(sendInputInterval);
+      console.log('Clearing position update interval');
+      clearInterval(sendInterval);
     };
-  }, [gameStarted, mouseDirection, isBoosting]);
+  }, [gameStarted, wsRef.current?.readyState, gameOver]);
 
   // Mouse tracking
   useEffect(() => {
@@ -1308,18 +1345,42 @@ export default function GamePage() {
       snake.updateVisibleSegments();
     };
     
-    // Track when tab becomes hidden/visible for catch-up movement (real Slither.io method)
+    // Track when tab becomes hidden/visible with Service Worker background sync
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setHiddenAt(performance.now());
-        console.log('Tab visibility changed:', 'hidden');
+        console.log('⏸️ Tab became hidden, starting Service Worker background sync');
+        
+        // Notify Service Worker that tab became inactive
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'VISIBILITY_CHANGE',
+            data: { 
+              hidden: true,
+              snakePosition: snake.head,
+              snakeAngle: snake.currentAngle,
+              snakeSpeed: snake.speed,
+              isBoosting: isBoosting
+            }
+          });
+        }
       } else {
+        console.log('▶️ Tab became visible, stopping Service Worker background sync');
+        
+        // Notify Service Worker that tab became active
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'VISIBILITY_CHANGE',
+            data: { hidden: false }
+          });
+        }
+        
         if (hiddenAt !== null) {
           const now = performance.now();
           const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
-          applySnakeCatchUp(delta);
+          console.log(`⏰ Page was hidden for ${delta.toFixed(2)}s, Service Worker handled background movement`);
+          // Service Worker handles movement, no need for catch-up
           setHiddenAt(null);
-          console.log('Tab visibility changed:', 'visible');
         }
       }
       setGameIsVisible(!document.hidden);
