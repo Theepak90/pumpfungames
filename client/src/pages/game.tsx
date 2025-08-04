@@ -1396,9 +1396,11 @@ export default function GamePage() {
           if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
             // Handle different types of food
             if (food.isMoneyCrate && food.moneyValue) {
-              // Snake eats money crate - add money instead of mass
+              // Snake eats money crate - add both money AND mass from dead snake
               snake.money += food.moneyValue;
-              console.log(`💰 Collected money crate worth $${food.moneyValue}! Total money: $${snake.money.toFixed(2)}`);
+              const massGain = 0.3; // Same mass gain as regular food particles
+              snake.eatFood(massGain);
+              console.log(`💰 Collected money crate worth $${food.moneyValue} + ${massGain} mass! Total money: $${snake.money.toFixed(2)}`);
               
               // Notify server about money crate collection for multiplayer sync
               if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1840,7 +1842,7 @@ export default function GamePage() {
             
             // Draw the money crate image if loaded (no glow, no pulsing)
             if (moneyCrateImage) {
-              const imageSize = food.radius * 2 * 2.5; // 2.5x bigger visually
+              const imageSize = food.radius * 2 * 1.5; // 1.5x bigger visually (40% smaller than before)
               ctx.drawImage(
                 moneyCrateImage,
                 drawX - imageSize / 2,
@@ -1849,8 +1851,8 @@ export default function GamePage() {
                 imageSize
               );
             } else {
-              // Fallback: Draw main money crate (square-ish) with dollar sign - 2.5x bigger
-              const visualRadius = food.radius * 2.5;
+              // Fallback: Draw main money crate (square-ish) with dollar sign - 1.5x bigger
+              const visualRadius = food.radius * 1.5;
               ctx.fillStyle = '#ffd700';
               ctx.fillRect(drawX - visualRadius, drawY - visualRadius, visualRadius * 2, visualRadius * 2);
               
