@@ -993,9 +993,14 @@ export default function GamePage() {
           console.log(`My player ID: ${data.playerId} in room ${data.roomId || roomId}`);
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
-          setServerPlayers(data.players || []);
-          // Food is handled client-side, not synced across players
+          
+          // Filter out our own player and set other players
+          const otherPlayersFromServer = (data.players || []).filter((p: any) => p.id !== myPlayerId);
+          setOtherPlayers(otherPlayersFromServer);
+          
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${foods.length} food`);
+          console.log(`Drawing ${otherPlayersFromServer.length} other players (excluding self)`);
+          
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);

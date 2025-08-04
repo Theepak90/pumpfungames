@@ -595,14 +595,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Player ${playerId} marked as disconnected in room ${room.region}/${room.id} - snake will continue moving server-side`);
         }
         
-        // Only fully remove player after 30 seconds of inactivity
+        // Only fully remove player after 2 minutes of inactivity
         setTimeout(() => {
           const currentPlayer = room.players.get(playerId);
           if (currentPlayer && !currentPlayer.isConnected) {
             room.players.delete(playerId);
             console.log(`Player ${playerId} fully removed from room ${room.region}/${room.id} after timeout`);
           }
-        }, 30000); // 30 second grace period
+        }, 120000); // 2 minute grace period
       }
       playerToRoom.delete(playerId);
     });
@@ -628,8 +628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Update server-side movement for all players, connected or not
       for (const [playerId, player] of room.players) {
-        // Skip movement if player recently sent an update (within 100ms)
-        if (currentTime - player.lastClientUpdate < 100) continue;
+        // Skip movement if player recently sent an update (within 200ms)
+        if (currentTime - player.lastClientUpdate < 200) continue;
         
         // Calculate movement based on time elapsed
         const deltaTime = 16 / 1000; // 16ms per frame = ~60 FPS
@@ -652,23 +652,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           player.angle = angleToCenter;
         }
         
-        // Update segments based on server-side position
+        // Update segments based on server-side position for smooth snake body
         const segmentSpacing = 10;
         if (!player.segments) player.segments = [];
         
         // Add new head position
         player.segments.unshift({ x: player.x, y: player.y });
         
-        // Maintain segment count based on mass
+        // Maintain proper segment trail length
         const targetSegments = Math.min(Math.floor(player.totalMass), 100);
-        while (player.segments.length > targetSegments * 2) {
+        const maxTrailLength = targetSegments * 2; // Allow more trail for smoother body
+        
+        while (player.segments.length > maxTrailLength) {
           player.segments.pop();
+        }
+        
+        // Ensure we have enough visible segments for the snake body
+        if (player.segments.length < targetSegments && player.segments.length > 0) {
+          // Fill missing segments by duplicating the last segment
+          const lastSegment = player.segments[player.segments.length - 1];
+          while (player.segments.length < targetSegments) {
+            player.segments.push({ x: lastSegment.x, y: lastSegment.y });
+          }
         }
         
         player.lastUpdate = currentTime;
         
-        if (!player.isConnected && Math.random() < 0.01) {
-          console.log(`🤖 Server moving disconnected player ${playerId} at (${player.x.toFixed(1)}, ${player.y.toFixed(1)})`);
+        if (!player.isConnected && Math.random() < 0.002) {
+          console.log(`🤖 Server moving disconnected player ${playerId} at (${player.x.toFixed(1)}, ${player.y.toFixed(1)}) with ${player.segments?.length || 0} segments`);
         }
       }
     }
