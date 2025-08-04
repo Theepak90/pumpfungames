@@ -1975,6 +1975,14 @@ export default function GamePage() {
           setSnakeVisible(false);
           setGameOver(true);
           console.log(`💀 FADE COMPLETE - Snake fully hidden, game over shown`);
+          
+          // Auto-return to home screen after 3 seconds
+          setTimeout(() => {
+            console.log(`🏠 Auto-returning to home screen after death`);
+            setGameStarted(false);
+            setGameOver(false);
+            gameOverRef.current = false;
+          }, 3000);
         }
       }
 
@@ -2413,8 +2421,8 @@ export default function GamePage() {
         </div>
       </div>
       
-      {gameOver && (
-        <div className="absolute inset-0 z-20" style={{ backgroundColor: '#15161b' }}>
+      {gameOver && gameStarted && (
+        <div className="absolute inset-0 z-30" style={{ backgroundColor: 'rgba(21, 22, 27, 0.95)' }}>
           <div className="w-full h-full flex flex-col items-center justify-center">
             {/* Game Over Title */}
             <div className="text-red-500 text-8xl font-bold mb-12" style={{ 
@@ -2422,6 +2430,14 @@ export default function GamePage() {
               textShadow: '4px 4px 0px #000000, 8px 8px 20px rgba(255, 0, 0, 0.5)'
             }}>
               GAME OVER
+            </div>
+            
+            {/* Auto-return message */}
+            <div className="text-white text-lg mb-8" style={{ 
+              fontFamily: "'Press Start 2P', monospace",
+              textAlign: 'center'
+            }}>
+              Returning to home screen...
             </div>
             
             {/* Buttons */}
@@ -2434,20 +2450,62 @@ export default function GamePage() {
                   boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                 }}
               >
-                RESPAWN
+                PLAY AGAIN
               </button>
               
               <button
-                onClick={exitGame}
-                className="px-8 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
+                onClick={() => {
+                  setGameStarted(false);
+                  setGameOver(false);
+                  gameOverRef.current = false;
+                }}
+                className="px-8 py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
                 style={{ 
                   fontFamily: "'Press Start 2P', monospace",
                   boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                 }}
               >
-                CONTINUE
+                HOME NOW
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Game Over screen that appears on top of home screen */}
+      {gameOver && !gameStarted && (
+        <div className="absolute inset-0 z-40" style={{ backgroundColor: 'rgba(21, 22, 27, 0.9)' }}>
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            {/* Game Over Title */}
+            <div className="text-red-500 text-6xl font-bold mb-8" style={{ 
+              fontFamily: "'Press Start 2P', monospace",
+              textShadow: '4px 4px 0px #000000, 8px 8px 20px rgba(255, 0, 0, 0.5)'
+            }}>
+              GAME OVER
+            </div>
+            
+            {/* Final score or stats */}
+            <div className="text-white text-lg mb-8" style={{ 
+              fontFamily: "'Press Start 2P', monospace",
+              textAlign: 'center'
+            }}>
+              Final Money: ${snake.money.toFixed(2)}
+            </div>
+            
+            {/* Single button to dismiss */}
+            <button
+              onClick={() => {
+                setGameOver(false);
+                gameOverRef.current = false;
+              }}
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
+              style={{ 
+                fontFamily: "'Press Start 2P', monospace",
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              CONTINUE
+            </button>
           </div>
         </div>
       )}
