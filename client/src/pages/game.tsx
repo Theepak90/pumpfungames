@@ -1659,9 +1659,11 @@ export default function GamePage() {
         // Skip players with very few segments (likely dead/disconnected)
         if (otherPlayer.segments.length < 2) continue;
         
-        for (const segment of otherPlayer.segments) {
+        // Only check collision with body segments (skip the head segment at index 0)
+        for (let i = 1; i < otherPlayer.segments.length; i++) {
+          const segment = otherPlayer.segments[i];
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
-          const collisionRadius = snake.getSegmentRadius() + 10; // Use standard segment radius
+          const collisionRadius = snake.getSegmentRadius() + 8; // Reduced collision radius for fairer gameplay
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
@@ -1702,18 +1704,24 @@ export default function GamePage() {
         }
       }
 
-      // Check for collisions with server players' snakes
+      // Check for collisions with server players' snakes (avoid duplicate collision checks)
       for (const serverPlayer of serverPlayers) {
         if (!serverPlayer.segments || serverPlayer.segments.length === 0) continue;
         if (serverPlayer.id === myPlayerId) continue; // Skip self
+        
+        // Skip if this player is already in otherPlayers to avoid duplicate collision checks
+        if (otherPlayers.some(p => p.id === serverPlayer.id)) continue;
+        
         // Skip collision with dead players
-        if (serverPlayer.isDead || serverPlayer.gameOver) continue;
+        if ((serverPlayer as any).isDead || (serverPlayer as any).gameOver) continue;
         // Skip players with very few segments (likely dead/disconnected) 
         if (serverPlayer.segments.length < 2) continue;
         
-        for (const segment of serverPlayer.segments) {
+        // Only check collision with body segments (skip the head segment at index 0)
+        for (let i = 1; i < serverPlayer.segments.length; i++) {
+          const segment = serverPlayer.segments[i];
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
-          const collisionRadius = snake.getSegmentRadius() + (serverPlayer.segmentRadius || 10);
+          const collisionRadius = snake.getSegmentRadius() + 8; // Reduced collision radius
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
