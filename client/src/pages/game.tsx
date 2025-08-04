@@ -1041,20 +1041,22 @@ export default function GamePage() {
           });
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
-          // Server detected our collision - immediately clear snake body and stop game
-          // Start fade animation for server death
-          console.log(`💀 SERVER DEATH - Starting fade animation`);
-          snakeFadingRef.current = true;
-          setSnakeFading(true);
-          fadeStartTimeRef.current = Date.now();
-          fadeOpacityRef.current = 1.0;
-          console.log(`💀 SERVER DEATH - FADE STARTED`);
+          // Server detected our collision - instantly return to home screen
+          console.log(`💀 SERVER DEATH - Instant return to home`);
           
-          // DON'T clear segments immediately - let them fade out
-          // snake.visibleSegments = []; // Keep segments for fade animation
-          // snake.segmentTrail = []; // Keep trail for fade animation
-          // Game over will be set when fade completes
-          console.log(`💀 SERVER DEATH: Starting fade animation`);
+          // Clear snake data completely
+          snake.visibleSegments = [];
+          snake.segmentTrail = [];
+          snake.totalMass = 0;
+          snake.clearSnakeOnDeath();
+          
+          // Instantly return to home screen - no fade, no game over screen
+          console.log(`🏠 Instantly returning to home screen after server death`);
+          setGameStarted(false);
+          setGameOver(false);
+          gameOverRef.current = false;
+          snakeFadingRef.current = false;
+          setSnakeFading(false);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1573,13 +1575,7 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
-            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Starting fade animation`);
-            // Start fade animation instead of instant hide
-            snakeFadingRef.current = true;
-            setSnakeFading(true);
-            fadeStartTimeRef.current = Date.now();
-            fadeOpacityRef.current = 1.0;
-            console.log(`💀 FADE ANIMATION STARTED`);
+            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) - Instant return to home`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1587,12 +1583,19 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data but keep segments for fade animation
+            // Clear snake data completely
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
             snake.totalMass = 0;
             snake.clearSnakeOnDeath();
             
-            // NOTE: Don't set gameOver=true here - let the fade animation complete first
-            // The fade animation will handle setting gameOver and returning to home screen
+            // Instantly return to home screen - no fade, no game over screen
+            console.log(`🏠 Instantly returning to home screen after death`);
+            setGameStarted(false);
+            setGameOver(false);
+            gameOverRef.current = false;
+            snakeFadingRef.current = false;
+            setSnakeFading(false);
             
             return; // Stop the game loop
           }
@@ -1614,13 +1617,7 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
-            console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length}) Starting fade animation`);
-            // Start fade animation instead of instant hide
-            snakeFadingRef.current = true;
-            setSnakeFading(true);
-            fadeStartTimeRef.current = Date.now();
-            fadeOpacityRef.current = 1.0;
-            console.log(`💀 FADE ANIMATION STARTED`);
+            console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length}) - Instant return to home`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1628,12 +1625,19 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data but keep segments for fade animation
+            // Clear snake data completely
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
             snake.totalMass = 0;
             snake.clearSnakeOnDeath();
             
-            // NOTE: Don't set gameOver=true here - let the fade animation complete first
-            // The fade animation will handle setting gameOver and returning to home screen
+            // Instantly return to home screen - no fade, no game over screen
+            console.log(`🏠 Instantly returning to home screen after death`);
+            setGameStarted(false);
+            setGameOver(false);
+            gameOverRef.current = false;
+            snakeFadingRef.current = false;
+            setSnakeFading(false);
             
             return; // Stop the game loop
           }
@@ -2418,53 +2422,7 @@ export default function GamePage() {
         </div>
       </div>
       
-      {/* Original Game Over screen that appears on top of home screen */}
-      {gameOver && !gameStarted && (
-        <div className="absolute inset-0 z-40" style={{ backgroundColor: '#15161b' }}>
-          <div className="w-full h-full flex flex-col items-center justify-center">
-            {/* Game Over Title */}
-            <div className="text-red-500 text-8xl font-bold mb-12" style={{ 
-              fontFamily: "'Press Start 2P', monospace",
-              textShadow: '4px 4px 0px #000000, 8px 8px 20px rgba(255, 0, 0, 0.5)'
-            }}>
-              GAME OVER
-            </div>
-            
-            {/* Buttons */}
-            <div className="flex gap-8">
-              <button
-                onClick={() => {
-                  setGameOver(false);
-                  gameOverRef.current = false;
-                  setGameStarted(true);
-                  resetGame();
-                }}
-                className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
-                style={{ 
-                  fontFamily: "'Press Start 2P', monospace",
-                  boxShadow: '0 8px 0 #2d5a2d, 0 12px 20px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                PLAY AGAIN
-              </button>
-              
-              <button
-                onClick={() => {
-                  setGameOver(false);
-                  gameOverRef.current = false;
-                }}
-                className="px-8 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xl font-bold transition-all duration-200 transform hover:scale-105"
-                style={{ 
-                  fontFamily: "'Press Start 2P', monospace",
-                  boxShadow: '0 8px 0 #374151, 0 12px 20px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                CONTINUE
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {showCongrats && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
