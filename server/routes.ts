@@ -176,10 +176,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     maxPlayers: number;
     initialized: boolean;
     lastActivity: number;
+    gameLoop?: NodeJS.Timeout; // Server-side game loop
   }
 
   const gameRooms = new Map<string, GameRoom>(); // Key format: "region:roomId"
   const playerToRoom = new Map<string, string>(); // Maps playerId to "region:roomId"
+
+  // Server-side movement constants
+  const SERVER_TICK_RATE = 60; // 60 FPS server updates
+  const MAP_CENTER_X = 2000;
+  const MAP_CENTER_Y = 2000;
+  const MAP_RADIUS = 1800;
+
+  // Server-side movement function
+  function updateServerPlayerMovement(player: any): void {
+    if (!player.segments || player.segments.length === 0) return;
+    if (!player.currentAngle) player.currentAngle = 0;
+    if (!player.speed) player.speed = 2.0;
+    
+    // Apply movement based on current angle and speed
+    const head = player.segments[0];
+    const newX = head.x + Math.cos(player.currentAngle) * player.speed;
+    const newY = head.y + Math.sin(player.currentAngle) * player.speed;
+    
+    // Check map boundaries (circular map)
+    const distFromCenter = Math.sqrt((newX - MAP_CENTER_X) ** 2 + (newY - MAP_CENTER_Y) ** 2);
+    if (distFromCenter > MAP_RADIUS) {
+      // Stop movement at boundary
+      return;
+    }
+    
+    // Update head position
+    player.segments[0] = { x: newX, y: newY };
+    
+    // Update segment trail (simple following logic)
+    for (let i = 1; i < player.segments.length; i++) {
+      const prevSegment = player.segments[i - 1];
+      const currentSegment = player.segments[i];
+      const distance = Math.sqrt((prevSegment.x - currentSegment.x) ** 2 + (prevSegment.y - currentSegment.y) ** 2);
+      
+      if (distance > 18) { // Target segment spacing
+        const angle = Math.atan2(prevSegment.y - currentSegment.y, prevSegment.x - currentSegment.x);
+        player.segments[i] = {
+          x: currentSegment.x + Math.cos(angle) * (distance - 18),
+          y: currentSegment.y + Math.sin(angle) * (distance - 18)
+        };
+      }
+    }
+  }
+
+  // Server-side game loop for a room
+  function startServerGameLoop(room: GameRoom, roomKey: string): void {
+    if (room.gameLoop) {
+      clearInterval(room.gameLoop);
+    }
+    
+    room.gameLoop = setInterval(() => {
+      // Update all players in the room
+      for (const [playerId, player] of room.players) {
+        updateServerPlayerMovement(player);
+      }
+      
+      // Broadcast updated positions to all clients in room
+      const gameState = {
+        type: 'serverUpdate',
+        players: Array.from(room.players.values())
+      };
+      
+      const message = JSON.stringify(gameState);
+      let broadcastCount = 0;
+      
+      room.players.forEach((player, id) => {
+        wss.clients.forEach(client => {
+          if ((client as any).playerId === id && client.readyState === WebSocket.OPEN) {
+            client.send(message);
+            broadcastCount++;
+          }
+        });
+      });
+      
+      // Clean up empty rooms
+      if (room.players.size === 0) {
+        if (room.gameLoop) {
+          clearInterval(room.gameLoop);
+          room.gameLoop = undefined;
+        }
+      }
+    }, 1000 / SERVER_TICK_RATE);
+  }
 
   // Initialize room with region support
   function createRoom(region: string, roomId: number): GameRoom {
@@ -195,6 +279,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const roomKey = `${region}:${roomId}`;
     gameRooms.set(roomKey, room);
     console.log(`Created room ${region}/${roomId}`);
+    
+    // Start server-side game loop for this room
+    startServerGameLoop(room, roomKey);
+    
     return room;
   }
 
@@ -335,6 +423,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on("message", function incoming(message: any) {
       try {
         const data = JSON.parse(message.toString());
+        if (data.type === 'input') {
+          // Handle input commands (direction, boost) instead of position updates
+          const roomKey = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomKey!);
+          if (!room) return;
+          
+          const player = room.players.get(playerId);
+          if (!player) return;
+          
+          // Update player input state
+          if (data.targetAngle !== undefined) {
+            player.currentAngle = data.targetAngle;
+          }
+          if (data.speed !== undefined) {
+            player.speed = data.speed;
+          }
+          if (data.isBoosting !== undefined) {
+            player.isBoosting = data.isBoosting;
+            player.speed = data.isBoosting ? 3.5 : 2.0; // Boost speed vs normal speed
+          }
+          
+          return; // Don't process as position update
+        }
+        
+        if (data.type === 'init') {
+          // Initialize player with starting position and segments
+          const roomKey = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomKey!);
+          if (!room) return;
+          
+          const player = room.players.get(playerId);
+          if (!player) return;
+          
+          // Set initial position and segments from client
+          player.segments = data.segments || [];
+          player.currentAngle = data.currentAngle || 0;
+          player.speed = data.speed || 2.0;
+          player.totalMass = data.totalMass || 6;
+          player.segmentRadius = data.segmentRadius || 8;
+          
+          console.log(`Player ${playerId} initialized with ${player.segments.length} segments`);
+          return;
+        }
+        
         if (data.type === 'update') {
           // Get player's room
           const roomKey = playerToRoom.get(playerId);

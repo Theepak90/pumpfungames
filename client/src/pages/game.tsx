@@ -1039,6 +1039,28 @@ export default function GamePage() {
             console.log(`💰 Removed money crate ${data.crateId}. Foods count: ${currentFoods.length} -> ${filtered.length}`);
             return filtered;
           });
+        } else if (data.type === 'serverUpdate') {
+          // Receive server-authoritative positions for all players
+          const serverPlayers = data.players || [];
+          
+          // Update our own snake position from server
+          const myServerData = serverPlayers.find((p: any) => p.id === myPlayerId);
+          if (myServerData && myServerData.segments && myServerData.segments.length > 0) {
+            // Apply server position to our snake
+            snake.head = { x: myServerData.segments[0].x, y: myServerData.segments[0].y };
+            snake.visibleSegments = myServerData.segments.map((seg: any) => ({ 
+              x: seg.x, 
+              y: seg.y, 
+              opacity: 1 
+            }));
+            snake.totalMass = myServerData.totalMass || snake.totalMass;
+          }
+          
+          // Update other players
+          const filteredPlayers = serverPlayers.filter((p: any) => 
+            p.id !== myPlayerId && p.segments && p.segments.length > 0
+          );
+          setOtherPlayers(filteredPlayers);
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - instantly return to home screen
@@ -1116,47 +1138,55 @@ export default function GamePage() {
     };
   }, [gameStarted, roomId]); // Include roomId to reconnect when room changes
 
-  // Send player data to server
+  // Send initial player data to server
   useEffect(() => {
     if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log(`Not sending updates: gameStarted=${gameStarted}, wsRef=${!!wsRef.current}, readyState=${wsRef.current?.readyState}`);
+      return;
+    }
+    
+    // Send initial snake data once
+    const initMessage = {
+      type: 'init',
+      segments: snake.visibleSegments,
+      currentAngle: snake.currentAngle,
+      speed: snake.speed,
+      totalMass: snake.totalMass,
+      segmentRadius: snake.segmentRadius
+    };
+    
+    wsRef.current.send(JSON.stringify(initMessage));
+    console.log(`Sent initial player data: ${snake.visibleSegments.length} segments`);
+  }, [gameStarted, myPlayerId]);
+
+  // Send input commands to server
+  useEffect(() => {
+    if (!gameStarted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    console.log(`Starting position updates - snake has ${snake.visibleSegments.length} segments`);
-    
-    const sendInterval = setInterval(() => {
-      // Stop sending updates immediately if game is over
-      if (gameOverRef.current) {
-        console.log(`🛑 Stopped sending updates: gameOver=${gameOverRef.current}`);
-        return;
-      }
+    // Send input commands based on mouse direction and boost state
+    const sendInputInterval = setInterval(() => {
+      if (gameOverRef.current) return;
       
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
-        const updateData = {
-          type: 'update',
-          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
-          color: '#d55400',
-          money: snake.money,
-          totalMass: snake.totalMass,
-          segmentRadius: snake.getSegmentRadius(),
-          visibleSegmentCount: snake.visibleSegments.length
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        // Calculate target angle from mouse direction
+        const targetAngle = Math.atan2(mouseDirection.y, mouseDirection.x);
+        
+        const inputData = {
+          type: 'input',
+          targetAngle: targetAngle,
+          isBoosting: isBoosting,
+          speed: isBoosting ? 3.5 : 2.0
         };
-        // Reduced logging for performance - only log every 30th update
-        if (Date.now() % 2000 < 67) {
-          console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
-        }
-        wsRef.current.send(JSON.stringify(updateData));
-      } else {
-        console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
+        
+        wsRef.current.send(JSON.stringify(inputData));
       }
-    }, 67); // Send updates every 67ms (~15 FPS) for better performance
+    }, 33); // Send input updates at 30 FPS
 
     return () => {
-      console.log('Clearing position update interval');
-      clearInterval(sendInterval);
+      clearInterval(sendInputInterval);
     };
-  }, [gameStarted, wsRef.current?.readyState, gameOver]);
+  }, [gameStarted, mouseDirection, isBoosting]);
 
   // Mouse tracking
   useEffect(() => {
