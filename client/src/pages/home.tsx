@@ -57,7 +57,7 @@ class DecorativeSnake {
   updateVisibleSegments() {
     this.visibleSegments = [];
     const segmentCount = 12;
-    const segmentSpacing = 8; // Reduced from 16 to 8 for closer segments like multiplayer
+    const segmentSpacing = 18; // Increased to 18 for proper spacing like in-game snakes
     
     for (let i = 0; i < segmentCount; i++) {
       const trailIndex = Math.floor(i * segmentSpacing);
