@@ -281,9 +281,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    ws.playerId = playerId;
-    ws.roomId = targetRoom.id;
-    ws.region = targetRoom.region;
+    (ws as any).playerId = playerId;
+    (ws as any).roomId = targetRoom.id;
+    (ws as any).region = targetRoom.region;
     const finalRoomKey = `${targetRoom.region}:${targetRoom.id}`;
     playerToRoom.set(playerId, finalRoomKey);
     
@@ -427,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     let broadcastCount = 0;
                     room.players.forEach((player, id) => {
                       wss.clients.forEach(client => {
-                        if (client.playerId === id && client.readyState === WebSocket.OPEN) {
+                        if ((client as any).playerId === id && client.readyState === WebSocket.OPEN) {
                           client.send(crateMessage);
                           broadcastCount++;
                         }
@@ -577,8 +577,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Find clients in this room and broadcast to them
         wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN && 
-              client.roomId === room.id && 
-              client.region === room.region) {
+              (client as any).roomId === room.id && 
+              (client as any).region === room.region) {
             try {
               client.send(worldMessage);
             } catch (error) {

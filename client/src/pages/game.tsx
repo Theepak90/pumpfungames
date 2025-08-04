@@ -1543,12 +1543,16 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Setting gameOver = true`);
-            gameOverRef.current = true; // Set this FIRST to stop rendering immediately
-            snake.visibleSegments = []; // IMMEDIATELY clear segments
-            snake.segmentTrail = []; // Clear trail
-            dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
-            snake.clearSnakeOnDeath(); // Clear all snake segments immediately  
+            // IMMEDIATELY stop rendering and clear everything  
+            gameOverRef.current = true;
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
+            snake.totalMass = 0;
             setGameOver(true);
+            
+            // Drop money crates
+            dropMoneyCrates(snake.money || 1.0, Math.max(snake.totalMass || 6, 1));
+            snake.clearSnakeOnDeath();
             
             return; // Stop the game loop
           }
@@ -1571,12 +1575,16 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length})`);
-            gameOverRef.current = true; // Set this FIRST to stop rendering immediately
-            snake.visibleSegments = []; // IMMEDIATELY clear segments
-            snake.segmentTrail = []; // Clear trail
-            dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
-            snake.clearSnakeOnDeath(); // Clear all snake segments immediately
+            // IMMEDIATELY stop rendering and clear everything
+            gameOverRef.current = true;
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
+            snake.totalMass = 0;
             setGameOver(true);
+            
+            // Drop money crates
+            dropMoneyCrates(snake.money || 1.0, Math.max(snake.totalMass || 6, 1));
+            snake.clearSnakeOnDeath();
             
             return; // Stop the game loop
           }
