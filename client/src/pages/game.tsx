@@ -1980,7 +1980,7 @@ export default function GamePage() {
 
       // Draw your own snake locally using EXACT same rendering as remote players
       // Render if game is active AND (visible OR fading) AND has segments
-      const shouldRender = gameStarted && (snakeVisibleRef.current || snakeFadingRef.current) && snake.visibleSegments.length > 0 && !gameOverRef.current;
+      const shouldRender = gameStarted && (snakeVisibleRef.current || snakeFadingRef.current) && snake.visibleSegments.length > 0;
       
       if (shouldRender) {
         const opacity = snakeFadingRef.current ? fadeOpacityRef.current : 1.0;
@@ -2080,7 +2080,7 @@ export default function GamePage() {
         // Restore opacity
         ctx.restore();
       } else {
-        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING (gameStarted=${gameStarted}, visible=${snakeVisibleRef.current}, fading=${snakeFadingRef.current}, segments=${snake.visibleSegments.length}, gameOver=${gameOverRef.current})`);
+        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING (gameStarted=${gameStarted}, visible=${snakeVisibleRef.current}, fading=${snakeFadingRef.current}, segments=${snake.visibleSegments.length})`);
       }
 
       // REMOVED: Legacy other players rendering to prevent duplicate snake bodies
