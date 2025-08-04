@@ -771,6 +771,11 @@ export default function GamePage() {
   const gameOverRef = useRef(false);
   const [snakeVisible, setSnakeVisible] = useState(true);
   const snakeVisibleRef = useRef(true);
+  const [snakeFading, setSnakeFading] = useState(false);
+  const snakeFadingRef = useRef(false);
+  const [fadeOpacity, setFadeOpacity] = useState(1.0);
+  const fadeOpacityRef = useRef(1.0);
+  const fadeStartTimeRef = useRef(0);
 
   // Sync ref with state
   useEffect(() => {
@@ -1029,18 +1034,19 @@ export default function GamePage() {
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
-          // IMMEDIATELY hide snake and clear everything
-          console.log(`💀 SERVER DEATH - BEFORE: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
-          snakeVisibleRef.current = false; // Hide snake immediately
-          setSnakeVisible(false);
-          gameOverRef.current = true; // Set this FIRST before anything else
-          console.log(`💀 SERVER DEATH - AFTER: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
+          // Start fade animation for server death
+          console.log(`💀 SERVER DEATH - Starting fade animation`);
+          snakeFadingRef.current = true;
+          setSnakeFading(true);
+          fadeStartTimeRef.current = Date.now();
+          fadeOpacityRef.current = 1.0;
+          console.log(`💀 SERVER DEATH - FADE STARTED`);
           
-          snake.visibleSegments = []; // Clear all body segments immediately
-          snake.segmentTrail = []; // Clear trail
-          snake.totalMass = 0; // Reset mass to 0
-          setGameOver(true);
-          console.log(`💀 SERVER DEATH: Snake hidden and cleared completely`);
+          // DON'T clear segments immediately - let them fade out
+          // snake.visibleSegments = []; // Keep segments for fade animation
+          // snake.segmentTrail = []; // Keep trail for fade animation
+          // Game over will be set when fade completes
+          console.log(`💀 SERVER DEATH: Starting fade animation`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1550,13 +1556,13 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
-            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Setting gameOver = true`);
-            // IMMEDIATELY stop rendering and clear everything  
-            console.log(`💀 BEFORE DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
-            snakeVisibleRef.current = false; // Hide snake immediately
-            setSnakeVisible(false);
-            gameOverRef.current = true;
-            console.log(`💀 AFTER DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
+            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Starting fade animation`);
+            // Start fade animation instead of instant hide
+            snakeFadingRef.current = true;
+            setSnakeFading(true);
+            fadeStartTimeRef.current = Date.now();
+            fadeOpacityRef.current = 1.0;
+            console.log(`💀 FADE ANIMATION STARTED`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1591,13 +1597,13 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
-            console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length})`);
-            // IMMEDIATELY stop rendering and clear everything
-            console.log(`💀 BEFORE DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
-            snakeVisibleRef.current = false; // Hide snake immediately
-            setSnakeVisible(false);
-            gameOverRef.current = true;
-            console.log(`💀 AFTER DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
+            console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length}) Starting fade animation`);
+            // Start fade animation instead of instant hide
+            snakeFadingRef.current = true;
+            setSnakeFading(true);
+            fadeStartTimeRef.current = Date.now();
+            fadeOpacityRef.current = 1.0;
+            console.log(`💀 FADE ANIMATION STARTED`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1935,16 +1941,37 @@ export default function GamePage() {
         }
       });
 
+      // Handle fade animation
+      if (snakeFadingRef.current) {
+        const fadeElapsed = Date.now() - fadeStartTimeRef.current;
+        const fadeDuration = 1000; // 1 second fade
+        const newOpacity = Math.max(0, 1 - (fadeElapsed / fadeDuration));
+        fadeOpacityRef.current = newOpacity;
+        setFadeOpacity(newOpacity);
+        
+        if (fadeElapsed >= fadeDuration) {
+          // Fade complete - hide snake completely and show game over
+          snakeFadingRef.current = false;
+          snakeVisibleRef.current = false;
+          gameOverRef.current = true;
+          setSnakeFading(false);
+          setSnakeVisible(false);
+          setGameOver(true);
+          console.log(`💀 FADE COMPLETE - Snake fully hidden, game over shown`);
+        }
+      }
+
       // Draw your own snake locally using EXACT same rendering as remote players
-      // Only render if game is active AND snake has segments AND game is not over AND snake is visible (disappears completely on death)
-      console.log(`🐍 RENDER CHECK: gameStarted=${gameStarted}, gameOver=${gameOverRef.current}, visible=${snakeVisibleRef.current}, segments=${snake.visibleSegments.length}`);
+      // Render if game is active AND (visible OR fading) AND has segments
+      const shouldRender = gameStarted && (snakeVisibleRef.current || snakeFadingRef.current) && snake.visibleSegments.length > 0 && !gameOverRef.current;
       
-      // FORCE HIDE SNAKE - DO NOT RENDER IF ANY OF THESE CONDITIONS ARE TRUE
-      if (!gameStarted || gameOverRef.current || !snakeVisibleRef.current || snake.visibleSegments.length === 0) {
-        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING`);
-      } else {
-        console.log(`✅ RENDERING SNAKE`);
-        // Render snake
+      if (shouldRender) {
+        const opacity = snakeFadingRef.current ? fadeOpacityRef.current : 1.0;
+        console.log(`✅ RENDERING SNAKE with opacity: ${opacity}`);
+        
+        // Save current context for opacity
+        ctx.save();
+        ctx.globalAlpha = opacity;
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
@@ -2033,7 +2060,10 @@ export default function GamePage() {
           ctx.restore();
         }
         
-
+        // Restore opacity
+        ctx.restore();
+      } else {
+        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING (gameStarted=${gameStarted}, visible=${snakeVisibleRef.current}, fading=${snakeFadingRef.current}, segments=${snake.visibleSegments.length}, gameOver=${gameOverRef.current})`);
       }
 
       // REMOVED: Legacy other players rendering to prevent duplicate snake bodies
@@ -2246,6 +2276,10 @@ export default function GamePage() {
     gameOverRef.current = false;
     setSnakeVisible(true);
     snakeVisibleRef.current = true;
+    setSnakeFading(false);
+    snakeFadingRef.current = false;
+    setFadeOpacity(1.0);
+    fadeOpacityRef.current = 1.0;
     setScore(0);
     setShowCongrats(false);
     // Reset snake to initial state using new system
