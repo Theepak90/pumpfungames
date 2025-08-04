@@ -1587,12 +1587,12 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data
-            snake.visibleSegments = [];
-            snake.segmentTrail = [];
+            // Clear snake data but keep segments for fade animation
             snake.totalMass = 0;
             snake.clearSnakeOnDeath();
-            setGameOver(true);
+            
+            // NOTE: Don't set gameOver=true here - let the fade animation complete first
+            // The fade animation will handle setting gameOver and returning to home screen
             
             return; // Stop the game loop
           }
@@ -1628,12 +1628,12 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data
-            snake.visibleSegments = [];
-            snake.segmentTrail = [];
+            // Clear snake data but keep segments for fade animation
             snake.totalMass = 0;
             snake.clearSnakeOnDeath();
-            setGameOver(true);
+            
+            // NOTE: Don't set gameOver=true here - let the fade animation complete first
+            // The fade animation will handle setting gameOver and returning to home screen
             
             return; // Stop the game loop
           }
