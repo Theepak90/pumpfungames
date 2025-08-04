@@ -971,6 +971,7 @@ export default function GamePage() {
         })
         .catch((error) => {
           console.error('🚨 Service Worker registration failed:', error);
+          console.error('Error details:', error.message, error.stack);
         });
     } else {
       console.warn('⚠️ Service Workers not supported in this browser');
