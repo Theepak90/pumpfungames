@@ -77,12 +77,23 @@ self.addEventListener('message', event => {
       break;
       
     case 'VISIBILITY_CHANGE':
+      console.log('📱 SW: Visibility change:', data.hidden ? 'hidden' : 'visible');
+      console.log('📱 SW: Game active:', gameState.isGameActive);
       if (data.hidden && gameState.isGameActive) {
         console.log('📱 SW: Tab became inactive, starting background movement');
+        // Update game state with latest values
+        if (data.snakePosition) gameState.snakePosition = data.snakePosition;
+        if (data.snakeAngle !== undefined) gameState.snakeAngle = data.snakeAngle;
+        if (data.snakeSpeed !== undefined) gameState.snakeSpeed = data.snakeSpeed;
+        if (data.isBoosting !== undefined) gameState.isBoosting = data.isBoosting;
+        gameState.lastUpdate = Date.now();
+        
         startBackgroundSync();
+        initBackgroundWebSocket();
       } else if (!data.hidden) {
         console.log('📱 SW: Tab became active, stopping background movement');
         stopBackgroundSync();
+        closeBackgroundWS();
       }
       break;
   }
@@ -90,11 +101,17 @@ self.addEventListener('message', event => {
 
 // Start background sync when tab is inactive
 function startBackgroundSync() {
-  if (backgroundSyncInterval) return; // Already running
+  if (backgroundSyncInterval) {
+    console.log('🔄 SW: Background sync already running');
+    return; // Already running
+  }
   
   console.log('🔄 SW: Starting background sync interval');
+  console.log('🔄 SW: Game state:', gameState);
+  
   backgroundSyncInterval = setInterval(() => {
     if (!gameState.isGameActive) {
+      console.log('🛑 SW: Game not active, stopping background sync');
       stopBackgroundSync();
       return;
     }
@@ -106,6 +123,8 @@ function startBackgroundSync() {
     sendBackgroundUpdate();
     
   }, SYNC_INTERVAL);
+  
+  console.log('🔄 SW: Background sync started with interval:', SYNC_INTERVAL);
 }
 
 // Stop background sync
@@ -150,22 +169,25 @@ function updateSnakePosition() {
 // Send background position update to server
 function sendBackgroundUpdate() {
   if (!backgroundWS || backgroundWS.readyState !== WebSocket.OPEN) {
+    console.log('🔌 SW: Background WebSocket not ready, initializing...');
     initBackgroundWebSocket();
     return;
   }
   
+  // Create position update in the same format as the main game
   const updateData = {
-    type: 'backgroundUpdate',
-    playerId: gameState.playerId,
-    position: gameState.snakePosition,
-    angle: gameState.snakeAngle,
-    speed: gameState.snakeSpeed,
-    isBoosting: gameState.isBoosting,
-    timestamp: Date.now()
+    type: 'update', // Use same type as main game
+    segments: [gameState.snakePosition], // Single segment for simplicity
+    color: '#d55400',
+    money: 0,
+    totalMass: 6.0,
+    segmentRadius: 8,
+    visibleSegmentCount: 1
   };
   
   try {
     backgroundWS.send(JSON.stringify(updateData));
+    console.log('📤 SW: Sent background update:', gameState.snakePosition);
   } catch (error) {
     console.error('🚨 SW: Failed to send background update:', error);
     closeBackgroundWS();
@@ -174,19 +196,40 @@ function sendBackgroundUpdate() {
 
 // Initialize background WebSocket connection
 function initBackgroundWebSocket() {
-  if (!gameState.wsUrl || backgroundWS) return;
+  if (!gameState.wsUrl) {
+    console.log('🚨 SW: No WebSocket URL available');
+    return;
+  }
+  
+  if (backgroundWS && (backgroundWS.readyState === WebSocket.CONNECTING || backgroundWS.readyState === WebSocket.OPEN)) {
+    console.log('🔌 SW: Background WebSocket already connected or connecting');
+    return;
+  }
   
   try {
-    console.log('🔌 SW: Connecting background WebSocket...');
+    console.log('🔌 SW: Connecting background WebSocket to:', gameState.wsUrl);
     backgroundWS = new WebSocket(gameState.wsUrl);
     
     backgroundWS.onopen = () => {
-      console.log('✅ SW: Background WebSocket connected');
+      console.log('✅ SW: Background WebSocket connected successfully');
     };
     
-    backgroundWS.onclose = () => {
-      console.log('❌ SW: Background WebSocket disconnected');
+    backgroundWS.onmessage = (event) => {
+      // Handle messages from server if needed
+      console.log('📨 SW: Received message:', event.data);
+    };
+    
+    backgroundWS.onclose = (event) => {
+      console.log('❌ SW: Background WebSocket disconnected:', event.code, event.reason);
       backgroundWS = null;
+      
+      // Attempt to reconnect after a delay if game is still active
+      if (gameState.isGameActive && backgroundSyncInterval) {
+        setTimeout(() => {
+          console.log('🔄 SW: Attempting WebSocket reconnection...');
+          initBackgroundWebSocket();
+        }, 2000);
+      }
     };
     
     backgroundWS.onerror = (error) => {

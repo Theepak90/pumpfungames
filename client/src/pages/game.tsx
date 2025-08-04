@@ -948,38 +948,76 @@ export default function GamePage() {
   // Service Worker registration for background sync
   useEffect(() => {
     if ('serviceWorker' in navigator) {
+      console.log('🔧 Registering Service Worker...');
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
-          console.log('🔧 Service Worker registered:', registration);
+          console.log('✅ Service Worker registered successfully:', registration);
           serviceWorkerRef.current = registration.active || registration.installing || registration.waiting;
+          
+          // Listen for Service Worker messages
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            console.log('📨 Message from Service Worker:', event.data);
+          });
+          
+          // Check if controller is ready
+          if (navigator.serviceWorker.controller) {
+            console.log('✅ Service Worker controller is ready');
+          } else {
+            console.log('⏳ Waiting for Service Worker controller...');
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              console.log('✅ Service Worker controller now ready');
+            });
+          }
         })
         .catch((error) => {
           console.error('🚨 Service Worker registration failed:', error);
         });
+    } else {
+      console.warn('⚠️ Service Workers not supported in this browser');
     }
   }, []);
 
   // Initialize Service Worker with game data when game starts
   useEffect(() => {
-    if (!gameStarted || !navigator.serviceWorker.controller || !myPlayerId) return;
+    if (!gameStarted || !myPlayerId) return;
     
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`;
-    
-    navigator.serviceWorker.controller.postMessage({
-      type: 'GAME_START',
-      data: {
+    // Wait for Service Worker to be ready
+    const initServiceWorker = () => {
+      if (!navigator.serviceWorker.controller) {
+        console.log('🔧 SW: Controller not ready, waiting...');
+        setTimeout(initServiceWorker, 100);
+        return;
+      }
+      
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.host;
+      const wsUrl = `${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`;
+      
+      console.log('🎮 Initializing Service Worker with game state:', {
         playerId: myPlayerId,
         roomId: roomId,
         wsUrl: wsUrl,
         snakePosition: snake.head,
         snakeAngle: snake.currentAngle,
         snakeSpeed: snake.speed
-      }
-    });
+      });
+      
+      navigator.serviceWorker.controller.postMessage({
+        type: 'GAME_START',
+        data: {
+          playerId: myPlayerId,
+          roomId: roomId,
+          wsUrl: wsUrl,
+          snakePosition: snake.head,
+          snakeAngle: snake.currentAngle,
+          snakeSpeed: snake.speed
+        }
+      });
+      
+      console.log('🎮 Service Worker initialized with game state');
+    };
     
-    console.log('🎮 Service Worker initialized with game state');
+    initServiceWorker();
   }, [gameStarted, myPlayerId, roomId, region]);
 
   // Send periodic updates to Service Worker
