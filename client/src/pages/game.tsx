@@ -1044,11 +1044,9 @@ export default function GamePage() {
           // Server detected our collision - instantly return to home screen
           console.log(`💀 SERVER DEATH - Instant return to home`);
           
-          // Clear snake data completely
-          snake.visibleSegments = [];
-          snake.segmentTrail = [];
-          snake.totalMass = 0;
-          snake.clearSnakeOnDeath();
+          // Hide snake first
+          snakeVisibleRef.current = false;
+          setSnakeVisible(false);
           
           // Instantly return to home screen - no fade, no game over screen
           console.log(`🏠 Instantly returning to home screen after server death`);
@@ -1057,6 +1055,14 @@ export default function GamePage() {
           gameOverRef.current = false;
           snakeFadingRef.current = false;
           setSnakeFading(false);
+          
+          // Clear snake data after state updates
+          setTimeout(() => {
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
+            snake.totalMass = 0;
+            snake.clearSnakeOnDeath();
+          }, 0);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1583,11 +1589,9 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data completely
-            snake.visibleSegments = [];
-            snake.segmentTrail = [];
-            snake.totalMass = 0;
-            snake.clearSnakeOnDeath();
+            // Hide snake first, then clear data
+            snakeVisibleRef.current = false;
+            setSnakeVisible(false);
             
             // Instantly return to home screen - no fade, no game over screen
             console.log(`🏠 Instantly returning to home screen after death`);
@@ -1596,6 +1600,14 @@ export default function GamePage() {
             gameOverRef.current = false;
             snakeFadingRef.current = false;
             setSnakeFading(false);
+            
+            // Clear snake data after state updates
+            setTimeout(() => {
+              snake.visibleSegments = [];
+              snake.segmentTrail = [];
+              snake.totalMass = 0;
+              snake.clearSnakeOnDeath();
+            }, 0);
             
             return; // Stop the game loop
           }
@@ -1625,11 +1637,9 @@ export default function GamePage() {
             console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
             dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
             
-            // Clear snake data completely
-            snake.visibleSegments = [];
-            snake.segmentTrail = [];
-            snake.totalMass = 0;
-            snake.clearSnakeOnDeath();
+            // Hide snake first, then clear data
+            snakeVisibleRef.current = false;
+            setSnakeVisible(false);
             
             // Instantly return to home screen - no fade, no game over screen
             console.log(`🏠 Instantly returning to home screen after death`);
@@ -1638,6 +1648,14 @@ export default function GamePage() {
             gameOverRef.current = false;
             snakeFadingRef.current = false;
             setSnakeFading(false);
+            
+            // Clear snake data after state updates
+            setTimeout(() => {
+              snake.visibleSegments = [];
+              snake.segmentTrail = [];
+              snake.totalMass = 0;
+              snake.clearSnakeOnDeath();
+            }, 0);
             
             return; // Stop the game loop
           }
