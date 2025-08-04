@@ -785,6 +785,7 @@ export default function GamePage() {
   const [isBoosting, setIsBoosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
 
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
@@ -1086,6 +1087,15 @@ export default function GamePage() {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - instantly return to home screen
           console.log(`💀 SERVER DEATH - Instant return to home`);
+          
+          // Calculate time alive in seconds
+          const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+          
+          // Store game over data for home page
+          localStorage.setItem('gameOverData', JSON.stringify({
+            finalMass: snake.totalMass,
+            timeAlive: timeAlive
+          }));
           
           // Hide snake first
           snakeVisibleRef.current = false;
@@ -1542,6 +1552,16 @@ export default function GamePage() {
       
       if (hitBoundary) {
         console.log(`💀 HIT DEATH BARRIER - Instant return to home`);
+        
+        // Calculate time alive in seconds
+        const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+        
+        // Store game over data for home page
+        localStorage.setItem('gameOverData', JSON.stringify({
+          finalMass: snake.totalMass,
+          timeAlive: timeAlive
+        }));
+        
         // Drop money crates before clearing snake
         dropMoneyCrates(snake.money, snake.totalMass);
         
@@ -1599,6 +1619,16 @@ export default function GamePage() {
       
       if (hitBot) {
         console.log(`💀 HIT BOT SNAKE - Instant return to home`);
+        
+        // Calculate time alive in seconds
+        const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+        
+        // Store game over data for home page
+        localStorage.setItem('gameOverData', JSON.stringify({
+          finalMass: snake.totalMass,
+          timeAlive: timeAlive
+        }));
+        
         // Drop money crates before clearing snake
         dropMoneyCrates(snake.money, snake.totalMass);
         
@@ -1749,6 +1779,15 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) - Instant return to home`);
+            
+            // Calculate time alive in seconds
+            const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+            
+            // Store game over data for home page
+            localStorage.setItem('gameOverData', JSON.stringify({
+              finalMass: snake.totalMass,
+              timeAlive: timeAlive
+            }));
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -2502,6 +2541,7 @@ export default function GamePage() {
   const handleLoadingComplete = () => {
     setIsLoading(false);
     setGameStarted(true);
+    setGameStartTime(Date.now()); // Track when the game started
     
     // Force immediate multiple renders to ensure all snake eyes appear instantly
     if (canvasRef.current) {

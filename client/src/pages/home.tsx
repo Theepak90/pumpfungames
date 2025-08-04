@@ -305,6 +305,10 @@ export default function Home() {
   // Celebration popup state
   const [showCelebration, setShowCelebration] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState(0);
+  
+  // Game over popup state
+  const [showGameOver, setShowGameOver] = useState(false);
+  const [gameOverData, setGameOverData] = useState({ finalMass: 0, timeAlive: 0 });
 
   // Check for celebration data from localStorage (set by cash-out completion)
   useEffect(() => {
@@ -314,6 +318,15 @@ export default function Home() {
       setCashOutAmount(amount);
       setShowCelebration(true);
       localStorage.removeItem('cashOutCelebration'); // Clean up
+    }
+    
+    // Check for game over data from localStorage (set by death)
+    const gameOverData = localStorage.getItem('gameOverData');
+    if (gameOverData) {
+      const data = JSON.parse(gameOverData);
+      setGameOverData(data);
+      setShowGameOver(true);
+      localStorage.removeItem('gameOverData'); // Clean up
     }
   }, []);
 
@@ -803,6 +816,54 @@ export default function Home() {
                 onClick={() => setShowCelebration(false)}
                 className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-8 py-3 rounded-lg"
                 data-testid="button-close-celebration"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Over Popup */}
+      {showGameOver && (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center">
+          {/* Game Over Content */}
+          <div className="relative bg-gray-900/95 border border-red-400/30 rounded-2xl p-8 text-center max-w-md mx-4 shadow-2xl">
+            {/* Content */}
+            <div className="relative z-10">
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <div className="text-4xl">💀</div>
+                </div>
+                <h2 className="text-3xl font-bold text-red-400 mb-2">
+                  Game Over
+                </h2>
+                <p className="text-gray-300 text-lg">
+                  Better luck next time!
+                </p>
+              </div>
+              
+              <div className="mb-8 space-y-4">
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="text-sm text-gray-400 mb-1">Final Mass</div>
+                  <div className="text-2xl font-bold text-white">
+                    {gameOverData.finalMass.toFixed(1)}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="text-sm text-gray-400 mb-1">Time Survived</div>
+                  <div className="text-2xl font-bold text-white">
+                    {Math.floor(gameOverData.timeAlive / 60)}:{String(gameOverData.timeAlive % 60).padStart(2, '0')}
+                  </div>
+                </div>
+              </div>
+              
+              <Button
+                onClick={() => setShowGameOver(false)}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold px-8 py-3 rounded-lg"
+                data-testid="button-close-game-over"
               >
                 <X className="w-4 h-4 mr-2" />
                 Continue
