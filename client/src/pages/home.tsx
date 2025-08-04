@@ -440,9 +440,9 @@ export default function Home() {
       // Update food wobble and attraction
       const time = Date.now() * 0.003;
       currentFoods.forEach(food => {
-        // Update wobble
-        food.wobbleX += 0.05;
-        food.wobbleY += 0.03;
+        // Update wobble - 50% slower
+        food.wobbleX += 0.025;
+        food.wobbleY += 0.015;
         
         // Check distance to snake
         const distanceToSnake = Math.sqrt((food.x - snake.head.x) ** 2 + (food.y - snake.head.y) ** 2);
