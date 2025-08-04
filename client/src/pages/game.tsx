@@ -1030,9 +1030,11 @@ export default function GamePage() {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
           // IMMEDIATELY hide snake and clear everything
+          console.log(`💀 SERVER DEATH - BEFORE: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
           snakeVisibleRef.current = false; // Hide snake immediately
           setSnakeVisible(false);
           gameOverRef.current = true; // Set this FIRST before anything else
+          console.log(`💀 SERVER DEATH - AFTER: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
           
           snake.visibleSegments = []; // Clear all body segments immediately
           snake.segmentTrail = []; // Clear trail
@@ -1550,9 +1552,11 @@ export default function GamePage() {
             // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Setting gameOver = true`);
             // IMMEDIATELY stop rendering and clear everything  
+            console.log(`💀 BEFORE DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
             snakeVisibleRef.current = false; // Hide snake immediately
             setSnakeVisible(false);
             gameOverRef.current = true;
+            console.log(`💀 AFTER DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1589,9 +1593,11 @@ export default function GamePage() {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length})`);
             // IMMEDIATELY stop rendering and clear everything
+            console.log(`💀 BEFORE DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
             snakeVisibleRef.current = false; // Hide snake immediately
             setSnakeVisible(false);
             gameOverRef.current = true;
+            console.log(`💀 AFTER DEATH: visible=${snakeVisibleRef.current}, gameOver=${gameOverRef.current}`);
             
             // Drop money crates BEFORE clearing
             const currentMoney = snake.money || 1.0;
@@ -1931,7 +1937,14 @@ export default function GamePage() {
 
       // Draw your own snake locally using EXACT same rendering as remote players
       // Only render if game is active AND snake has segments AND game is not over AND snake is visible (disappears completely on death)
-      if (gameStarted && !gameOverRef.current && snakeVisibleRef.current && snake.visibleSegments.length > 0) {
+      console.log(`🐍 RENDER CHECK: gameStarted=${gameStarted}, gameOver=${gameOverRef.current}, visible=${snakeVisibleRef.current}, segments=${snake.visibleSegments.length}`);
+      
+      // FORCE HIDE SNAKE - DO NOT RENDER IF ANY OF THESE CONDITIONS ARE TRUE
+      if (!gameStarted || gameOverRef.current || !snakeVisibleRef.current || snake.visibleSegments.length === 0) {
+        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING`);
+      } else {
+        console.log(`✅ RENDERING SNAKE`);
+        // Render snake
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
