@@ -1056,6 +1056,10 @@ export default function GamePage() {
           snakeFadingRef.current = false;
           setSnakeFading(false);
           
+          // Navigate back to home page
+          window.history.pushState({}, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          
           // Clear snake data after state updates
           setTimeout(() => {
             snake.visibleSegments = [];
@@ -1455,6 +1459,10 @@ export default function GamePage() {
         snakeFadingRef.current = false;
         setSnakeFading(false);
         
+        // Navigate back to home page
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        
         // Clear snake data after state updates
         setTimeout(() => {
           snake.visibleSegments = [];
@@ -1507,6 +1515,10 @@ export default function GamePage() {
         gameOverRef.current = false;
         snakeFadingRef.current = false;
         setSnakeFading(false);
+        
+        // Navigate back to home page
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
         
         // Clear snake data after state updates
         setTimeout(() => {
@@ -1564,6 +1576,10 @@ export default function GamePage() {
           gameOverRef.current = false;
           snakeFadingRef.current = false;
           setSnakeFading(false);
+          
+          // Navigate back to home page
+          window.history.pushState({}, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
           
           // Clear snake data after state updates
           setTimeout(() => {
@@ -1654,6 +1670,10 @@ export default function GamePage() {
             snakeFadingRef.current = false;
             setSnakeFading(false);
             
+            // Navigate back to home page
+            window.history.pushState({}, '', '/');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            
             // Clear snake data after state updates
             setTimeout(() => {
               snake.visibleSegments = [];
@@ -1701,6 +1721,10 @@ export default function GamePage() {
             gameOverRef.current = false;
             snakeFadingRef.current = false;
             setSnakeFading(false);
+            
+            // Navigate back to home page
+            window.history.pushState({}, '', '/');
+            window.dispatchEvent(new PopStateEvent('popstate'));
             
             // Clear snake data after state updates
             setTimeout(() => {
