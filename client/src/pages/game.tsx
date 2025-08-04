@@ -1389,14 +1389,44 @@ export default function GamePage() {
         // Complete cash-out after 3 seconds
         if (progress >= 1) {
           const amount = snake.money;
-          console.log(`Cashed out $${amount.toFixed(2)}!`);
-          setCashedOutAmount(amount);
-          setShowCongrats(true);
-          snake.money = 1.00; // Reset to starting money
+          console.log(`Cashed out $${amount.toFixed(2)}! Returning to home page.`);
+          
+          // Clean up game state
+          setGameStarted(false);
+          setGameOver(false);
+          gameOverRef.current = false;
+          
+          // Hide snake
+          snakeVisibleRef.current = false;
+          setSnakeVisible(false);
+          
+          // Clean up WebSocket connection
+          if (wsRef.current) {
+            console.log('Cleaning up WebSocket connection after cash out...');
+            wsRef.current.close();
+            wsRef.current = null;
+          }
+          
+          // Reset cash-out state
           setCashingOut(false);
           setCashOutProgress(0);
           setCashOutStartTime(null);
           setQKeyPressed(false);
+          
+          // Navigate back to home page instantly
+          window.history.pushState({}, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          
+          // Clear snake data
+          setTimeout(() => {
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
+            snake.totalMass = 0;
+            snake.money = 1.00; // Reset to starting money
+            snake.clearSnakeOnDeath();
+          }, 0);
+          
+          console.log('🏠 Returned to home page after cash out');
         }
       } else if (cashingOut && !qKeyPressed) {
         // Q was released, cancel cash-out

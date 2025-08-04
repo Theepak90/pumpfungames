@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Social Features**: Friend system, global leaderboard, user statistics tracking.
 - **Virtual Economy**: Dual currency (game currency and SOL), daily crate rewards, betting mechanics, wallet management.
 - **Bot AI**: State-based AI (wander, avoid, aggro) with food targeting removed, strategic boosting, realistic movement patterns.
-- **Technical Implementations**: **Tab Switch Handling**: When player switches browser tabs, game instantly returns to home page and snake disappears completely. This prevents AFK gameplay and ensures active engagement. Dynamic turn speed for snakes when boosting. Visual effects include snake shadows and boosting outlines. Multiplayer WebSocket functionality working with real-time player updates and collision detection.
+- **Technical Implementations**: **Tab Switch Handling**: When player switches browser tabs, game instantly returns to home page and snake disappears completely. This prevents AFK gameplay and ensures active engagement. **Cash-Out Flow**: Completed cash-out instantly returns player to home page with snake disappearing completely. Dynamic turn speed for snakes when boosting. Visual effects include snake shadows and boosting outlines. Multiplayer WebSocket functionality working with real-time player updates and collision detection.
 
 ## External Dependencies
 
