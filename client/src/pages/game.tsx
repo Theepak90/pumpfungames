@@ -1413,6 +1413,9 @@ export default function GamePage() {
           setCashOutStartTime(null);
           setQKeyPressed(false);
           
+          // Store celebration data for home page
+          localStorage.setItem('cashOutCelebration', JSON.stringify({ amount }));
+          
           // Navigate back to home page instantly
           window.history.pushState({}, '', '/');
           window.dispatchEvent(new PopStateEvent('popstate'));

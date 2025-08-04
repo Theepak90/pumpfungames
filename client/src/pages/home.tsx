@@ -18,7 +18,9 @@ import {
   Edit3, 
   Wallet as WalletIcon,
   Users,
-  Gift
+  Gift,
+  Trophy,
+  X
 } from "lucide-react";
 import logoImage from "@assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png_1753912259610.png";
 
@@ -299,6 +301,21 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
+  
+  // Celebration popup state
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [cashOutAmount, setCashOutAmount] = useState(0);
+
+  // Check for celebration data from localStorage (set by cash-out completion)
+  useEffect(() => {
+    const celebrationData = localStorage.getItem('cashOutCelebration');
+    if (celebrationData) {
+      const { amount } = JSON.parse(celebrationData);
+      setCashOutAmount(amount);
+      setShowCelebration(true);
+      localStorage.removeItem('cashOutCelebration'); // Clean up
+    }
+  }, []);
 
   // Auth form handler
   const handleAuth = async (e: React.FormEvent) => {
@@ -728,6 +745,72 @@ export default function Home() {
       </div>
       
       </div> {/* End content wrapper */}
+      {/* Celebration Popup */}
+      {showCelebration && (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center">
+          {/* Confetti Animation */}
+          <div className="absolute inset-0 overflow-hidden">
+            {Array.from({ length: 50 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute animate-pulse"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animation: `confetti-fall ${2 + Math.random() * 3}s linear infinite`,
+                  animationDelay: `${Math.random() * 2}s`
+                }}
+              >
+                <div
+                  className="w-2 h-2 rotate-45"
+                  style={{
+                    backgroundColor: ['#ffd700', '#ff6b6b', '#4ecdc4', '#95e1d3', '#f38ba8'][Math.floor(Math.random() * 5)]
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          
+          {/* Celebration Content */}
+          <div className="relative bg-gray-900/95 border border-yellow-400/30 rounded-2xl p-8 text-center max-w-md mx-4 shadow-2xl">
+            {/* Trophy Background */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              <Trophy className="w-64 h-64 text-yellow-400" />
+            </div>
+            
+            {/* Content */}
+            <div className="relative z-10">
+              <div className="mb-6">
+                <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-bounce" />
+                <h2 className="text-3xl font-bold text-yellow-400 mb-2">
+                  Cash Out Complete!
+                </h2>
+                <p className="text-gray-300 text-lg">
+                  Congratulations on your profit!
+                </p>
+              </div>
+              
+              <div className="mb-8">
+                <div className="text-5xl font-bold text-green-400 mb-2">
+                  ${cashOutAmount.toFixed(2)}
+                </div>
+                <div className="text-gray-400">
+                  Successfully cashed out
+                </div>
+              </div>
+              
+              <Button
+                onClick={() => setShowCelebration(false)}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-8 py-3 rounded-lg"
+                data-testid="button-close-celebration"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
