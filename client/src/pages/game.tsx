@@ -1531,6 +1531,10 @@ export default function GamePage() {
       // Check for collisions with other players' snakes
       for (const otherPlayer of otherPlayers) {
         if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
+        // Skip collision with dead players (check if they have any meaningful segments)
+        if (otherPlayer.isDead || otherPlayer.gameOver) continue;
+        // Skip players with very few segments (likely dead/disconnected)
+        if (otherPlayer.segments.length < 2) continue;
         
         for (const segment of otherPlayer.segments) {
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
@@ -1538,7 +1542,7 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
-            console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
+            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Setting gameOver = true`);
             dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
             snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
@@ -1560,6 +1564,10 @@ export default function GamePage() {
       for (const serverPlayer of serverPlayers) {
         if (!serverPlayer.segments || serverPlayer.segments.length === 0) continue;
         if (serverPlayer.id === myPlayerId) continue; // Skip self
+        // Skip collision with dead players
+        if (serverPlayer.isDead || serverPlayer.gameOver) continue;
+        // Skip players with very few segments (likely dead/disconnected) 
+        if (serverPlayer.segments.length < 2) continue;
         
         for (const segment of serverPlayer.segments) {
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
@@ -1567,11 +1575,11 @@ export default function GamePage() {
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
-            console.log(`💀 CRASHED into server player ${serverPlayer.id}!`);
+            console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length})`);
+            dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
+            snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
-            
-            // Death loot removed
             
             return; // Stop the game loop
           }
