@@ -844,17 +844,10 @@ export default function Home() {
                 </p>
               </div>
               
-              <div className="mb-8 space-y-4">
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-sm text-gray-400 mb-1">Final Mass</div>
-                  <div className="text-2xl font-bold text-white">
-                    {gameOverData.finalMass.toFixed(1)}
-                  </div>
-                </div>
-                
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-sm text-gray-400 mb-1">Time Survived</div>
-                  <div className="text-2xl font-bold text-white">
+              <div className="mb-8">
+                <div className="bg-gray-800/50 rounded-lg p-6">
+                  <div className="text-sm text-gray-400 mb-2">Time Survived</div>
+                  <div className="text-4xl font-bold text-white">
                     {Math.floor(gameOverData.timeAlive / 60)}:{String(gameOverData.timeAlive % 60).padStart(2, '0')}
                   </div>
                 </div>
