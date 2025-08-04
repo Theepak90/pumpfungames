@@ -3,6 +3,7 @@ import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
 import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
+import moneyCrateImageSrc from '@assets/$ (1)_1754305354543.png';
 import LoadingScreen from '@/components/LoadingScreen';
 
 // Game constants
@@ -780,6 +781,7 @@ export default function GamePage() {
 
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dollarSignImage, setDollarSignImage] = useState<HTMLImageElement | null>(null);
+  const [moneyCrateImage, setMoneyCrateImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(2); // Start at 2× zoomed-in
   const [lastFrameTime, setLastFrameTime] = useState(Date.now());
   
@@ -807,14 +809,15 @@ export default function GamePage() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Function to drop money crates when snake dies (spread along entire snake body)
-  const dropMoneyCrates = (playerMoney: number) => {
-    const crateValue = 0.02; // Each crate worth $0.02
-    const crateCount = Math.floor(playerMoney / crateValue);
+  // Function to drop money crates when snake dies (1 crate per mass unit)
+  const dropMoneyCrates = (playerMoney: number, snakeMass: number) => {
+    const crateCount = Math.floor(snakeMass); // 1 crate per mass unit
     
     if (crateCount <= 0) return;
     
-    console.log(`💰 Dropping ${crateCount} money crates worth $${crateValue} each (total: $${playerMoney})`);
+    const crateValue = playerMoney / crateCount; // Split money evenly across all crates
+    
+    console.log(`💰 Dropping ${crateCount} money crates worth $${crateValue.toFixed(3)} each (total: $${playerMoney}, mass: ${snakeMass})`);
     
     // Get positions along the snake body
     const positions = snake.getSnakeBodyPositions(crateCount);
@@ -827,7 +830,7 @@ export default function GamePage() {
         id: `money_crate_${Date.now()}_${i}`,
         x: pos.x,
         y: pos.y,
-        radius: 4, // Slightly larger than boost food
+        radius: 6, // Larger to accommodate image
         mass: 0, // No mass growth, just money
         color: '#ffd700', // Gold color for money
         vx: 0,
@@ -865,6 +868,19 @@ export default function GamePage() {
     };
     img.onerror = (e) => {
       console.error('Failed to load background image:', e);
+    };
+  }, []);
+
+  // Load money crate image
+  useEffect(() => {
+    const img = new Image();
+    img.src = moneyCrateImageSrc;
+    img.onload = () => {
+      console.log('Money crate image loaded successfully');
+      setMoneyCrateImage(img);
+    };
+    img.onerror = (e) => {
+      console.error('Failed to load money crate image:', e);
     };
   }, []);
 
@@ -1385,7 +1401,7 @@ export default function GamePage() {
       
       if (hitBoundary) {
         // Drop money crates before clearing snake
-        dropMoneyCrates(snake.money);
+        dropMoneyCrates(snake.money, snake.totalMass);
         // Clear snake body completely when hitting death barrier
         snake.clearSnakeOnDeath();
         setGameOver(true);
@@ -1420,7 +1436,7 @@ export default function GamePage() {
       
       if (hitBot) {
         // Drop money crates before clearing snake
-        dropMoneyCrates(snake.money);
+        dropMoneyCrates(snake.money, snake.totalMass);
         // Clear snake body completely when hitting bot
         snake.clearSnakeOnDeath();
         setGameOver(true);
@@ -1451,7 +1467,7 @@ export default function GamePage() {
         
         if (headOnCollision) {
           // Drop money crates before clearing snake
-          dropMoneyCrates(snake.money);
+          dropMoneyCrates(snake.money, snake.totalMass);
           // Both snakes die in head-on collision - clear snake body completely
           snake.clearSnakeOnDeath();
           
@@ -1523,7 +1539,7 @@ export default function GamePage() {
           if (dist < collisionRadius) {
             // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
-            dropMoneyCrates(snake.money); // Drop money crates before clearing
+            dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
             snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
@@ -1651,7 +1667,7 @@ export default function GamePage() {
             ctx.globalAlpha = food.opacity;
           }
           
-          // Special rendering for money crates with gold effect
+          // Special rendering for money crates with image
           if (food.isMoneyCrate) {
             const pulseTime = Date.now() * 0.006;
             const pulseScale = 1 + Math.sin(pulseTime) * 0.2;
@@ -1659,27 +1675,43 @@ export default function GamePage() {
             
             // Create golden glowing effect for money crates
             ctx.shadowColor = '#ffd700';
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 15;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             
             // Draw outer golden glow
-            ctx.fillStyle = '#ffd70060'; // Semi-transparent gold
+            ctx.fillStyle = '#ffd70040'; // Semi-transparent gold
             ctx.beginPath();
-            ctx.arc(food.x, food.y, currentRadius * 1.5, 0, Math.PI * 2);
+            ctx.arc(food.x, food.y, currentRadius * 2, 0, Math.PI * 2);
             ctx.fill();
             
-            // Draw main money crate (square-ish)
-            ctx.fillStyle = '#ffd700';
-            ctx.fillRect(food.x - currentRadius, food.y - currentRadius, currentRadius * 2, currentRadius * 2);
+            // Draw the money crate image if loaded
+            if (moneyCrateImage) {
+              const imageSize = currentRadius * 2;
+              ctx.drawImage(
+                moneyCrateImage,
+                food.x - imageSize / 2,
+                food.y - imageSize / 2,
+                imageSize,
+                imageSize
+              );
+            } else {
+              // Fallback: Draw main money crate (square-ish) with dollar sign
+              ctx.fillStyle = '#ffd700';
+              ctx.fillRect(food.x - currentRadius, food.y - currentRadius, currentRadius * 2, currentRadius * 2);
+              
+              // Add dollar sign in the center
+              ctx.shadowBlur = 0;
+              ctx.fillStyle = '#000000';
+              ctx.font = `${currentRadius}px Arial`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('$', food.x, food.y);
+            }
             
-            // Add dollar sign in the center
+            // Reset shadow effects for other food rendering
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#000000';
-            ctx.font = `${currentRadius}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('$', food.x, food.y);
+            ctx.shadowColor = 'transparent';
           }
           // Special rendering for boost food with pulsing effect
           else if (food.isBoostFood || food.expiresAt) {
