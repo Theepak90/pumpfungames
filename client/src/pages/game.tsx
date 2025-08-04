@@ -608,13 +608,14 @@ class SmoothSnake {
           id: `boost_${Date.now()}_${Math.random()}`,
           x: dropX,
           y: dropY,
-          radius: 2, // Smaller than regular food
+          radius: 3, // Slightly larger for better visibility
           mass: 0.025, // Half the previous value
           color: this.color, // Use snake's color
           vx: 0,
           vy: 0,
           wobbleOffset: Math.random() * Math.PI * 2,
-          expiresAt: Date.now() + 10000 // Expires after 10 seconds
+          expiresAt: Date.now() + 10000, // Expires after 10 seconds
+          isBoostFood: true // Flag to identify boost food for special rendering
         };
         
         // Add to foods array (will need to be passed from game loop)
@@ -723,10 +724,13 @@ export default function GamePage() {
       
       // Send boost food to server for broadcasting to other players
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log(`🍕 Sending boost food to server:`, boostFood);
         wsRef.current.send(JSON.stringify({
           type: 'boostFood',
           food: boostFood
         }));
+      } else {
+        console.log(`⚠️ Cannot send boost food - WebSocket not connected`);
       }
     };
   }, [snake]);
@@ -919,14 +923,17 @@ export default function GamePage() {
           }
         } else if (data.type === 'boostFood') {
           // Received boost food from another player - add it to our local food array
-          console.log(`🍕 Received boost food from player ${data.playerId}`);
+          console.log(`🍕 Received boost food from player ${data.playerId}:`, data.food);
           // Ensure the boost food has an expiration time if not already set
           const boostFood = { 
             ...data.food, 
             expiresAt: data.food.expiresAt || (Date.now() + 10000),
             opacity: data.food.opacity || 1.0 // Start with full opacity
           };
-          setFoods(currentFoods => [...currentFoods, boostFood]);
+          setFoods(currentFoods => {
+            console.log(`🍕 Adding boost food to foods array. Current count: ${currentFoods.length}`);
+            return [...currentFoods, boostFood];
+          });
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
@@ -1556,24 +1563,57 @@ export default function GamePage() {
             ctx.globalAlpha = food.opacity;
           }
           
-          // Create glowing effect with shadow
-          ctx.shadowColor = food.color;
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-          
-          // Draw main food circle
-          ctx.fillStyle = food.color;
-          ctx.beginPath();
-          ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Add inner bright glow for more intensity
-          ctx.shadowBlur = 4;
-          ctx.fillStyle = food.color;
-          ctx.beginPath();
-          ctx.arc(food.x, food.y, food.radius * 0.7, 0, Math.PI * 2);
-          ctx.fill();
+          // Special rendering for boost food with pulsing effect
+          if (food.isBoostFood || food.expiresAt) {
+            const pulseTime = Date.now() * 0.008;
+            const pulseScale = 1 + Math.sin(pulseTime) * 0.3;
+            const currentRadius = food.radius * pulseScale;
+            
+            // Create stronger glowing effect for boost food
+            ctx.shadowColor = food.color;
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            // Draw outer glow ring
+            ctx.fillStyle = food.color + '40'; // Semi-transparent
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, currentRadius * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw main food circle with pulse
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, currentRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add bright inner core
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, currentRadius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Regular food rendering
+            // Create glowing effect with shadow
+            ctx.shadowColor = food.color;
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            // Draw main food circle
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add inner bright glow for more intensity
+            ctx.shadowBlur = 4;
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, food.radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+          }
           
           ctx.restore();
         }
