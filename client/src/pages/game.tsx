@@ -1031,6 +1031,14 @@ export default function GamePage() {
             console.log(`💰 Adding money crate to foods array. Current count: ${currentFoods.length}`);
             return [...currentFoods, data.crate];
           });
+        } else if (data.type === 'moneyCrateRemoved') {
+          console.log(`💰 CLIENT: Money crate ${data.crateId} was collected by ${data.collectedBy}`);
+          // Remove money crate from foods array
+          setFoods(currentFoods => {
+            const filtered = currentFoods.filter(food => food.id !== data.crateId);
+            console.log(`💰 Removed money crate ${data.crateId}. Foods count: ${currentFoods.length} -> ${filtered.length}`);
+            return filtered;
+          });
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
@@ -1379,6 +1387,15 @@ export default function GamePage() {
               // Snake eats money crate - add money instead of mass
               snake.money += food.moneyValue;
               console.log(`💰 Collected money crate worth $${food.moneyValue}! Total money: $${snake.money.toFixed(2)}`);
+              
+              // Notify server about money crate collection for multiplayer sync
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                  type: 'moneyCrateCollected',
+                  crateId: food.id
+                }));
+                console.log(`💰 Notified server about collecting money crate ${food.id}`);
+              }
             } else {
               // Regular food or boost food - add mass
               snake.eatFood(food.mass);
