@@ -815,9 +815,7 @@ export default function GamePage() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  
-  // Service Worker for background sync
-  const serviceWorkerRef = useRef<ServiceWorker | null>(null);
+
 
   // Function to drop money crates when snake dies (1 crate per mass unit)
   const dropMoneyCrates = (playerMoney: number, snakeMass: number) => {
@@ -945,100 +943,47 @@ export default function GamePage() {
 
 
 
-  // Service Worker registration for background sync
+  // Simple tab visibility handling - return to home when tab becomes inactive
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      console.log('🔧 Registering Service Worker...');
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('✅ Service Worker registered successfully:', registration);
-          serviceWorkerRef.current = registration.active || registration.installing || registration.waiting;
-          
-          // Listen for Service Worker messages
-          navigator.serviceWorker.addEventListener('message', (event) => {
-            console.log('📨 Message from Service Worker:', event.data);
-          });
-          
-          // Check if controller is ready
-          if (navigator.serviceWorker.controller) {
-            console.log('✅ Service Worker controller is ready');
-          } else {
-            console.log('⏳ Waiting for Service Worker controller...');
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              console.log('✅ Service Worker controller now ready');
-            });
-          }
-        })
-        .catch((error) => {
-          console.error('🚨 Service Worker registration failed:', error);
-          console.error('Error details:', error.message, error.stack);
-        });
-    } else {
-      console.warn('⚠️ Service Workers not supported in this browser');
-    }
-  }, []);
-
-  // Initialize Service Worker with game data when game starts
-  useEffect(() => {
-    if (!gameStarted || !myPlayerId) return;
-    
-    // Wait for Service Worker to be ready
-    const initServiceWorker = () => {
-      if (!navigator.serviceWorker.controller) {
-        console.log('🔧 SW: Controller not ready, waiting...');
-        setTimeout(initServiceWorker, 100);
-        return;
+    const handleVisibilityChange = () => {
+      if (document.hidden && gameStarted) {
+        console.log('⏸️ Tab became hidden, instantly returning to home page');
+        
+        // Instantly return to home page when tab becomes inactive
+        setGameStarted(false);
+        setGameOver(false);
+        gameOverRef.current = false;
+        
+        // Hide snake immediately
+        snakeVisibleRef.current = false;
+        setSnakeVisible(false);
+        
+        // Clean up WebSocket connection
+        if (wsRef.current) {
+          console.log('Cleaning up WebSocket connection...');
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+        
+        // Navigate back to home page
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        
+        // Clear snake data
+        setTimeout(() => {
+          snake.visibleSegments = [];
+          snake.segmentTrail = [];
+          snake.totalMass = 0;
+          snake.clearSnakeOnDeath();
+        }, 0);
+        
+        console.log('🏠 Returned to home page due to tab switch');
       }
-      
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = window.location.host;
-      const wsUrl = `${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`;
-      
-      console.log('🎮 Initializing Service Worker with game state:', {
-        playerId: myPlayerId,
-        roomId: roomId,
-        wsUrl: wsUrl,
-        snakePosition: snake.head,
-        snakeAngle: snake.currentAngle,
-        snakeSpeed: snake.speed
-      });
-      
-      navigator.serviceWorker.controller.postMessage({
-        type: 'GAME_START',
-        data: {
-          playerId: myPlayerId,
-          roomId: roomId,
-          wsUrl: wsUrl,
-          snakePosition: snake.head,
-          snakeAngle: snake.currentAngle,
-          snakeSpeed: snake.speed
-        }
-      });
-      
-      console.log('🎮 Service Worker initialized with game state');
     };
-    
-    initServiceWorker();
-  }, [gameStarted, myPlayerId, roomId, region]);
 
-  // Send periodic updates to Service Worker
-  useEffect(() => {
-    if (!gameStarted || !navigator.serviceWorker.controller) return;
-    
-    const updateServiceWorker = setInterval(() => {
-      navigator.serviceWorker.controller!.postMessage({
-        type: 'GAME_UPDATE',
-        data: {
-          snakePosition: snake.head,
-          snakeAngle: snake.currentAngle,
-          snakeSpeed: snake.speed,
-          isBoosting: isBoosting
-        }
-      });
-    }, 200); // Update Service Worker every 200ms
-    
-    return () => clearInterval(updateServiceWorker);
-  }, [gameStarted, snake, isBoosting]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [gameStarted]);
 
   // Initialize food system when game starts
   useEffect(() => {
@@ -1146,13 +1091,7 @@ export default function GamePage() {
           snakeVisibleRef.current = false;
           setSnakeVisible(false);
           
-          // Notify Service Worker that game stopped
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'GAME_STOP',
-              data: {}
-            });
-          }
+          // No Service Worker cleanup needed
           
           // Instantly return to home screen - no fade, no game over screen
           console.log(`🏠 Instantly returning to home screen after server death`);
@@ -1384,43 +1323,37 @@ export default function GamePage() {
       snake.updateVisibleSegments();
     };
     
-    // Track when tab becomes hidden/visible with Service Worker background sync
+    // Track when tab becomes hidden/visible - instantly return to home when tab becomes inactive
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setHiddenAt(performance.now());
-        console.log('⏸️ Tab became hidden, starting Service Worker background sync');
+        console.log('⏸️ Tab became hidden, instantly returning to home page');
         
-        // Notify Service Worker that tab became inactive
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'VISIBILITY_CHANGE',
-            data: { 
-              hidden: true,
-              snakePosition: snake.head,
-              snakeAngle: snake.currentAngle,
-              snakeSpeed: snake.speed,
-              isBoosting: isBoosting
-            }
-          });
-        }
-      } else {
-        console.log('▶️ Tab became visible, stopping Service Worker background sync');
+        // Instantly return to home page when tab becomes inactive
+        setGameStarted(false);
+        setGameOver(false);
+        gameOverRef.current = false;
         
-        // Notify Service Worker that tab became active
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'VISIBILITY_CHANGE',
-            data: { hidden: false }
-          });
+        // Hide snake immediately
+        snakeVisibleRef.current = false;
+        setSnakeVisible(false);
+        
+        // Clean up WebSocket connection
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
         }
         
-        if (hiddenAt !== null) {
-          const now = performance.now();
-          const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
-          console.log(`⏰ Page was hidden for ${delta.toFixed(2)}s, Service Worker handled background movement`);
-          // Service Worker handles movement, no need for catch-up
-          setHiddenAt(null);
-        }
+        // Navigate back to home page
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        
+        // Clear snake data
+        snake.visibleSegments = [];
+        snake.segmentTrail = [];
+        snake.totalMass = 0;
+        snake.clearSnakeOnDeath();
+        
+        console.log('🏠 Returned to home page due to tab switch');
       }
       setGameIsVisible(!document.hidden);
     };

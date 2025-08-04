@@ -11,12 +11,7 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Serve Service Worker file
-  app.get('/sw.js', (req, res) => {
-    res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Service-Worker-Allowed', '/');
-    res.sendFile('sw.js', { root: './public' });
-  });
+
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
