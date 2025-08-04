@@ -1548,12 +1548,19 @@ export default function GamePage() {
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
-            // FORCE immediate re-render by clearing canvas
+            // FORCE immediate re-render by clearing canvas and stopping render loop
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#15161b';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             console.log(`💀 Game over state set and canvas cleared!`);
+            
+            // Force one final render with cleared snake to ensure visibility
+            setTimeout(() => {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = '#15161b';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }, 0);
             
             return; // Stop the game loop
           }
@@ -1580,6 +1587,13 @@ export default function GamePage() {
             snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
+            
+            // FORCE immediate re-render by clearing canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#15161b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            console.log(`💀 Server player collision - game over state set and canvas cleared!`);
             
             return; // Stop the game loop
           }
@@ -1906,7 +1920,7 @@ export default function GamePage() {
 
       // Draw your own snake locally using EXACT same rendering as remote players
       // Only render if game is active AND snake has segments (disappears completely on death)
-      if (gameStarted && snake.visibleSegments.length > 0 && !gameOver) {
+      if (gameStarted && snake.visibleSegments.length > 0 && !gameOverRef.current) {
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
