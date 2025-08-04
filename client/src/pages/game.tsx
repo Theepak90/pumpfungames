@@ -1840,7 +1840,7 @@ export default function GamePage() {
             
             // Draw the money crate image if loaded (no glow, no pulsing)
             if (moneyCrateImage) {
-              const imageSize = food.radius * 2;
+              const imageSize = food.radius * 2 * 2.5; // 2.5x bigger visually
               ctx.drawImage(
                 moneyCrateImage,
                 drawX - imageSize / 2,
@@ -1849,13 +1849,14 @@ export default function GamePage() {
                 imageSize
               );
             } else {
-              // Fallback: Draw main money crate (square-ish) with dollar sign
+              // Fallback: Draw main money crate (square-ish) with dollar sign - 2.5x bigger
+              const visualRadius = food.radius * 2.5;
               ctx.fillStyle = '#ffd700';
-              ctx.fillRect(drawX - food.radius, drawY - food.radius, food.radius * 2, food.radius * 2);
+              ctx.fillRect(drawX - visualRadius, drawY - visualRadius, visualRadius * 2, visualRadius * 2);
               
-              // Add dollar sign in the center
+              // Add dollar sign in the center - scale font size too
               ctx.fillStyle = '#000000';
-              ctx.font = `${food.radius}px Arial`;
+              ctx.font = `${visualRadius}px Arial`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('$', drawX, drawY);
