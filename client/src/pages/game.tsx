@@ -697,7 +697,11 @@ class SmoothSnake {
     this.growthRemaining = 0;
     this.partialGrowth = 0;
     this.currentSegmentCount = 0;
-    console.log(`💀 SNAKE DEATH: All segments cleared, body completely invisible`);
+    
+    // Also clear the head position to ensure nothing renders
+    this.head = { x: -1000, y: -1000 }; // Move head off-screen
+    
+    console.log(`💀 SNAKE DEATH: All segments cleared, head moved off-screen, body completely invisible`);
   }
   
   // Method to get positions along the snake body for dropping money crates
@@ -1027,12 +1031,22 @@ export default function GamePage() {
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - immediately clear snake body and stop game
-          snake.visibleSegments = []; // Clear all body segments immediately
-          snake.segmentTrail = []; // Clear trail
-          snake.totalMass = 0; // Reset mass to 0
+          snake.clearSnakeOnDeath(); // Use the complete clear method
+          gameOverRef.current = true; // Set ref FIRST for immediate effect
           setGameOver(true);
-          gameOverRef.current = true;
-          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
+          
+          // FORCE immediate canvas clear to remove snake visually
+          if (canvasRef.current) {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = '#15161b';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+          }
+          
+          console.log(`💀 SERVER DEATH: gameOver=${true}, gameOverRef=${gameOverRef.current}, snake completely cleared and canvas wiped`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1548,19 +1562,20 @@ export default function GamePage() {
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
-            // FORCE immediate re-render by clearing canvas and stopping render loop
+            // IMMEDIATELY stop the game loop and clear canvas
+            gameOverRef.current = true; // Already set above but ensure it's first
+            
+            // Stop any further animation frames
+            if (window.animationId) {
+              cancelAnimationFrame(window.animationId);
+            }
+            
+            // FORCE immediate canvas clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#15161b';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            console.log(`💀 Game over state set and canvas cleared!`);
-            
-            // Force one final render with cleared snake to ensure visibility
-            setTimeout(() => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.fillStyle = '#15161b';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }, 0);
+            console.log(`💀 Game over state set, animation stopped, and canvas cleared!`);
             
             return; // Stop the game loop
           }
@@ -1588,12 +1603,20 @@ export default function GamePage() {
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
             
-            // FORCE immediate re-render by clearing canvas
+            // IMMEDIATELY stop the game loop and clear canvas
+            gameOverRef.current = true; // Already set above but ensure it's first
+            
+            // Stop any further animation frames
+            if (window.animationId) {
+              cancelAnimationFrame(window.animationId);
+            }
+            
+            // FORCE immediate canvas clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#15161b';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            console.log(`💀 Server player collision - game over state set and canvas cleared!`);
+            console.log(`💀 Server player collision - game stopped and canvas cleared!`);
             
             return; // Stop the game loop
           }
@@ -2204,9 +2227,13 @@ export default function GamePage() {
 
       // Only continue game loop if game is not over (use ref for immediate response)
       if (!gameOverRef.current) {
-        animationId = requestAnimationFrame(gameLoop);
+        window.animationId = requestAnimationFrame(gameLoop);
       } else {
         console.log(`🛑 GAME LOOP STOPPED - gameOverRef = ${gameOverRef.current}`);
+        // Ensure canvas is completely clear on game over
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#15161b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     };
 
