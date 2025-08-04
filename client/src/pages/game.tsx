@@ -1667,51 +1667,38 @@ export default function GamePage() {
             ctx.globalAlpha = food.opacity;
           }
           
-          // Special rendering for money crates with image
+          // Special rendering for money crates with gentle wobbling
           if (food.isMoneyCrate) {
-            const pulseTime = Date.now() * 0.006;
-            const pulseScale = 1 + Math.sin(pulseTime) * 0.2;
-            const currentRadius = food.radius * pulseScale;
+            // Gentle wobbling motion - much slower than boost food
+            const wobbleTime = Date.now() * 0.001 + food.wobbleOffset;
+            const wobbleX = Math.sin(wobbleTime) * 1.5; // Small horizontal wobble
+            const wobbleY = Math.cos(wobbleTime * 0.8) * 1; // Smaller vertical wobble
             
-            // Create golden glowing effect for money crates
-            ctx.shadowColor = '#ffd700';
-            ctx.shadowBlur = 15;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            const drawX = food.x + wobbleX;
+            const drawY = food.y + wobbleY;
             
-            // Draw outer golden glow
-            ctx.fillStyle = '#ffd70040'; // Semi-transparent gold
-            ctx.beginPath();
-            ctx.arc(food.x, food.y, currentRadius * 2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw the money crate image if loaded
+            // Draw the money crate image if loaded (no glow, no pulsing)
             if (moneyCrateImage) {
-              const imageSize = currentRadius * 2;
+              const imageSize = food.radius * 2;
               ctx.drawImage(
                 moneyCrateImage,
-                food.x - imageSize / 2,
-                food.y - imageSize / 2,
+                drawX - imageSize / 2,
+                drawY - imageSize / 2,
                 imageSize,
                 imageSize
               );
             } else {
               // Fallback: Draw main money crate (square-ish) with dollar sign
               ctx.fillStyle = '#ffd700';
-              ctx.fillRect(food.x - currentRadius, food.y - currentRadius, currentRadius * 2, currentRadius * 2);
+              ctx.fillRect(drawX - food.radius, drawY - food.radius, food.radius * 2, food.radius * 2);
               
               // Add dollar sign in the center
-              ctx.shadowBlur = 0;
               ctx.fillStyle = '#000000';
-              ctx.font = `${currentRadius}px Arial`;
+              ctx.font = `${food.radius}px Arial`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
-              ctx.fillText('$', food.x, food.y);
+              ctx.fillText('$', drawX, drawY);
             }
-            
-            // Reset shadow effects for other food rendering
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
           }
           // Special rendering for boost food with pulsing effect
           else if (food.isBoostFood || food.expiresAt) {
