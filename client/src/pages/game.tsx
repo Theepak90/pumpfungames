@@ -1032,7 +1032,7 @@ export default function GamePage() {
           snake.segmentTrail = []; // Clear trail
           snake.totalMass = 0; // Reset mass to 0
           setGameOver(true);
-          console.log(`💀 LOCAL DEATH STATE SET: gameOver=${true}, gameOverRef=${gameOverRef.current}, segments cleared`);
+          console.log(`💀 SERVER DEATH: gameOverRef=${gameOverRef.current}, segments=${snake.visibleSegments.length}, cleared completely`);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -1544,8 +1544,12 @@ export default function GamePage() {
             // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) Setting gameOver = true`);
             gameOverRef.current = true; // Set this FIRST to stop rendering immediately
+            snake.visibleSegments = []; // IMMEDIATELY clear segments
+            snake.segmentTrail = []; // Clear trail
+            console.log(`💀 IMMEDIATE CLEAR: gameOverRef=${gameOverRef.current}, segments=${snake.visibleSegments.length}`);
+            
             dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
-            snake.clearSnakeOnDeath(); // Clear all snake segments immediately
+            snake.clearSnakeOnDeath(); // Clear all snake segments immediately  
             setGameOver(true);
             
             console.log(`💀 Game over state set and snake cleared!`);
@@ -1572,6 +1576,10 @@ export default function GamePage() {
             // Player died - crash into another snake!
             console.log(`💀 CRASHED into server player ${serverPlayer.id}! (segments: ${serverPlayer.segments.length})`);
             gameOverRef.current = true; // Set this FIRST to stop rendering immediately
+            snake.visibleSegments = []; // IMMEDIATELY clear segments
+            snake.segmentTrail = []; // Clear trail
+            console.log(`💀 IMMEDIATE CLEAR: gameOverRef=${gameOverRef.current}, segments=${snake.visibleSegments.length}`);
+            
             dropMoneyCrates(snake.money, snake.totalMass); // Drop money crates before clearing
             snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             setGameOver(true);
@@ -1903,7 +1911,10 @@ export default function GamePage() {
 
       // Draw your own snake locally using EXACT same rendering as remote players
       // Only render if game is active AND snake has segments AND game is not over (disappears completely on death)
-      if (gameStarted && !gameOverRef.current && snake.visibleSegments.length > 0) {
+      const shouldRenderSnake = gameStarted && !gameOverRef.current && snake.visibleSegments.length > 0;
+      console.log(`🐍 Snake render check: gameStarted=${gameStarted}, gameOverRef=${gameOverRef.current}, segments=${snake.visibleSegments.length}, shouldRender=${shouldRenderSnake}`);
+      
+      if (shouldRenderSnake) {
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
