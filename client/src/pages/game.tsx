@@ -812,6 +812,8 @@ export default function GamePage() {
     segments: Array<{ x: number; y: number }>;
     color: string;
     money: number;
+    cashingOut?: boolean;
+    cashOutProgress?: number;
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -1083,6 +1085,24 @@ export default function GamePage() {
             console.log(`💰 Removed money crate ${data.crateId}. Foods count: ${currentFoods.length} -> ${filtered.length}`);
             return filtered;
           });
+        } else if (data.type === 'cashingOut') {
+          // Update other player's cash-out status
+          setOtherPlayers(current => 
+            current.map(player => 
+              player.id === data.playerId 
+                ? { ...player, cashingOut: true, cashOutProgress: data.progress }
+                : player
+            )
+          );
+        } else if (data.type === 'cashOutComplete' || data.type === 'cashOutCancelled') {
+          // Remove cash-out status from other player
+          setOtherPlayers(current => 
+            current.map(player => 
+              player.id === data.playerId 
+                ? { ...player, cashingOut: false, cashOutProgress: 0 }
+                : player
+            )
+          );
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
           // Server detected our collision - instantly return to home screen
@@ -1268,6 +1288,17 @@ export default function GamePage() {
       } else if (e.key.toLowerCase() === 'q') {
         setQKeyPressed(false);
         // Cancel cash-out process when Q is released
+        if (cashingOut) {
+          console.log('Cash-out cancelled - Q key released');
+          
+          // Send cancellation message to other players
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'cashOutCancelled',
+              playerId: myPlayerId
+            }));
+          }
+        }
         setCashingOut(false);
         setCashOutProgress(0);
         setCashOutStartTime(null);
@@ -1396,10 +1427,27 @@ export default function GamePage() {
         const progress = Math.min(elapsed / 3000, 1); // 3 seconds = 100%
         setCashOutProgress(progress);
         
+        // Send cash-out progress to other players every frame for smooth updates
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'cashingOut',
+            progress: progress,
+            playerId: myPlayerId
+          }));
+        }
+        
         // Complete cash-out after 3 seconds
         if (progress >= 1) {
           const amount = snake.money;
           console.log(`Cashed out $${amount.toFixed(2)}! Returning to home page.`);
+          
+          // Send completion message to other players
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'cashOutComplete',
+              playerId: myPlayerId
+            }));
+          }
           
           // Clean up game state
           setGameStarted(false);
@@ -1442,7 +1490,17 @@ export default function GamePage() {
           console.log('🏠 Returned to home page after cash out');
         }
       } else if (cashingOut && !qKeyPressed) {
-        // Q was released, cancel cash-out
+        // Q was released, cancel cash-out  
+        console.log('Cash-out cancelled - Q key released during game loop');
+        
+        // Send cancellation message to other players
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'cashOutCancelled',
+            playerId: myPlayerId
+          }));
+        }
+        
         setCashingOut(false);
         setCashOutProgress(0);
         setCashOutStartTime(null);
@@ -2072,11 +2130,26 @@ export default function GamePage() {
           // Draw snake body with EXACT same styling as local snake
           ctx.save();
           
-          // Add drop shadow when not boosting (like local snake)
-          ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-          ctx.shadowBlur = 6;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
+          // Check if this player is cashing out
+          const cashingOutPlayer = otherPlayers.find(p => p.id === serverPlayer.id);
+          const isCashingOut = cashingOutPlayer?.cashingOut;
+          const cashOutProgress = cashingOutPlayer?.cashOutProgress || 0;
+          
+          // Add cash-out glow effect
+          if (isCashingOut) {
+            const glowIntensity = 0.3 + (cashOutProgress * 0.7);
+            const pulseIntensity = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+            ctx.shadowColor = "#ffd700";
+            ctx.shadowBlur = 15 * glowIntensity * pulseIntensity;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+          } else {
+            // Add drop shadow when not boosting (like local snake)
+            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+          }
           
           // Use spaced segments for natural appearance
           const segmentsToRender = spacedSegments.length;
@@ -2090,6 +2163,16 @@ export default function GamePage() {
             ctx.beginPath();
             ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Add cash-out outline
+            if (isCashingOut) {
+              const glowIntensity = 0.3 + (cashOutProgress * 0.7);
+              ctx.strokeStyle = '#ffd700';
+              ctx.lineWidth = 2 * glowIntensity;
+              ctx.beginPath();
+              ctx.arc(segment.x, segment.y, segmentRadius + 1, 0, Math.PI * 2);
+              ctx.stroke();
+            }
           }
           
           // Reduced logging for performance
@@ -2191,6 +2274,33 @@ export default function GamePage() {
             ctx.strokeText(moneyText, head.x, head.y - offsetY);
             ctx.fillText(moneyText, head.x, head.y - offsetY);
             ctx.restore();
+            
+            // Cash-out progress indicator above head
+            if (isCashingOut && cashOutProgress > 0) {
+              const barWidth = 50;
+              const barHeight = 8;
+              const barX = head.x - barWidth / 2;
+              const barY = head.y - cappedRadius - 30;
+              
+              // Background bar
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+              ctx.fillRect(barX, barY, barWidth, barHeight);
+              
+              // Progress bar
+              ctx.fillStyle = '#ffd700';
+              ctx.fillRect(barX, barY, barWidth * cashOutProgress, barHeight);
+              
+              // Border
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(barX, barY, barWidth, barHeight);
+              
+              // "CASHING OUT" text
+              ctx.fillStyle = '#ffd700';
+              ctx.font = 'bold 12px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('CASHING OUT', head.x, barY - 8);
+            }
           }
         }
       });
