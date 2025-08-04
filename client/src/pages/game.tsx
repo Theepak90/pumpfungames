@@ -815,7 +815,6 @@ export default function GamePage() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const tabSwitchGracePeriodRef = useRef<number>(0); // Grace period after tab switch to prevent false collisions
 
   // Function to drop money crates when snake dies (1 crate per mass unit)
   const dropMoneyCrates = (playerMoney: number, snakeMass: number) => {
@@ -994,14 +993,9 @@ export default function GamePage() {
           console.log(`My player ID: ${data.playerId} in room ${data.roomId || roomId}`);
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
-          
-          // Filter out our own player and set other players
-          const otherPlayersFromServer = (data.players || []).filter((p: any) => p.id !== myPlayerId);
-          setOtherPlayers(otherPlayersFromServer);
-          
+          setServerPlayers(data.players || []);
+          // Food is handled client-side, not synced across players
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${foods.length} food`);
-          console.log(`Drawing ${otherPlayersFromServer.length} other players (excluding self)`);
-          
           if (data.players && data.players.length > 0) {
             data.players.forEach((player: any, idx: number) => {
               console.log(`Player ${idx}: id=${player.id}, segments=${player.segments?.length || 0}, color=${player.color}`);
@@ -1146,13 +1140,7 @@ export default function GamePage() {
           money: snake.money,
           totalMass: snake.totalMass,
           segmentRadius: snake.getSegmentRadius(),
-          visibleSegmentCount: snake.visibleSegments.length,
-          // Include position and movement data for server-side continuation
-          x: snake.head.x,
-          y: snake.head.y,
-          angle: snake.currentAngle,
-          speed: snake.baseSpeed,
-          isBoosting: snake.isBoosting
+          visibleSegmentCount: snake.visibleSegments.length
         };
         // Reduced logging for performance - only log every 30th update
         if (Date.now() % 2000 < 67) {
@@ -1301,18 +1289,13 @@ export default function GamePage() {
           const delta = (now - hiddenAt) / 1000; // seconds tab was hidden
           applySnakeCatchUp(delta);
           setHiddenAt(null);
-          
-          // Add grace period to prevent false collision detection after tab switch
-          tabSwitchGracePeriodRef.current = Date.now() + 1000; // 1 second grace period
-          console.log('Tab visibility changed:', 'visible', '- collision detection disabled for 1 second');
+          console.log('Tab visibility changed:', 'visible');
         }
       }
       setGameIsVisible(!document.hidden);
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -1655,84 +1638,69 @@ export default function GamePage() {
 
       // Server food system removed
 
-      // Check for collisions with other players' snakes (but skip during grace period)
-      const inGracePeriod = currentTime < tabSwitchGracePeriodRef.current;
-      
-      if (!inGracePeriod) {
-        for (const otherPlayer of otherPlayers) {
-          if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
-          // Skip collision with dead players (check if they have any meaningful segments)
-          if ((otherPlayer as any).isDead || (otherPlayer as any).gameOver) continue;
-          // Skip players with very few segments (likely dead/disconnected)
-          if (otherPlayer.segments.length < 2) continue;
+      // Check for collisions with other players' snakes
+      for (const otherPlayer of otherPlayers) {
+        if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
+        // Skip collision with dead players (check if they have any meaningful segments)
+        if (otherPlayer.isDead || otherPlayer.gameOver) continue;
+        // Skip players with very few segments (likely dead/disconnected)
+        if (otherPlayer.segments.length < 2) continue;
+        
+        for (const segment of otherPlayer.segments) {
+          const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
+          const collisionRadius = snake.getSegmentRadius() + 10; // Use standard segment radius
           
-          // Only check collision with body segments (skip the head segment at index 0)
-          for (let i = 1; i < otherPlayer.segments.length; i++) {
-            const segment = otherPlayer.segments[i];
-            const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
-            const collisionRadius = snake.getSegmentRadius() + 8; // Reduced collision radius for fairer gameplay
+          if (dist < collisionRadius) {
+            // Player died - crash into another snake! Drop money crates first
+            console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) - Instant return to home`);
             
-            if (dist < collisionRadius) {
-              // Player died - crash into another snake! Drop money crates first
-              console.log(`💀 CRASHED into player ${otherPlayer.id}! (segments: ${otherPlayer.segments.length}) - Instant return to home`);
-              
-              // Drop money crates BEFORE clearing
-              const currentMoney = snake.money || 1.0;
-              const currentMass = snake.totalMass || 6;
-              console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
-              dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
-              
-              // Hide snake first, then clear data
-              snakeVisibleRef.current = false;
-              setSnakeVisible(false);
-              
-              // Instantly return to home screen - no fade, no game over screen
-              console.log(`🏠 Instantly returning to home screen after death`);
-              setGameStarted(false);
-              setGameOver(false);
-              gameOverRef.current = false;
-              snakeFadingRef.current = false;
-              setSnakeFading(false);
-              
-              // Navigate back to home page
-              window.history.pushState({}, '', '/');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-              
-              // Clear snake data after state updates
-              setTimeout(() => {
-                snake.visibleSegments = [];
-                snake.segmentTrail = [];
-                snake.totalMass = 0;
-                snake.clearSnakeOnDeath();
-              }, 0);
-              
-              return; // Stop the game loop
-            }
+            // Drop money crates BEFORE clearing
+            const currentMoney = snake.money || 1.0;
+            const currentMass = snake.totalMass || 6;
+            console.log(`💰 Dropping money crates: $${currentMoney}, mass: ${currentMass}`);
+            dropMoneyCrates(currentMoney, Math.max(currentMass, 1));
+            
+            // Hide snake first, then clear data
+            snakeVisibleRef.current = false;
+            setSnakeVisible(false);
+            
+            // Instantly return to home screen - no fade, no game over screen
+            console.log(`🏠 Instantly returning to home screen after death`);
+            setGameStarted(false);
+            setGameOver(false);
+            gameOverRef.current = false;
+            snakeFadingRef.current = false;
+            setSnakeFading(false);
+            
+            // Navigate back to home page
+            window.history.pushState({}, '', '/');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            
+            // Clear snake data after state updates
+            setTimeout(() => {
+              snake.visibleSegments = [];
+              snake.segmentTrail = [];
+              snake.totalMass = 0;
+              snake.clearSnakeOnDeath();
+            }, 0);
+            
+            return; // Stop the game loop
           }
         }
-      } else {
-        console.log('⏳ Collision detection skipped during grace period');
       }
 
-      // Check for collisions with server players' snakes (avoid duplicate collision checks and respect grace period)
-      if (!inGracePeriod) {
-        for (const serverPlayer of serverPlayers) {
+      // Check for collisions with server players' snakes
+      for (const serverPlayer of serverPlayers) {
         if (!serverPlayer.segments || serverPlayer.segments.length === 0) continue;
         if (serverPlayer.id === myPlayerId) continue; // Skip self
-        
-        // Skip if this player is already in otherPlayers to avoid duplicate collision checks
-        if (otherPlayers.some(p => p.id === serverPlayer.id)) continue;
-        
         // Skip collision with dead players
-        if ((serverPlayer as any).isDead || (serverPlayer as any).gameOver) continue;
+        if (serverPlayer.isDead || serverPlayer.gameOver) continue;
         // Skip players with very few segments (likely dead/disconnected) 
         if (serverPlayer.segments.length < 2) continue;
         
-        // Only check collision with body segments (skip the head segment at index 0)
-        for (let i = 1; i < serverPlayer.segments.length; i++) {
-          const segment = serverPlayer.segments[i];
+        for (const segment of serverPlayer.segments) {
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
-          const collisionRadius = snake.getSegmentRadius() + 8; // Reduced collision radius
+          const collisionRadius = snake.getSegmentRadius() + (serverPlayer.segmentRadius || 10);
           
           if (dist < collisionRadius) {
             // Player died - crash into another snake!
@@ -1772,7 +1740,6 @@ export default function GamePage() {
           }
         }
       }
-      } // Close grace period check for server players
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;

@@ -300,16 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       color: playerColor,
       money: 1.00,
       lastUpdate: Date.now(),
-      roomId: targetRoom.id,
-      // Server-side movement properties
-      x: 2000 + (Math.random() - 0.5) * 200, // Random spawn near center
-      y: 2000 + (Math.random() - 0.5) * 200,
-      angle: Math.random() * Math.PI * 2,
-      speed: 1.2,
-      totalMass: 6,
-      isBoosting: false,
-      isConnected: true,
-      lastClientUpdate: Date.now()
+      roomId: targetRoom.id
     };
     
     // Add player to room
@@ -368,15 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             segmentRadius: data.segmentRadius || 8,
             visibleSegmentCount: Math.min(data.visibleSegmentCount || 0, MAX_SEGMENTS),
             lastUpdate: Date.now(),
-            roomId: room.id,
-            // Update server-side movement data when client sends updates
-            x: data.x || existingPlayer?.x || 2000,
-            y: data.y || existingPlayer?.y || 2000,
-            angle: data.angle || existingPlayer?.angle || 0,
-            speed: data.speed || existingPlayer?.speed || 1.2,
-            isBoosting: data.isBoosting || false,
-            isConnected: true,
-            lastClientUpdate: Date.now()
+            roomId: room.id
           };
           console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           
@@ -588,21 +571,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Player ${playerId} left room ${roomKey}. Code: ${code}, Reason: ${reason.toString()}`);
       
       if (room) {
-        // Mark player as disconnected but keep them in the game for server-side movement
-        const player = room.players.get(playerId);
-        if (player) {
-          player.isConnected = false;
-          console.log(`Player ${playerId} marked as disconnected in room ${room.region}/${room.id} - snake will continue moving server-side`);
-        }
-        
-        // Only fully remove player after 2 minutes of inactivity
-        setTimeout(() => {
-          const currentPlayer = room.players.get(playerId);
-          if (currentPlayer && !currentPlayer.isConnected) {
-            room.players.delete(playerId);
-            console.log(`Player ${playerId} fully removed from room ${room.region}/${room.id} after timeout`);
-          }
-        }, 120000); // 2 minute grace period
+        room.players.delete(playerId);
+        console.log(`Room ${room.region}/${room.id} now has ${room.players.size}/${room.maxPlayers} players`);
       }
       playerToRoom.delete(playerId);
     });
@@ -618,72 +588,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       playerToRoom.delete(playerId);
     });
   });
-
-  // Server-side snake movement system - continues even when tabs are closed
-  setInterval(() => {
-    const currentTime = Date.now();
-    
-    for (const [roomKey, room] of gameRooms) {
-      if (room.players.size === 0) continue;
-      
-      // Update server-side movement for all players, connected or not
-      for (const [playerId, player] of room.players) {
-        // Skip movement if player recently sent an update (within 200ms)
-        if (currentTime - player.lastClientUpdate < 200) continue;
-        
-        // Calculate movement based on time elapsed
-        const deltaTime = 16 / 1000; // 16ms per frame = ~60 FPS
-        const speed = player.isBoosting ? (player.speed * 2.0) : player.speed;
-        const distance = speed * deltaTime;
-        
-        // Update position based on current angle
-        player.x += Math.cos(player.angle) * distance;
-        player.y += Math.sin(player.angle) * distance;
-        
-        // Keep within map bounds (circular boundary)
-        const MAP_CENTER_X = 2000;
-        const MAP_CENTER_Y = 2000;
-        const MAP_RADIUS = 1800;
-        
-        const distFromCenter = Math.sqrt((player.x - MAP_CENTER_X) ** 2 + (player.y - MAP_CENTER_Y) ** 2);
-        if (distFromCenter > MAP_RADIUS - 50) {
-          // Redirect towards center when hitting boundary
-          const angleToCenter = Math.atan2(MAP_CENTER_Y - player.y, MAP_CENTER_X - player.x);
-          player.angle = angleToCenter;
-        }
-        
-        // Update segments based on server-side position for smooth snake body
-        const segmentSpacing = 10;
-        if (!player.segments) player.segments = [];
-        
-        // Add new head position
-        player.segments.unshift({ x: player.x, y: player.y });
-        
-        // Maintain proper segment trail length
-        const targetSegments = Math.min(Math.floor(player.totalMass), 100);
-        const maxTrailLength = targetSegments * 2; // Allow more trail for smoother body
-        
-        while (player.segments.length > maxTrailLength) {
-          player.segments.pop();
-        }
-        
-        // Ensure we have enough visible segments for the snake body
-        if (player.segments.length < targetSegments && player.segments.length > 0) {
-          // Fill missing segments by duplicating the last segment
-          const lastSegment = player.segments[player.segments.length - 1];
-          while (player.segments.length < targetSegments) {
-            player.segments.push({ x: lastSegment.x, y: lastSegment.y });
-          }
-        }
-        
-        player.lastUpdate = currentTime;
-        
-        if (!player.isConnected && Math.random() < 0.002) {
-          console.log(`🤖 Server moving disconnected player ${playerId} at (${player.x.toFixed(1)}, ${player.y.toFixed(1)}) with ${player.segments?.length || 0} segments`);
-        }
-      }
-    }
-  }, 16); // 60 FPS server-side movement
 
   // Broadcast game state every 100ms for stable multiplayer
   setInterval(() => {
