@@ -34,6 +34,9 @@ interface Food {
   wobbleOffset: number;
   expiresAt?: number; // Optional expiration timestamp for boost food
   opacity?: number; // Optional opacity for fading boost food
+  isBoostFood?: boolean; // Flag to identify boost food for special rendering
+  isMoneyCrate?: boolean; // Flag to identify money crates
+  moneyValue?: number; // Money value for money crates
 }
 
 interface BotSnake {
@@ -695,6 +698,31 @@ class SmoothSnake {
     this.currentSegmentCount = 0;
     console.log(`💀 SNAKE DEATH: All segments cleared, body completely invisible`);
   }
+  
+  // Method to get positions along the snake body for dropping money crates
+  getSnakeBodyPositions(crateCount: number): Position[] {
+    if (this.visibleSegments.length === 0) return [];
+    
+    const positions: Position[] = [];
+    const segmentCount = this.visibleSegments.length;
+    
+    // Distribute money crates evenly along the snake body
+    for (let i = 0; i < crateCount && i < segmentCount; i++) {
+      const segmentIndex = Math.floor((i / crateCount) * segmentCount);
+      const segment = this.visibleSegments[segmentIndex];
+      if (segment) {
+        // Add some random offset to spread crates out
+        const offsetX = (Math.random() - 0.5) * 20;
+        const offsetY = (Math.random() - 0.5) * 20;
+        positions.push({
+          x: segment.x + offsetX,
+          y: segment.y + offsetY
+        });
+      }
+    }
+    
+    return positions;
+  }
 }
 
 export default function GamePage() {
@@ -779,12 +807,51 @@ export default function GamePage() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Death food dropping removed
-
   // Function to drop money crates when snake dies (spread along entire snake body)
-  // Money crate dropping removed
-
-  // All death loot functions removed
+  const dropMoneyCrates = (playerMoney: number) => {
+    const crateValue = 0.02; // Each crate worth $0.02
+    const crateCount = Math.floor(playerMoney / crateValue);
+    
+    if (crateCount <= 0) return;
+    
+    console.log(`💰 Dropping ${crateCount} money crates worth $${crateValue} each (total: $${playerMoney})`);
+    
+    // Get positions along the snake body
+    const positions = snake.getSnakeBodyPositions(crateCount);
+    
+    // Create money crates at each position
+    const newCrates: Food[] = [];
+    for (let i = 0; i < Math.min(crateCount, positions.length); i++) {
+      const pos = positions[i];
+      const crate: Food = {
+        id: `money_crate_${Date.now()}_${i}`,
+        x: pos.x,
+        y: pos.y,
+        radius: 4, // Slightly larger than boost food
+        mass: 0, // No mass growth, just money
+        color: '#ffd700', // Gold color for money
+        vx: 0,
+        vy: 0,
+        wobbleOffset: Math.random() * Math.PI * 2,
+        isMoneyCrate: true,
+        moneyValue: crateValue
+      };
+      newCrates.push(crate);
+    }
+    
+    // Add all crates to the foods array
+    setFoods(currentFoods => [...currentFoods, ...newCrates]);
+    
+    // Send money crates to server for broadcasting to other players
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      newCrates.forEach(crate => {
+        wsRef.current!.send(JSON.stringify({
+          type: 'moneyCrate',
+          crate: crate
+        }));
+      });
+    }
+  };
 
 
 
@@ -933,6 +1000,13 @@ export default function GamePage() {
           setFoods(currentFoods => {
             console.log(`🍕 Adding boost food to foods array. Current count: ${currentFoods.length}`);
             return [...currentFoods, boostFood];
+          });
+        } else if (data.type === 'moneyCrate') {
+          // Received money crate from another player's death
+          console.log(`💰 Received money crate from player ${data.playerId}:`, data.crate);
+          setFoods(currentFoods => {
+            console.log(`💰 Adding money crate to foods array. Current count: ${currentFoods.length}`);
+            return [...currentFoods, data.crate];
           });
         } else if (data.type === 'death') {
           console.log(`💀 CLIENT RECEIVED DEATH MESSAGE: ${data.reason} - crashed into ${data.crashedInto}`);
@@ -1270,8 +1344,15 @@ export default function GamePage() {
           );
           
           if (distToSnake < FOOD_CONSUMPTION_RADIUS) {
-            // Snake eats food
-            snake.eatFood(food.mass);
+            // Handle different types of food
+            if (food.isMoneyCrate && food.moneyValue) {
+              // Snake eats money crate - add money instead of mass
+              snake.money += food.moneyValue;
+              console.log(`💰 Collected money crate worth $${food.moneyValue}! Total money: $${snake.money.toFixed(2)}`);
+            } else {
+              // Regular food or boost food - add mass
+              snake.eatFood(food.mass);
+            }
             consumedFoodIds.push(food.id);
           }
         }
@@ -1303,6 +1384,8 @@ export default function GamePage() {
       }
       
       if (hitBoundary) {
+        // Drop money crates before clearing snake
+        dropMoneyCrates(snake.money);
         // Clear snake body completely when hitting death barrier
         snake.clearSnakeOnDeath();
         setGameOver(true);
@@ -1336,6 +1419,8 @@ export default function GamePage() {
       }
       
       if (hitBot) {
+        // Drop money crates before clearing snake
+        dropMoneyCrates(snake.money);
         // Clear snake body completely when hitting bot
         snake.clearSnakeOnDeath();
         setGameOver(true);
@@ -1365,6 +1450,8 @@ export default function GamePage() {
         }
         
         if (headOnCollision) {
+          // Drop money crates before clearing snake
+          dropMoneyCrates(snake.money);
           // Both snakes die in head-on collision - clear snake body completely
           snake.clearSnakeOnDeath();
           
@@ -1434,8 +1521,9 @@ export default function GamePage() {
           const collisionRadius = snake.getSegmentRadius() + 10; // Use standard segment radius
           
           if (dist < collisionRadius) {
-            // Player died - crash into another snake! Clear snake body completely
+            // Player died - crash into another snake! Drop money crates first
             console.log(`💀 CRASHED into player ${otherPlayer.id}! Setting gameOver = true`);
+            dropMoneyCrates(snake.money); // Drop money crates before clearing
             snake.clearSnakeOnDeath(); // Clear all snake segments immediately
             gameOverRef.current = true; // Set ref immediately
             setGameOver(true);
@@ -1563,8 +1651,38 @@ export default function GamePage() {
             ctx.globalAlpha = food.opacity;
           }
           
+          // Special rendering for money crates with gold effect
+          if (food.isMoneyCrate) {
+            const pulseTime = Date.now() * 0.006;
+            const pulseScale = 1 + Math.sin(pulseTime) * 0.2;
+            const currentRadius = food.radius * pulseScale;
+            
+            // Create golden glowing effect for money crates
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = 12;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            // Draw outer golden glow
+            ctx.fillStyle = '#ffd70060'; // Semi-transparent gold
+            ctx.beginPath();
+            ctx.arc(food.x, food.y, currentRadius * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw main money crate (square-ish)
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(food.x - currentRadius, food.y - currentRadius, currentRadius * 2, currentRadius * 2);
+            
+            // Add dollar sign in the center
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#000000';
+            ctx.font = `${currentRadius}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('$', food.x, food.y);
+          }
           // Special rendering for boost food with pulsing effect
-          if (food.isBoostFood || food.expiresAt) {
+          else if (food.isBoostFood || food.expiresAt) {
             const pulseTime = Date.now() * 0.008;
             const pulseScale = 1 + Math.sin(pulseTime) * 0.3;
             const currentRadius = food.radius * pulseScale;

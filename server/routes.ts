@@ -446,6 +446,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           console.log(`🍕 Boost food broadcast to ${broadcastCount} players in room ${room.region}/${room.id}`);
+        } else if (data.type === 'moneyCrate') {
+          // Handle money crate drops - broadcast to all players in room
+          const roomKey = playerToRoom.get(playerId);
+          const room = gameRooms.get(roomKey!);
+          if (!room) return;
+          
+          console.log(`💰 Player ${playerId} dropped money crate in room ${room.region}/${room.id}:`, data.crate);
+          
+          // Broadcast money crate to all other players in room
+          const moneyCrateMessage = JSON.stringify({
+            type: 'moneyCrate',
+            crate: data.crate,
+            playerId: playerId
+          });
+          
+          let broadcastCount = 0;
+          wss.clients.forEach((client: any) => {
+            if (client.readyState === WebSocket.OPEN && 
+                client.roomId === room.id && 
+                client.region === room.region &&
+                client.playerId !== playerId) { // Don't send back to the sender
+              try {
+                client.send(moneyCrateMessage);
+                broadcastCount++;
+              } catch (error) {
+                console.error(`Error broadcasting money crate to room ${room.region}/${room.id}:`, error);
+              }
+            }
+          });
+          
+          console.log(`💰 Money crate broadcast to ${broadcastCount} players in room ${room.region}/${room.id}`);
         } // Food system completely removed from multiplayer
       } catch (error) {
         console.error("WebSocket message error:", error);
