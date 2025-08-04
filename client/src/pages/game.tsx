@@ -1140,7 +1140,13 @@ export default function GamePage() {
           money: snake.money,
           totalMass: snake.totalMass,
           segmentRadius: snake.getSegmentRadius(),
-          visibleSegmentCount: snake.visibleSegments.length
+          visibleSegmentCount: snake.visibleSegments.length,
+          // Include position and movement data for server-side continuation
+          x: snake.head.x,
+          y: snake.head.y,
+          angle: snake.currentAngle,
+          speed: snake.baseSpeed,
+          isBoosting: snake.isBoosting
         };
         // Reduced logging for performance - only log every 30th update
         if (Date.now() % 2000 < 67) {
@@ -1297,52 +1303,7 @@ export default function GamePage() {
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Background timer to keep snake moving even when tab is inactive
-    let lastUpdateTime = performance.now();
-    const backgroundTimer = setInterval(() => {
-      if (gameOver || !gameStarted) return;
-      
-      const currentTime = performance.now();
-      const deltaTime = (currentTime - lastUpdateTime) / 1000; // Convert to seconds
-      lastUpdateTime = currentTime;
-      
-      // Move snake based on time elapsed
-      const speed = snake.isBoosting ? (snake.baseSpeed * snake.boostMultiplier) : snake.baseSpeed;
-      const distance = speed * deltaTime;
-      
-      // Update snake position
-      snake.head.x += Math.cos(snake.currentAngle) * distance;
-      snake.head.y += Math.sin(snake.currentAngle) * distance;
-      
-      // Add trail point for movement
-      snake.segmentTrail.unshift({ x: snake.head.x, y: snake.head.y });
-      
-      // Limit trail length
-      const maxTrailLength = Math.floor(snake.totalMass * SEGMENT_SPACING * 2);
-      if (snake.segmentTrail.length > maxTrailLength) {
-        snake.segmentTrail.length = maxTrailLength;
-      }
-      
-      // Update visible segments
-      snake.updateVisibleSegments();
-      
-      // Send position updates to server if WebSocket is connected
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        const updateData = {
-          type: 'playerUpdate',
-          playerId: myPlayerId,
-          x: snake.head.x,
-          y: snake.head.y,
-          angle: snake.currentAngle,
-          segments: snake.visibleSegments.map(seg => ({ x: seg.x, y: seg.y })),
-          totalMass: snake.totalMass,
-          segmentRadius: snake.getSegmentRadius(),
-          isBoosting: snake.isBoosting,
-          money: snake.money
-        };
-        wsRef.current.send(JSON.stringify(updateData));
-      }
-    }, 16); // ~60 FPS background updates
+
     
     const gameLoop = () => {
       // Calculate delta time for smooth growth processing
@@ -1689,7 +1650,7 @@ export default function GamePage() {
       for (const otherPlayer of otherPlayers) {
         if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
         // Skip collision with dead players (check if they have any meaningful segments)
-        if (otherPlayer.isDead || otherPlayer.gameOver) continue;
+        if ((otherPlayer as any).isDead || (otherPlayer as any).gameOver) continue;
         // Skip players with very few segments (likely dead/disconnected)
         if (otherPlayer.segments.length < 2) continue;
         
@@ -2413,7 +2374,6 @@ export default function GamePage() {
     animationId = requestAnimationFrame(gameLoop);
     return () => {
       cancelAnimationFrame(animationId);
-      clearInterval(backgroundTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [mouseDirection, snake, gameOver, canvasSize, score, hiddenAt, gameStarted]);
