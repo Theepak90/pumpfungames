@@ -1439,12 +1439,30 @@ export default function GamePage() {
       }
       
       if (hitBoundary) {
+        console.log(`💀 HIT DEATH BARRIER - Instant return to home`);
         // Drop money crates before clearing snake
         dropMoneyCrates(snake.money, snake.totalMass);
-        // Clear snake body completely when hitting death barrier
-        snake.clearSnakeOnDeath();
-        setGameOver(true);
-        gameOverRef.current = true;
+        
+        // Hide snake first, then clear data
+        snakeVisibleRef.current = false;
+        setSnakeVisible(false);
+        
+        // Instantly return to home screen - no fade, no game over screen
+        console.log(`🏠 Instantly returning to home screen after hitting barrier`);
+        setGameStarted(false);
+        setGameOver(false);
+        gameOverRef.current = false;
+        snakeFadingRef.current = false;
+        setSnakeFading(false);
+        
+        // Clear snake data after state updates
+        setTimeout(() => {
+          snake.visibleSegments = [];
+          snake.segmentTrail = [];
+          snake.totalMass = 0;
+          snake.clearSnakeOnDeath();
+        }, 0);
+        
         return;
       }
 
@@ -1474,12 +1492,30 @@ export default function GamePage() {
       }
       
       if (hitBot) {
+        console.log(`💀 HIT BOT SNAKE - Instant return to home`);
         // Drop money crates before clearing snake
         dropMoneyCrates(snake.money, snake.totalMass);
-        // Clear snake body completely when hitting bot
-        snake.clearSnakeOnDeath();
-        setGameOver(true);
-        gameOverRef.current = true;
+        
+        // Hide snake first, then clear data
+        snakeVisibleRef.current = false;
+        setSnakeVisible(false);
+        
+        // Instantly return to home screen - no fade, no game over screen
+        console.log(`🏠 Instantly returning to home screen after hitting bot`);
+        setGameStarted(false);
+        setGameOver(false);
+        gameOverRef.current = false;
+        snakeFadingRef.current = false;
+        setSnakeFading(false);
+        
+        // Clear snake data after state updates
+        setTimeout(() => {
+          snake.visibleSegments = [];
+          snake.segmentTrail = [];
+          snake.totalMass = 0;
+          snake.clearSnakeOnDeath();
+        }, 0);
+        
         return;
       }
 
@@ -1505,10 +1541,9 @@ export default function GamePage() {
         }
         
         if (headOnCollision) {
+          console.log(`💀 HEAD-ON COLLISION WITH BOT - Instant return to home`);
           // Drop money crates before clearing snake
           dropMoneyCrates(snake.money, snake.totalMass);
-          // Both snakes die in head-on collision - clear snake body completely
-          snake.clearSnakeOnDeath();
           
           // Remove the bot
           setBotSnakes(prevBots => prevBots.filter((_, index) => index !== i));
@@ -1518,8 +1553,26 @@ export default function GamePage() {
             setBotSnakes(prevBots => [...prevBots, createBotSnake(`bot_${Date.now()}`)]);
           }, 3000);
           
-          setGameOver(true);
-          gameOverRef.current = true;
+          // Hide snake first, then clear data
+          snakeVisibleRef.current = false;
+          setSnakeVisible(false);
+          
+          // Instantly return to home screen - no fade, no game over screen
+          console.log(`🏠 Instantly returning to home screen after head-on collision`);
+          setGameStarted(false);
+          setGameOver(false);
+          gameOverRef.current = false;
+          snakeFadingRef.current = false;
+          setSnakeFading(false);
+          
+          // Clear snake data after state updates
+          setTimeout(() => {
+            snake.visibleSegments = [];
+            snake.segmentTrail = [];
+            snake.totalMass = 0;
+            snake.clearSnakeOnDeath();
+          }, 0);
+          
           return;
         }
       }
