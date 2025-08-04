@@ -1234,7 +1234,7 @@ export default function GamePage() {
 
   // Game loop
   useEffect(() => {
-    if (gameOver || !gameStarted) return; // Don't start game loop until loading is complete
+    if (!gameStarted) return; // Don't start game loop until loading is complete
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1962,42 +1962,17 @@ export default function GamePage() {
         }
       });
 
-      // Handle fade animation
-      if (snakeFadingRef.current) {
-        const fadeElapsed = Date.now() - fadeStartTimeRef.current;
-        const fadeDuration = 1000; // 1 second fade
-        const newOpacity = Math.max(0, 1 - (fadeElapsed / fadeDuration));
-        fadeOpacityRef.current = newOpacity;
-        setFadeOpacity(newOpacity);
-        
-        if (fadeElapsed >= fadeDuration) {
-          // Fade complete - hide snake completely and show game over
-          snakeFadingRef.current = false;
-          snakeVisibleRef.current = false;
-          gameOverRef.current = true;
-          setSnakeFading(false);
-          setSnakeVisible(false);
-          setGameOver(true);
-          console.log(`💀 FADE COMPLETE - Snake fully hidden, game over shown`);
-          
-          // Instantly return to home screen but keep game over overlay
-          console.log(`🏠 Instantly returning to home screen after death`);
-          setGameStarted(false);
-          // Keep gameOver true to show overlay on home screen
-        }
-      }
+      // No fade animation - removed completely
 
       // Draw your own snake locally using EXACT same rendering as remote players
-      // Render if game is active AND (visible OR fading) AND has segments
-      const shouldRender = gameStarted && (snakeVisibleRef.current || snakeFadingRef.current) && snake.visibleSegments.length > 0;
+      // Render if game is active AND visible AND has segments
+      const shouldRender = gameStarted && snakeVisibleRef.current && snake.visibleSegments.length > 0;
       
       if (shouldRender) {
-        const opacity = snakeFadingRef.current ? fadeOpacityRef.current : 1.0;
-        console.log(`✅ RENDERING SNAKE with opacity: ${opacity}`);
+        console.log(`✅ RENDERING SNAKE`);
         
-        // Save current context for opacity
+        // Save current context
         ctx.save();
-        ctx.globalAlpha = opacity;
         const fullSnakeBody = snake.visibleSegments;
         
         // Draw snake body with EXACT same styling as remote players
@@ -2089,7 +2064,7 @@ export default function GamePage() {
         // Restore opacity
         ctx.restore();
       } else {
-        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING (gameStarted=${gameStarted}, visible=${snakeVisibleRef.current}, fading=${snakeFadingRef.current}, segments=${snake.visibleSegments.length})`);
+        console.log(`🚫 SNAKE HIDDEN - NOT RENDERING (gameStarted=${gameStarted}, visible=${snakeVisibleRef.current}, segments=${snake.visibleSegments.length})`);
       }
 
       // REMOVED: Legacy other players rendering to prevent duplicate snake bodies
