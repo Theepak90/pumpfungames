@@ -385,7 +385,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log(`💀 SERVER Room ${room.region}/${room.id}: Player ${playerId} crashed into ${otherPlayerId}!`);
                   collisionDetected = true;
                   
-                  // Remove crashed player immediately from room
+                  // Get crashed player data for money crate calculation
+                  const crashedPlayer = room.players.get(playerId);
+                  const crashedPlayerMoney = crashedPlayer?.money || 1.0;
+                  const crashedPlayerMass = crashedPlayer?.totalMass || 6;
+                  
+                  // Create money crates (1 crate per mass unit) at player's death location
+                  const numCrates = Math.floor(crashedPlayerMass) || 1; // At least 1 crate
+                  const moneyPerCrate = crashedPlayerMoney / numCrates;
+                  
+                  console.log(`💰 SERVER: Creating ${numCrates} money crates worth $${moneyPerCrate.toFixed(2)} each at death location`);
+                  
+                  // Drop money crates in a spread pattern around death location
+                  for (let i = 0; i < numCrates; i++) {
+                    const angle = (i / numCrates) * Math.PI * 2;
+                    const spreadRadius = 20 + (i * 8); // Spread crates in expanding circle
+                    const crateX = currentPlayerHead.x + Math.cos(angle) * spreadRadius;
+                    const crateY = currentPlayerHead.y + Math.sin(angle) * spreadRadius;
+                    
+                    const moneyCrate = {
+                      id: `money_crate_${Date.now()}_${i}`,
+                      x: crateX,
+                      y: crateY,
+                      radius: 6,
+                      mass: 0,
+                      color: '#ffd700',
+                      vx: 0,
+                      vy: 0,
+                      wobbleOffset: Math.random() * Math.PI * 2,
+                      isMoneyCrate: true,
+                      moneyValue: parseFloat(moneyPerCrate.toFixed(2))
+                    };
+                    
+                    // Broadcast money crate to all players in the room
+                    const crateMessage = JSON.stringify({
+                      type: 'moneyCrate',
+                      playerId: playerId,
+                      crate: moneyCrate
+                    });
+                    
+                    let broadcastCount = 0;
+                    room.players.forEach((player, id) => {
+                      wss.clients.forEach(client => {
+                        if (client.playerId === id && client.readyState === WebSocket.OPEN) {
+                          client.send(crateMessage);
+                          broadcastCount++;
+                        }
+                      });
+                    });
+                    
+                    console.log(`💰 Player ${playerId} dropped money crate in room ${room.region}/${room.id}: ${JSON.stringify(moneyCrate)}`);
+                  }
+                  
+                  // Remove crashed player from room
                   room.players.delete(playerId);
                   playerToRoom.delete(playerId);
                   
