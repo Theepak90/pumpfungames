@@ -364,8 +364,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastUpdate: Date.now(),
             roomId: room.id
           };
-          // Reduce server logging frequency for performance
-          if (Math.random() < 0.01) { // Only log 1% of updates
+          // Reduce server logging frequency for performance at 60 FPS
+          if (Math.random() < 0.005) { // Only log 0.5% of updates at higher frequency
             console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           }
           
@@ -595,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 50ms for stable multiplayer without overwhelming clients
+  // Broadcast game state every 16ms for ultra-smooth 60 FPS multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Broadcast to each room separately
@@ -625,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     }
-  }, 50); // Balanced server broadcasts (20 FPS) for smooth but stable sync
+  }, 16); // Ultra-fast 60 FPS server broadcasts for maximum smoothness
 
   return httpServer;
 }
