@@ -1,42 +1,37 @@
-import { useState } from 'react';
-import SlitherHome from './pages/SlitherHome';
-import SlitherGame from './pages/SlitherGame';
-import './App.css';
+import { Switch, Route } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/auth-context";
+import { GameProvider } from "@/contexts/game-context";
+import Home from "@/pages/home";
+import Game from "@/pages/game";
+import NotFound from "@/pages/not-found";
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route path="/game" component={Game} />
+      <Route path="/snake/:region/:roomId" component={Game} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
 
 function App() {
-  const [gameState, setGameState] = useState<'home' | 'game'>('home');
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [username, setUsername] = useState<string>('');
-
-  const handleGameStart = (newSocket: WebSocket, playerUsername: string) => {
-    setSocket(newSocket);
-    setUsername(playerUsername);
-    setGameState('game');
-  };
-
-  const handleGameEnd = () => {
-    if (socket) {
-      socket.close();
-      setSocket(null);
-    }
-    setUsername('');
-    setGameState('home');
-  };
-
   return (
-    <div className="app">
-      {gameState === 'home' ? (
-        <SlitherHome onGameStart={handleGameStart} />
-      ) : (
-        socket && (
-          <SlitherGame 
-            socket={socket} 
-            username={username} 
-            onGameEnd={handleGameEnd} 
-          />
-        )
-      )}
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <GameProvider>
+            <Toaster />
+            <Router />
+          </GameProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
