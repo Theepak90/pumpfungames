@@ -1258,15 +1258,15 @@ export default function GamePage() {
           segmentRadius: snake.getSegmentRadius(),
           visibleSegmentCount: snake.visibleSegments.length
         };
-        // Reduced logging for performance - only log every 60th update
-        if (Date.now() % 4000 < 33) {
+        // Reduced logging for performance - only log every 180th update
+        if (Date.now() % 12000 < 16) {
           console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
         }
         wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
-    }, 33); // Send updates every 33ms (~30 FPS) for much smoother multiplayer
+    }, 16); // Send updates every 16ms (~60 FPS) for ultra-smooth multiplayer
 
     return () => {
       console.log('Clearing position update interval');

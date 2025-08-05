@@ -349,6 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const MAX_SEGMENTS = 100;
           const MAX_MASS = 100;
           const segments = data.segments || [];
+          // Send ALL segments up to the limit - don't truncate visible segments
           const limitedSegments = segments.length > MAX_SEGMENTS ? segments.slice(0, MAX_SEGMENTS) : segments;
           const limitedMass = Math.min(data.totalMass || 6, MAX_MASS); // Cap mass at 100
           
@@ -363,7 +364,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastUpdate: Date.now(),
             roomId: room.id
           };
-          console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          // Reduce server logging frequency for performance
+          if (Math.random() < 0.01) { // Only log 1% of updates
+            console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
+          }
           
           // Check for collisions with other players BEFORE updating position
           const currentPlayerHead = data.segments && data.segments.length > 0 ? data.segments[0] : null;
@@ -591,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 50ms for much smoother multiplayer
+  // Broadcast game state every 33ms for ultra-smooth multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Broadcast to each room separately
@@ -621,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     }
-  }, 50); // Much faster server broadcasts for smoother multiplayer
+  }, 33); // Ultra-fast server broadcasts (30 FPS) for perfect synchronization
 
   return httpServer;
 }
