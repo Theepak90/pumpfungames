@@ -1,0 +1,314 @@
+.slither-home {
+  position: relative;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #001122 0%, #000811 50%, #001a33 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: 'Arial', sans-serif;
+}
+
+.background-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.floating-orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: float 10s infinite ease-in-out;
+}
+
+.floating-orb:nth-child(odd) {
+  background: radial-gradient(circle, #00ff00, #00aa00);
+  width: 8px;
+  height: 8px;
+}
+
+.floating-orb:nth-child(even) {
+  background: radial-gradient(circle, #ff6600, #cc4400);
+  width: 12px;
+  height: 12px;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-20px) translateX(10px); }
+  50% { transform: translateY(-10px) translateX(-15px); }
+  75% { transform: translateY(-30px) translateX(5px); }
+}
+
+/* Generate random positions for orbs */
+.orb-0 { top: 10%; left: 20%; animation-delay: 0s; }
+.orb-1 { top: 30%; left: 80%; animation-delay: 1s; }
+.orb-2 { top: 60%; left: 10%; animation-delay: 2s; }
+.orb-3 { top: 80%; left: 70%; animation-delay: 3s; }
+.orb-4 { top: 20%; left: 50%; animation-delay: 4s; }
+.orb-5 { top: 70%; left: 30%; animation-delay: 5s; }
+.orb-6 { top: 40%; left: 90%; animation-delay: 6s; }
+.orb-7 { top: 90%; left: 20%; animation-delay: 7s; }
+.orb-8 { top: 15%; left: 75%; animation-delay: 8s; }
+.orb-9 { top: 50%; left: 5%; animation-delay: 9s; }
+.orb-10 { top: 35%; left: 60%; animation-delay: 0.5s; }
+.orb-11 { top: 75%; left: 85%; animation-delay: 1.5s; }
+.orb-12 { top: 25%; left: 40%; animation-delay: 2.5s; }
+.orb-13 { top: 85%; left: 15%; animation-delay: 3.5s; }
+.orb-14 { top: 45%; left: 95%; animation-delay: 4.5s; }
+.orb-15 { top: 65%; left: 25%; animation-delay: 5.5s; }
+.orb-16 { top: 5%; left: 65%; animation-delay: 6.5s; }
+.orb-17 { top: 95%; left: 45%; animation-delay: 7.5s; }
+.orb-18 { top: 55%; left: 80%; animation-delay: 8.5s; }
+.orb-19 { top: 15%; left: 35%; animation-delay: 9.5s; }
+
+.home-container {
+  position: relative;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #333;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.2);
+}
+
+.title-section {
+  margin-bottom: 30px;
+}
+
+.game-title {
+  font-size: 3.5rem;
+  font-weight: bold;
+  color: #00ff00;
+  text-shadow: 0 0 20px #00ff00;
+  margin: 0;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.title-plus {
+  color: #ffff00;
+  text-shadow: 0 0 20px #ffff00;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.game-subtitle {
+  font-size: 1.2rem;
+  color: #888;
+  margin: 10px 0 0 0;
+  font-style: italic;
+}
+
+.controls-section {
+  margin-bottom: 30px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  color: white;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #333;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 16px;
+  text-align: center;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #00ff00;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.error-message {
+  background: rgba(255, 0, 0, 0.2);
+  border: 1px solid #ff0000;
+  border-radius: 5px;
+  padding: 10px;
+  color: #ff6666;
+  margin-bottom: 15px;
+}
+
+.game-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  color: #666;
+  font-weight: bold;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #333;
+  margin: 0 15px;
+}
+
+.join-game-section h3 {
+  color: #00ff00;
+  margin-bottom: 15px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #00ff00, #00aa00);
+  color: #000;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 255, 0, 0.4);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #ffff00, #cccc00);
+  color: #000;
+  box-shadow: 0 0 15px rgba(255, 255, 0, 0.3);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(255, 255, 0, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+}
+
+.btn-outline:hover {
+  background: rgba(0, 255, 0, 0.1);
+}
+
+.footer-section {
+  border-top: 1px solid #333;
+  padding-top: 20px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #001122;
+  border: 2px solid #333;
+  border-radius: 15px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #333;
+}
+
+.modal-header h2 {
+  color: #00ff00;
+  margin: 0;
+  text-shadow: 0 0 10px #00ff00;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #ff0000;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: #ff6666;
+}
+
+.modal-body {
+  padding: 20px;
+  color: white;
+}
+
+.instruction {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 4px solid #00ff00;
+}
+
+.instruction h3 {
+  color: #00ff00;
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+}
+
+.instruction p {
+  margin: 0;
+  line-height: 1.5;
+}

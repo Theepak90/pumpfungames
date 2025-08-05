@@ -1,0 +1,42 @@
+.game-code {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 15px;
+  z-index: 1000;
+  font-family: 'Arial', sans-serif;
+  color: white;
+  min-width: 200px;
+}
+
+.game-code-header h4 {
+  margin: 0 0 10px 0;
+  text-align: center;
+  color: #00ff00;
+  font-size: 16px;
+  text-shadow: 0 0 10px #00ff00;
+}
+
+.game-code-value {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #444;
+  border-radius: 5px;
+  padding: 10px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffff00;
+  letter-spacing: 2px;
+  text-shadow: 0 0 5px #ffff00;
+  margin-bottom: 8px;
+}
+
+.game-code-subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}

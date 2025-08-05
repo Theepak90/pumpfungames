@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerSlitherRoutes, registerSlitherAPI } from "./slitherRoutes";
+import { SlitherServer } from "./slitherServer";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -37,7 +38,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Setup Slither.io WebSocket server
+  const server = registerSlitherRoutes(app);
+  
+  // Create slither server instance for API routes
+  const slitherServer = new SlitherServer();
+  registerSlitherAPI(app, slitherServer);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -69,6 +75,6 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`🐍 Slither.io server running on port ${port}`);
   });
 })();
