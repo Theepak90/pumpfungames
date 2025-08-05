@@ -7,6 +7,7 @@ This project is a real-time multiplayer snake game with integrated betting mecha
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+User wants to recreate full Slither.io game based on GitHub repository reference.
 
 ## System Architecture
 
