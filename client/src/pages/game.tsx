@@ -1059,12 +1059,21 @@ export default function GamePage() {
                 const existing = newPositions.get(player.id);
                 
                 if (existing) {
-                  // Update target and keep current for interpolation
-                  newPositions.set(player.id, {
-                    current: existing.current.length > 0 ? existing.current : player.segments,
-                    target: player.segments,
-                    lastUpdate: currentTime
-                  });
+                  // Check if positions changed significantly to avoid interpolating identical positions
+                  const headDistance = existing.target.length > 0 && player.segments.length > 0 ? 
+                    Math.sqrt(
+                      Math.pow(existing.target[0].x - player.segments[0].x, 2) + 
+                      Math.pow(existing.target[0].y - player.segments[0].y, 2)
+                    ) : 0;
+                  
+                  // Only update if there's meaningful movement (>1px)
+                  if (headDistance > 1) {
+                    newPositions.set(player.id, {
+                      current: existing.current.length > 0 ? existing.current : player.segments,
+                      target: player.segments,
+                      lastUpdate: currentTime
+                    });
+                  }
                 } else {
                   // New player - no interpolation needed
                   newPositions.set(player.id, {
@@ -1554,15 +1563,27 @@ export default function GamePage() {
         
         newPositions.forEach((posData, playerId) => {
           const timeSinceUpdate = currentTime - posData.lastUpdate;
-          const interpolationTime = 32; // 2 frames at 60fps for smooth movement
+          const interpolationTime = 16; // Match server update frequency (16ms)
           
           if (timeSinceUpdate < interpolationTime && posData.current.length === posData.target.length) {
             const progress = Math.min(1, timeSinceUpdate / interpolationTime);
-            const smoothProgress = progress * progress * (3 - 2 * progress); // Smooth step
+            // Linear interpolation for immediate responsiveness
+            const smoothProgress = progress;
             
             const interpolatedSegments = posData.current.map((currentSeg, index) => {
               const targetSeg = posData.target[index];
               if (!targetSeg) return currentSeg;
+              
+              // Check if movement distance is reasonable to prevent teleporting
+              const distance = Math.sqrt(
+                Math.pow(targetSeg.x - currentSeg.x, 2) + 
+                Math.pow(targetSeg.y - currentSeg.y, 2)
+              );
+              
+              // If movement is too large (>100px), snap immediately
+              if (distance > 100) {
+                return targetSeg;
+              }
               
               return {
                 x: currentSeg.x + (targetSeg.x - currentSeg.x) * smoothProgress,
