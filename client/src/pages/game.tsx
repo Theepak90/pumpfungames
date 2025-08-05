@@ -766,12 +766,7 @@ export default function GamePage() {
   const [botSnakes, setBotSnakes] = useState<BotSnake[]>([]);
   const [serverBots, setServerBots] = useState<any[]>([]);
   const [serverPlayers, setServerPlayers] = useState<any[]>([]);
-  const [playerInterpolationData, setPlayerInterpolationData] = useState<Map<string, {
-    lastUpdate: number;
-    currentSegments: Array<{ x: number; y: number }>;
-    targetSegments: Array<{ x: number; y: number }>;
-    interpolationProgress: number;
-  }>>(new Map());
+  const [lastServerUpdate, setLastServerUpdate] = useState<number>(0);
   const [foods, setFoods] = useState<Food[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const gameOverRef = useRef(false);
@@ -1050,52 +1045,8 @@ export default function GamePage() {
           const currentTime = Date.now();
           setServerPlayers(data.players || []);
           
-          // Update interpolation data for smooth movement
-          setPlayerInterpolationData(currentMap => {
-            const newMap = new Map(currentMap);
-            
-            (data.players || []).forEach((player: any) => {
-              if (player.id !== myPlayerId && player.segments && player.segments.length > 0) {
-                const existing = newMap.get(player.id);
-                
-                if (existing && existing.currentSegments.length > 0) {
-                  // Check if this is a significant position change (teleport detection)
-                  const headDistance = Math.sqrt(
-                    Math.pow(existing.targetSegments[0]?.x - player.segments[0]?.x || 0, 2) +
-                    Math.pow(existing.targetSegments[0]?.y - player.segments[0]?.y || 0, 2)
-                  );
-                  
-                  // If movement is too large (>200px), skip interpolation to prevent teleporting
-                  if (headDistance > 200) {
-                    newMap.set(player.id, {
-                      lastUpdate: currentTime,
-                      currentSegments: player.segments,
-                      targetSegments: player.segments,
-                      interpolationProgress: 1
-                    });
-                  } else {
-                    // Normal smooth interpolation
-                    newMap.set(player.id, {
-                      lastUpdate: currentTime,
-                      currentSegments: existing.currentSegments,
-                      targetSegments: player.segments,
-                      interpolationProgress: 0
-                    });
-                  }
-                } else {
-                  // New player or no existing data
-                  newMap.set(player.id, {
-                    lastUpdate: currentTime,
-                    currentSegments: player.segments,
-                    targetSegments: player.segments,
-                    interpolationProgress: 1
-                  });
-                }
-              }
-            });
-            
-            return newMap;
-          });
+          // Simple update without complex interpolation
+          setLastServerUpdate(currentTime);
           
           // Food is handled client-side, not synced across players
           console.log(`Room ${data.roomId || roomId}: Received shared world: ${data.bots?.length} bots, ${data.players?.length} players, ${foods.length} food`);
@@ -1274,15 +1225,15 @@ export default function GamePage() {
           segmentRadius: snake.getSegmentRadius(),
           visibleSegmentCount: snake.visibleSegments.length
         };
-        // Reduced logging for performance - only log every 180th update
-        if (Date.now() % 12000 < 16) {
+        // Reduced logging for performance - only log every 40th update
+        if (Date.now() % 2000 < 50) {
           console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
         }
         wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
-    }, 16); // Send updates every 16ms (~60 FPS) for ultra-smooth multiplayer
+    }, 50); // Send updates every 50ms (20 FPS) to match server frequency
 
     return () => {
       console.log('Clearing position update interval');
@@ -1563,41 +1514,7 @@ export default function GamePage() {
         setCashOutStartTime(null);
       }
 
-      // Update interpolation for smooth player movement
-      setPlayerInterpolationData(currentMap => {
-        const newMap = new Map(currentMap);
-        const currentTime = Date.now();
-        
-        newMap.forEach((interpData, playerId) => {
-          const timeSinceUpdate = currentTime - interpData.lastUpdate;
-          const interpolationDuration = 50; // Shorter 50ms interpolation window to match server frequency
-          
-          if (timeSinceUpdate < interpolationDuration && interpData.interpolationProgress < 1) {
-            const progress = Math.min(1, timeSinceUpdate / interpolationDuration);
-            // Use easing for smoother movement
-            const easedProgress = progress * progress * (3 - 2 * progress); // Smooth step function
-            
-            // Interpolate between current and target positions
-            const interpolatedSegments = interpData.currentSegments.map((currentSeg, index) => {
-              const targetSeg = interpData.targetSegments[index];
-              if (!targetSeg) return currentSeg;
-              
-              return {
-                x: currentSeg.x + (targetSeg.x - currentSeg.x) * easedProgress,
-                y: currentSeg.y + (targetSeg.y - currentSeg.y) * easedProgress
-              };
-            });
-            
-            newMap.set(playerId, {
-              ...interpData,
-              currentSegments: interpolatedSegments,
-              interpolationProgress: progress
-            });
-          }
-        });
-        
-        return newMap;
-      });
+      // Remove complex interpolation to fix teleporting issues
 
       // Update food physics and check consumption
       const allSnakes = [
@@ -2215,12 +2132,9 @@ export default function GamePage() {
       }
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
-          // Use interpolated segments for smooth movement if available
-          const interpData = playerInterpolationData.get(serverPlayer.id);
-          const fullSnakeBody = interpData && interpData.currentSegments.length > 0 
-            ? interpData.currentSegments 
-            : serverPlayer.segments;
-          const spacedSegments = fullSnakeBody; // Use interpolated segments for smooth movement
+          // Use server segments directly - no interpolation to prevent teleporting
+          const fullSnakeBody = serverPlayer.segments;
+          const spacedSegments = fullSnakeBody;
           
           // Draw snake body with EXACT same styling as local snake
           ctx.save();
