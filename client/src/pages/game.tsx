@@ -813,6 +813,7 @@ export default function GamePage() {
   const [qKeyPressed, setQKeyPressed] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [cashedOutAmount, setCashedOutAmount] = useState(0);
+  const lastSentPositionRef = useRef<{ x: number; y: number; segmentCount: number } | null>(null);
   const [otherPlayers, setOtherPlayers] = useState<Array<{
     id: string;
     segments: Array<{ x: number; y: number }>;
@@ -1258,24 +1259,42 @@ export default function GamePage() {
       }
       
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && snake.visibleSegments.length > 0) {
-        const updateData = {
-          type: 'update',
-          segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
-          color: '#d55400',
-          money: snake.money,
-          totalMass: snake.totalMass,
-          segmentRadius: snake.getSegmentRadius(),
-          visibleSegmentCount: snake.visibleSegments.length
-        };
-        // Reduced logging for performance - only log every 120th update at 60 FPS
-        if (Date.now() % 2000 < 16) {
-          console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+        // Only send update if position actually changed to reduce network traffic
+        const currentHeadPos = snake.visibleSegments[0];
+        const lastSentPos = lastSentPositionRef.current;
+        const shouldSendUpdate = !lastSentPos || 
+          Math.abs(currentHeadPos.x - lastSentPos.x) > 2 || 
+          Math.abs(currentHeadPos.y - lastSentPos.y) > 2 ||
+          snake.visibleSegments.length !== lastSentPos.segmentCount;
+
+        if (shouldSendUpdate) {
+          const updateData = {
+            type: 'update',
+            segments: snake.visibleSegments.slice(0, 100).map(seg => ({ x: seg.x, y: seg.y })), // Send up to 100 segments max
+            color: '#d55400',
+            money: snake.money,
+            totalMass: snake.totalMass,
+            segmentRadius: snake.getSegmentRadius(),
+            visibleSegmentCount: snake.visibleSegments.length
+          };
+          
+          // Track last sent position
+          lastSentPositionRef.current = {
+            x: currentHeadPos.x,
+            y: currentHeadPos.y,
+            segmentCount: snake.visibleSegments.length
+          };
+          
+          // Reduced logging for performance - only log every 60th update at 30 FPS
+          if (Date.now() % 2000 < 33) {
+            console.log(`Sending update with ${updateData.segments.length} segments to server (snake total visible: ${snake.visibleSegments.length}, mass: ${snake.totalMass.toFixed(1)}, trail: ${snake.segmentTrail.length})`);
+          }
+          wsRef.current.send(JSON.stringify(updateData));
         }
-        wsRef.current.send(JSON.stringify(updateData));
       } else {
         console.log(`Skipping update: wsReadyState=${wsRef.current?.readyState}, segments=${snake.visibleSegments.length}`);
       }
-    }, 16); // Send updates every 16ms (60 FPS) for ultra-smooth multiplayer
+    }, 33); // Send updates every 33ms (30 FPS) for smooth but efficient multiplayer
 
     return () => {
       console.log('Clearing position update interval');
@@ -1563,7 +1582,7 @@ export default function GamePage() {
         
         newPositions.forEach((posData, playerId) => {
           const timeSinceUpdate = currentTime - posData.lastUpdate;
-          const interpolationTime = 16; // Match server update frequency (16ms)
+          const interpolationTime = 33; // Match server update frequency (33ms)
           
           if (timeSinceUpdate < interpolationTime && posData.current.length === posData.target.length) {
             const progress = Math.min(1, timeSinceUpdate / interpolationTime);

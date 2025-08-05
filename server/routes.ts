@@ -364,8 +364,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastUpdate: Date.now(),
             roomId: room.id
           };
-          // Reduce server logging frequency for performance at 60 FPS
-          if (Math.random() < 0.005) { // Only log 0.5% of updates at higher frequency
+          // Reduce server logging frequency for performance at 30 FPS
+          if (Math.random() < 0.01) { // Only log 1% of updates for better performance
             console.log(`Room ${room.region}/${room.id}: Server received update from ${playerId}: ${limitedSegments.length} segments (was ${segments.length}), mass: ${limitedMass.toFixed(1)} (was ${data.totalMass?.toFixed(1)}), radius: ${data.segmentRadius?.toFixed(1) || 'unknown'}`);
           }
           
@@ -595,17 +595,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 16ms for ultra-smooth 60 FPS multiplayer
+  // Broadcast game state every 33ms for smooth 30 FPS multiplayer
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Broadcast to each room separately
       for (const [roomKey, room] of gameRooms) {
         if (room.players.size === 0) continue;
         
+        // Only send essential player data to reduce bandwidth
+        const playersData = Array.from(room.players.values()).map(player => ({
+          id: player.id,
+          segments: player.segments,
+          color: player.color,
+          totalMass: player.totalMass,
+          segmentRadius: player.segmentRadius,
+          visibleSegmentCount: player.visibleSegmentCount,
+          money: player.money,
+          roomId: player.roomId
+        }));
+        
         const worldMessage = JSON.stringify({
           type: 'gameWorld',
           bots: room.bots,
-          players: Array.from(room.players.values()),
+          players: playersData,
           roomId: room.id,
           region: room.region
         });
@@ -625,7 +637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     }
-  }, 16); // Ultra-fast 60 FPS server broadcasts for maximum smoothness
+  }, 33); // Optimized 30 FPS server broadcasts for smooth performance
 
   return httpServer;
 }
