@@ -1058,16 +1058,32 @@ export default function GamePage() {
               if (player.id !== myPlayerId && player.segments && player.segments.length > 0) {
                 const existing = newMap.get(player.id);
                 
-                if (existing) {
-                  // Update target and reset interpolation
-                  newMap.set(player.id, {
-                    lastUpdate: currentTime,
-                    currentSegments: existing.currentSegments.length > 0 ? existing.currentSegments : player.segments,
-                    targetSegments: player.segments,
-                    interpolationProgress: 0
-                  });
+                if (existing && existing.currentSegments.length > 0) {
+                  // Check if this is a significant position change (teleport detection)
+                  const headDistance = Math.sqrt(
+                    Math.pow(existing.targetSegments[0]?.x - player.segments[0]?.x || 0, 2) +
+                    Math.pow(existing.targetSegments[0]?.y - player.segments[0]?.y || 0, 2)
+                  );
+                  
+                  // If movement is too large (>200px), skip interpolation to prevent teleporting
+                  if (headDistance > 200) {
+                    newMap.set(player.id, {
+                      lastUpdate: currentTime,
+                      currentSegments: player.segments,
+                      targetSegments: player.segments,
+                      interpolationProgress: 1
+                    });
+                  } else {
+                    // Normal smooth interpolation
+                    newMap.set(player.id, {
+                      lastUpdate: currentTime,
+                      currentSegments: existing.currentSegments,
+                      targetSegments: player.segments,
+                      interpolationProgress: 0
+                    });
+                  }
                 } else {
-                  // New player
+                  // New player or no existing data
                   newMap.set(player.id, {
                     lastUpdate: currentTime,
                     currentSegments: player.segments,
@@ -1554,10 +1570,12 @@ export default function GamePage() {
         
         newMap.forEach((interpData, playerId) => {
           const timeSinceUpdate = currentTime - interpData.lastUpdate;
-          const interpolationDuration = 100; // 100ms interpolation window
+          const interpolationDuration = 50; // Shorter 50ms interpolation window to match server frequency
           
           if (timeSinceUpdate < interpolationDuration && interpData.interpolationProgress < 1) {
             const progress = Math.min(1, timeSinceUpdate / interpolationDuration);
+            // Use easing for smoother movement
+            const easedProgress = progress * progress * (3 - 2 * progress); // Smooth step function
             
             // Interpolate between current and target positions
             const interpolatedSegments = interpData.currentSegments.map((currentSeg, index) => {
@@ -1565,8 +1583,8 @@ export default function GamePage() {
               if (!targetSeg) return currentSeg;
               
               return {
-                x: currentSeg.x + (targetSeg.x - currentSeg.x) * progress,
-                y: currentSeg.y + (targetSeg.y - currentSeg.y) * progress
+                x: currentSeg.x + (targetSeg.x - currentSeg.x) * easedProgress,
+                y: currentSeg.y + (targetSeg.y - currentSeg.y) * easedProgress
               };
             });
             

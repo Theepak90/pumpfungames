@@ -595,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Broadcast game state every 33ms for ultra-smooth multiplayer
+  // Broadcast game state every 50ms for stable multiplayer without overwhelming clients
   setInterval(() => {
     if (wss.clients.size > 0) {
       // Broadcast to each room separately
@@ -625,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     }
-  }, 33); // Ultra-fast server broadcasts (30 FPS) for perfect synchronization
+  }, 50); // Balanced server broadcasts (20 FPS) for smooth but stable sync
 
   return httpServer;
 }
