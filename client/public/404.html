@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>PixelPal - Redirecting...</title>
+    <script type="text/javascript">
+      // Netlify SPA 404 handler
+      (function() {
+        var path = window.location.pathname;
+        var search = window.location.search;
+        var hash = window.location.hash;
+        
+        // Store the intended path
+        sessionStorage.redirect = path + search + hash;
+        
+        // Redirect to root
+        window.location.href = '/';
+      })();
+    </script>
+  </head>
+  <body>
+    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+      <h1>🚀 PixelPal</h1>
+      <p>Redirecting to game...</p>
+      <p>If you're not redirected automatically, <a href="/">click here</a></p>
+    </div>
+  </body>
+</html> 

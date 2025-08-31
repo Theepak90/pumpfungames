@@ -9,26 +9,35 @@ const EU_COUNTRIES = [
   'LU', 'MT', 'CY', 'GR', 'GB'
 ];
 
-// Method 1: IP Geolocation Detection (Primary)
-const detectUserRegionByIP = async (): Promise<Region> => {
+export async function detectRegion(): Promise<string> {
   try {
     const response = await fetch('https://ipapi.co/json/', {
-      timeout: 3000, // 3 second timeout
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
     });
     
     if (!response.ok) {
-      throw new Error('IP geolocation API failed');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log(`Detected country: ${data.country_code}`);
+    const country = data.country_code;
     
-    return EU_COUNTRIES.includes(data.country_code) ? 'eu' : 'us';
+    // Map countries to regions
+    if (['US', 'CA', 'MX'].includes(country)) {
+      return 'us';
+    } else if (['GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'SE', 'NO', 'DK', 'FI', 'PL', 'CZ', 'HU', 'RO', 'BG', 'HR', 'SI', 'SK', 'EE', 'LV', 'LT', 'LU', 'MT', 'CY', 'IE', 'PT', 'GR'].includes(country)) {
+      return 'eu';
+    } else {
+      return 'us'; // Default to US
+    }
   } catch (error) {
-    console.warn('IP geolocation failed:', error);
-    throw error;
+    console.error('Region detection failed:', error);
+    return 'us'; // Default to US on error
   }
-};
+}
 
 // Method 2: Timezone Detection (Backup)
 const detectRegionByTimezone = (): Region => {
@@ -55,9 +64,9 @@ const detectRegionByTimezone = (): Region => {
 export const detectBestRegion = async (): Promise<Region> => {
   try {
     console.log('Attempting IP geolocation detection...');
-    const ipRegion = await detectUserRegionByIP();
+    const ipRegion = await detectRegion();
     console.log(`IP geolocation result: ${ipRegion}`);
-    return ipRegion;
+    return ipRegion === 'eu' ? 'eu' : 'us'; // Map string to Region type
   } catch {
     console.log('IP geolocation failed, falling back to timezone detection...');
     const timezoneRegion = detectRegionByTimezone();

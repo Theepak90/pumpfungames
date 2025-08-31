@@ -1,0 +1,100 @@
+[
+  {
+    "id": "1755380085296",
+    "username": "testuser",
+    "password": "password123",
+    "balance": 95,
+    "holdBalance": 0
+  },
+  {
+    "id": "1755380883497",
+    "username": "jjj",
+    "password": "123456",
+    "balance": 50,
+    "holdBalance": 0
+  },
+  {
+    "id": "1755381006611",
+    "username": "testplayer",
+    "password": "test123",
+    "balance": 75,
+    "holdBalance": 0
+  },
+  {
+    "id": "1755411118625",
+    "username": "ghhh",
+    "password": "123456",
+    "balance": 100,
+    "holdBalance": 0
+  },
+  {
+    "id": "1755411793815",
+    "username": "123",
+    "password": "123456",
+    "balance": 144,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-17T07:32:39.282Z"
+  },
+  {
+    "id": "1755428667858",
+    "username": "efef",
+    "password": "123456",
+    "balance": 0,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-17T11:15:13.677Z"
+  },
+  {
+    "id": "1755442406363",
+    "username": "afafef",
+    "password": "123456",
+    "balance": 0,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-17T15:10:45.815Z"
+  },
+  {
+    "id": "1755444165196",
+    "username": "eagaeg",
+    "password": "123456",
+    "balance": 0,
+    "holdBalance": 0
+  },
+  {
+    "id": "1755445417415",
+    "username": "sam",
+    "password": "123456",
+    "balance": 0,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-17T15:47:57.365Z"
+  },
+  {
+    "id": "1755445838905",
+    "username": "qwfqwf",
+    "password": "111111",
+    "balance": 0,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-17T15:50:50.086Z"
+  },
+  {
+    "id": "1755445966189",
+    "username": "newusername123",
+    "password": "333333",
+    "balance": 200.7,
+    "holdBalance": 15,
+    "lastDailyRewardClaim": "2025-08-18T19:28:46.795Z"
+  },
+  {
+    "id": "1756447969899",
+    "username": "123456",
+    "password": "Theepakk123",
+    "balance": 0.2,
+    "holdBalance": 0,
+    "lastDailyRewardClaim": "2025-08-29T06:15:22.008Z"
+  },
+  {
+    "id": "1756489194457",
+    "username": "fff",
+    "password": "123456",
+    "balance": 0,
+    "holdBalance": 0
+  }
+]

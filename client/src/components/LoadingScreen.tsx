@@ -10,12 +10,12 @@ export default function LoadingScreen({ onLoadingComplete }: LoadingScreenProps)
 
   useEffect(() => {
     const loadingSteps = [
-      { text: 'INITIALIZING GAME...', delay: 600, progress: 20 },
-      { text: 'LOADING ASSETS...', delay: 800, progress: 40 },
-      { text: 'SPAWNING SNAKES...', delay: 700, progress: 70 },
+      { text: 'INITIALIZING PUMPGAMES.FUN...', delay: 600, progress: 20 },
+      { text: 'LOADING SNAKE ASSETS...', delay: 800, progress: 40 },
+      { text: 'SPAWNING BATTLE SNAKES...', delay: 700, progress: 70 },
       { text: 'PREPARING ARENA...', delay: 600, progress: 90 },
-      { text: 'FINALIZING...', delay: 400, progress: 100 },
-      { text: 'READY TO PLAY!', delay: 500, progress: 100 }
+      { text: 'CONNECTING TO PUMPS...', delay: 400, progress: 100 },
+      { text: 'READY TO PUMP!', delay: 500, progress: 100 }
     ];
 
     let currentStep = 0;

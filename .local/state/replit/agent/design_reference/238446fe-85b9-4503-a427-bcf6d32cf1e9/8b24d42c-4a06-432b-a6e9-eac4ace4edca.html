@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAMNBRUH - Skill-Based Crypto Snake Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/heroicons@2.0.18/24/outline/index.js" type="module"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-bg': '#0d0d0d',
+                        'dark-card': '#1a1a1a',
+                        'dark-border': '#333333',
+                        'neon-yellow': '#FFD700',
+                        'neon-green': '#00FF88',
+                        'neon-blue': '#5465FF',
+                        'dark-gray': '#2a2a2a'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'neon-yellow': '0 0 20px rgba(255, 215, 0, 0.3)',
+                        'neon-green': '0 0 20px rgba(0, 255, 136, 0.3)',
+                        'neon-blue': '0 0 20px rgba(84, 101, 255, 0.3)',
+                        'card-dark': '0 4px 20px rgba(0, 0, 0, 0.3)'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 2s infinite'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        .grid-pattern {
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+        .snake-preview {
+            background: radial-gradient(circle, rgba(0,255,136,0.2) 0%, transparent 70%);
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-white font-inter grid-pattern min-h-screen">
+    
+    <!-- @COMPONENT: Header -->
+    <header class="sticky top-0 z-50 bg-dark-bg/90 backdrop-blur-sm border-b border-dark-border">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Left side - Welcome -->
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">🎃</span>
+                    <div>
+                        <span class="text-white font-semibold">Welcome, </span>
+                        <span class="text-neon-yellow font-bold" data-bind="user.username" data-mock="true">bobscratch</span>
+                        <span class="text-white font-semibold">!</span>
+                    </div>
+                </div>
+
+                <!-- Center - Alert Banner (if any) -->
+                <div class="hidden lg:block">
+                    <!-- Alert would appear here when needed -->
+                </div>
+
+                <!-- Right side - User controls -->
+                <div class="flex items-center space-x-4">
+                    <!-- Wallet balance -->
+                    <div class="flex items-center space-x-2 bg-dark-card px-4 py-2 rounded-lg border border-dark-border">
+                        <svg class="w-5 h-5 text-neon-yellow" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"/>
+                        </svg>
+                        <span class="text-neon-yellow font-bold" data-bind="user.balance" data-mock="true">$1.26</span>
+                    </div>
+
+                    <!-- Sound toggle -->
+                    <button class="p-2 hover:bg-dark-card rounded-lg transition-colors" data-event="click:toggleSound">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 14.142M5 12a7 7 0 007-7 7 7 0 007 7z"/>
+                        </svg>
+                    </button>
+
+                    <!-- Settings -->
+                    <button class="p-2 hover:bg-dark-card rounded-lg transition-colors" data-event="click:openSettings">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </button>
+
+                    <!-- Logout -->
+                    <button class="bg-neon-yellow text-dark-bg px-4 py-2 rounded-lg font-semibold hover:bg-yellow-400 transition-colors" data-event="click:logout">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <!-- Main Layout Container -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-screen">
+            
+            <!-- @COMPONENT: LeftPanel [leaderboard, friends] -->
+            <aside class="lg:col-span-3 space-y-6">
+                
+                <!-- Leaderboard Card -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border shadow-card-dark">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-6 h-6 text-neon-yellow" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            <h3 class="text-lg font-bold text-white">Leaderboard</h3>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-2 h-2 bg-neon-green rounded-full animate-pulse-slow"></div>
+                            <span class="text-xs text-neon-green font-medium">Live</span>
+                        </div>
+                    </div>
+
+                    <!-- Top 3 Players -->
+                    <div class="space-y-3 mb-4">
+                        <!-- @MAP: topPlayers.slice(0,3).map((player, index) => ( -->
+                        <div class="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-neon-yellow font-bold text-lg">1</span>
+                                <span class="text-white font-medium" data-bind="player.username">CryptoViper</span>
+                            </div>
+                            <span class="text-neon-yellow font-bold" data-bind="player.earnings">$247</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-gray-300 font-bold text-lg">2</span>
+                                <span class="text-white font-medium" data-bind="player.username">SnakeKing88</span>
+                            </div>
+                            <span class="text-neon-yellow font-bold" data-bind="player.earnings">$189</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-amber-600 font-bold text-lg">3</span>
+                                <span class="text-white font-medium" data-bind="player.username">BlockchainBoa</span>
+                            </div>
+                            <span class="text-neon-yellow font-bold" data-bind="player.earnings">$156</span>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+
+                    <button class="w-full bg-dark-bg border border-dark-border text-white py-2 rounded-lg hover:border-neon-yellow transition-colors" data-event="click:viewFullLeaderboard">
+                        View Full Leaderboard
+                    </button>
+                </div>
+
+                <!-- Friends Card -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border shadow-card-dark">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-white">Friends</h3>
+                        <button class="text-gray-400 hover:text-white transition-colors" data-event="click:refreshFriends">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Friends list or empty state -->
+                    <div class="text-center py-8" data-mock="true">
+                        <svg class="w-12 h-12 text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        <p class="text-gray-400 mb-4">No friends… add some!</p>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm text-gray-400">Status</span>
+                        <span class="text-sm bg-dark-bg px-2 py-1 rounded text-gray-300" data-bind="friendsOnline" data-mock="true">0 playing</span>
+                    </div>
+
+                    <button class="w-full bg-neon-blue text-white py-2 rounded-lg hover:bg-blue-600 transition-colors" data-event="click:addFriends">
+                        Add Friends
+                    </button>
+                </div>
+            </aside>
+            <!-- @END_COMPONENT: LeftPanel -->
+
+            <!-- @COMPONENT: CenterPanel [main game interface] -->
+            <main class="lg:col-span-6 space-y-6">
+                
+                <!-- Username Block -->
+                <div class="flex items-center justify-center space-x-4">
+                    <!-- Score cube -->
+                    <div class="bg-neon-yellow text-dark-bg w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl shadow-neon-yellow">
+                        <span data-bind="user.score" data-mock="true">0</span>
+                    </div>
+                    
+                    <!-- Username field -->
+                    <div class="flex items-center space-x-2 bg-dark-card px-4 py-2 rounded-lg border border-dark-border">
+                        <span class="text-white font-medium" data-bind="user.username" data-mock="true">bobscratch</span>
+                        <button class="text-gray-400 hover:text-white transition-colors" data-event="click:editUsername">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Game Amount Buttons -->
+                <div class="flex justify-center space-x-4">
+                    <!-- @STATE: selectedAmount:string = '$1' -->
+                    <button class="px-6 py-3 bg-neon-yellow text-dark-bg rounded-full font-bold hover:bg-yellow-400 transition-colors glow-hover" data-event="click:selectAmount" data-value="1" data-mock="true">
+                        $1
+                    </button>
+                    <button class="px-6 py-3 bg-dark-card text-white rounded-full font-bold border border-dark-border hover:border-neon-yellow transition-colors" data-event="click:selectAmount" data-value="5" data-mock="true">
+                        $5
+                    </button>
+                    <button class="px-6 py-3 bg-dark-card text-white rounded-full font-bold border border-dark-border hover:border-neon-yellow transition-colors" data-event="click:selectAmount" data-value="20" data-mock="true">
+                        $20
+                    </button>
+                </div>
+
+                <!-- Start Button -->
+                <div class="text-center">
+                    <button class="bg-dark-card text-white px-12 py-4 rounded-xl font-bold text-lg border-2 border-dark-border hover:border-neon-green hover:shadow-neon-green transition-all duration-300 transform hover:scale-105" data-event="click:startGame" data-implementation="Should validate balance and start game">
+                        <span data-mock="true">PLAY GAME</span>
+                        <!-- In maintenance mode, would show: MAINTENANCE MODE -->
+                    </button>
+                </div>
+
+                <!-- Region & Lobby Buttons -->
+                <div class="flex justify-center space-x-4">
+                    <button class="px-4 py-2 bg-neon-blue text-white rounded-full font-medium hover:bg-blue-600 transition-colors" data-event="click:selectRegion" data-value="EU" data-mock="true">
+                        EU Region
+                    </button>
+                    <button class="px-4 py-2 bg-dark-card text-white rounded-full font-medium border border-dark-border hover:border-neon-blue transition-colors" data-event="click:browseLobbies">
+                        Browse Lobbies
+                    </button>
+                </div>
+
+                <!-- Stats Strip -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border shadow-card-dark">
+                    <div class="grid grid-cols-2 gap-6 text-center">
+                        <div>
+                            <div class="text-neon-yellow text-3xl font-bold mb-1" data-bind="gameStats.playersInGame" data-mock="true">18</div>
+                            <div class="text-gray-400 text-sm">Players in Game</div>
+                        </div>
+                        <div>
+                            <div class="text-neon-yellow text-3xl font-bold mb-1" data-bind="gameStats.globalWinnings" data-mock="true">$38,154</div>
+                            <div class="text-gray-400 text-sm">Global Player Winnings</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <!-- @END_COMPONENT: CenterPanel -->
+
+            <!-- @COMPONENT: RightPanel [wallet, customization] -->
+            <aside class="lg:col-span-3 space-y-6">
+                
+                <!-- Wallet Block -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border border-l-4 border-l-neon-green shadow-card-dark">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-white">Wallet</h3>
+                        <div class="flex space-x-2">
+                            <!-- Copy address -->
+                            <button class="text-gray-400 hover:text-white transition-colors" data-event="click:copyAddress" title="Copy wallet address">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                            <!-- Refresh balance -->
+                            <button class="text-gray-400 hover:text-white transition-colors" data-event="click:refreshBalance" title="Refresh balance">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Balance display -->
+                    <div class="text-center mb-6">
+                        <div class="text-neon-yellow text-4xl font-bold mb-1" data-bind="wallet.usdBalance" data-mock="true">$1.26</div>
+                        <div class="text-gray-400 text-sm" data-bind="wallet.solBalance" data-mock="true">0.0070 SOL</div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="bg-neon-green text-dark-bg py-3 rounded-lg font-semibold hover:bg-green-400 transition-colors" data-event="click:addFunds">
+                            Add Funds
+                        </button>
+                        <button class="bg-neon-blue text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors" data-event="click:cashOut">
+                            Cash Out
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Customize Snake -->
+                <div class="bg-dark-card rounded-xl p-6 border border-dark-border shadow-card-dark">
+                    <h3 class="text-lg font-bold text-white mb-4">Customize</h3>
+                    
+                    <!-- Snake preview -->
+                    <div class="bg-dark-bg rounded-lg p-6 mb-4 snake-preview">
+                        <div class="flex items-center justify-center">
+                            <!-- Snake representation -->
+                            <div class="relative">
+                                <div class="w-16 h-16 bg-neon-green rounded-full relative" data-mock="true">
+                                    <!-- Snake head with eyes -->
+                                    <div class="absolute top-3 left-3 w-3 h-3 bg-white rounded-full"></div>
+                                    <div class="absolute top-3 right-3 w-3 h-3 bg-white rounded-full"></div>
+                                    <div class="absolute top-6 left-6 w-1 h-1 bg-dark-bg rounded-full"></div>
+                                    <div class="absolute top-6 right-6 w-1 h-1 bg-dark-bg rounded-full"></div>
+                                </div>
+                                <!-- Snake body segments -->
+                                <div class="absolute -left-4 top-2 w-12 h-12 bg-neon-green/80 rounded-full -z-10"></div>
+                                <div class="absolute -left-8 top-4 w-10 h-10 bg-neon-green/60 rounded-full -z-20"></div>
+                                <div class="absolute -left-11 top-6 w-8 h-8 bg-neon-green/40 rounded-full -z-30"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="w-full bg-dark-bg border border-dark-border text-white py-3 rounded-lg hover:border-neon-green transition-colors" data-event="click:changeAppearance">
+                        Change Appearance
+                    </button>
+                </div>
+            </aside>
+            <!-- @END_COMPONENT: RightPanel -->
+        </div>
+    </div>
+
+    <!-- @COMPONENT: BottomBar [daily crate, affiliate] -->
+    <footer class="mt-12 border-t border-dark-border bg-dark-bg/50">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex justify-center space-x-8">
+                
+                <!-- Daily Crate -->
+                <div class="bg-dark-card rounded-xl p-4 border border-dark-border shadow-card-dark cursor-pointer hover:border-neon-yellow transition-colors" data-event="click:openDailyCrate">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-neon-yellow rounded-lg flex items-center justify-center animate-bounce-slow">
+                            <svg class="w-5 h-5 text-dark-bg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                            </svg>
+                        </div>
+                        <span class="text-white font-medium">Daily Crate</span>
+                    </div>
+                </div>
+
+                <!-- Affiliate (disabled) -->
+                <div class="bg-dark-card rounded-xl p-4 border border-dark-border opacity-50 cursor-not-allowed" data-mock="true">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gray-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
+                            </svg>
+                        </div>
+                        <span class="text-gray-400 font-medium">Affiliate</span>
+                        <span class="text-xs bg-gray-700 px-2 py-1 rounded text-gray-400">Soon</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: BottomBar -->
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        
+        (function() {
+            // Mock interaction handlers for demonstration
+            const mockHandlers = {
+                toggleSound: () => console.log('Sound toggled'),
+                openSettings: () => console.log('Settings opened'),
+                logout: () => console.log('User logged out'),
+                viewFullLeaderboard: () => console.log('Full leaderboard opened'),
+                refreshFriends: () => console.log('Friends list refreshed'),
+                addFriends: () => console.log('Add friends dialog opened'),
+                editUsername: () => console.log('Username editor opened'),
+                selectAmount: (amount) => console.log(`Selected amount: $${amount}`),
+                startGame: () => console.log('Game started - would deduct fee and join lobby'),
+                selectRegion: (region) => console.log(`Selected region: ${region}`),
+                browseLobbies: () => console.log('Lobby browser opened'),
+                copyAddress: () => console.log('Wallet address copied'),
+                refreshBalance: () => console.log('Balance refreshed'),
+                addFunds: () => console.log('Add funds dialog opened'),
+                cashOut: () => console.log('Cash out initiated'),
+                changeAppearance: () => console.log('Snake customization opened'),
+                openDailyCrate: () => console.log('Daily crate opened')
+            };
+
+            // Add event listeners for demo purposes
+            document.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-event]');
+                if (target) {
+                    const [event, handler] = target.dataset.event.split(':');
+                    const value = target.dataset.value;
+                    if (mockHandlers[handler]) {
+                        mockHandlers[handler](value);
+                    }
+                }
+            });
+
+            // Simulate live data updates
+            setInterval(() => {
+                const playersElement = document.querySelector('[data-bind="gameStats.playersInGame"]');
+                const winningsElement = document.querySelector('[data-bind="gameStats.globalWinnings"]');
+                
+                if (playersElement && winningsElement) {
+                    // Simulate player count fluctuation
+                    const currentPlayers = parseInt(playersElement.textContent);
+                    const newPlayers = Math.max(10, currentPlayers + Math.floor(Math.random() * 6) - 3);
+                    playersElement.textContent = newPlayers;
+                    
+                    // Simulate winnings growth
+                    const currentWinnings = parseInt(winningsElement.textContent.replace(/[^0-9]/g, ''));
+                    const newWinnings = currentWinnings + Math.floor(Math.random() * 50);
+                    winningsElement.textContent = `$${newWinnings.toLocaleString()}`;
+                }
+            }, 5000);
+        })();
+    </script>
+</body>
+</html>

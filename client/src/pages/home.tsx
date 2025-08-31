@@ -9,8 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet } from "@/components/ui/wallet";
+import FriendsModal from "@/components/FriendsModal";
+import LoginModal from "@/components/LoginModal";
+import BalanceWarningModal from "@/components/BalanceWarningModal";
+import DailyRewardModal from "@/components/DailyRewardModal";
+import TopUpModal from "@/components/TopUpModal";
+import WithdrawModal from "@/components/WithdrawModal";
 
-import { apiRequest } from "@/lib/queryClient";
+import { fullUrl } from "@/lib/queryClient";
 import { 
   Settings, 
   Volume2, 
@@ -22,7 +28,6 @@ import {
   Trophy,
   X
 } from "lucide-react";
-import logoImage from "@assets/0b174992-98e7-4e65-b9d4-2e1f1794e0ca.png_1753912259610.png";
 
 // Decorative snake for background animation
 class DecorativeSnake {
@@ -206,13 +211,16 @@ class DecorativeSnake {
 }
 
 export default function Home() {
-  const { user, login, register, logout, updateUser } = useAuth();
+  const { user, login, register, logout, updateUser, updateUsername, placeBet, winBet, loseBet } = useAuth();
   const [, setLocation] = useLocation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { 
-    selectedBetAmount, 
-    setSelectedBetAmount
-  } = useGame();
+  
+  // Local state for bet management
+  const [selectedBetAmount, setSelectedBetAmount] = useState(1);
+  const [customBetAmount, setCustomBetAmount] = useState("");
+  const [isCustomBet, setIsCustomBet] = useState(false);
+  
+  const { setCurrentBetAmount, onGameWin, onGameLoss } = useGame();
   const { toast } = useToast();
 
   // Decorative snake animation state
@@ -297,8 +305,6 @@ export default function Home() {
   }, []);
 
   // State variables
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [animatedPlayerCount, setAnimatedPlayerCount] = useState(150);
   const [dailyWinnings, setDailyWinnings] = useState(0);
   
@@ -330,70 +336,75 @@ export default function Home() {
     }
   }, []);
 
-  // Auth form handler
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await login(username, password);
-      toast({
-        title: "Welcome back!",
-        description: "Successfully logged in.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Authentication failed",
-        variant: "destructive",
-      });
-    }
-  };
+
 
   // Region selection state
   const [selectedRegion, setSelectedRegion] = useState<'us' | 'eu' | null>(null);
   const [isDetectingRegion, setIsDetectingRegion] = useState(false);
+  
+  // Friends modal state
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  
+  // Login modal state
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  
+  // Balance warning modal state
+  const [isBalanceWarningOpen, setIsBalanceWarningOpen] = useState(false);
+  
+  // Daily reward modal state
+  const [isDailyRewardOpen, setIsDailyRewardOpen] = useState(false);
+  
+  // Wallet modal states
+  const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
-  // Start game handler with region selection
-  const handleStartGameWithRegion = async (manualRegion?: 'us' | 'eu') => {
+  // Username editing states
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+
+  // Start game handler with automatic random region selection
+  const handleStartGameWithRegion = async (region: string) => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    const betAmount = getEffectiveBetAmount();
+    
+    if (user.balance < betAmount) {
+      setIsBalanceWarningOpen(true);
+      return;
+    }
+
     try {
-      let gameRegion = manualRegion;
+      // Place the bet first
+      await placeBet(betAmount);
       
-      if (!gameRegion) {
-        // Auto-detect region
-        setIsDetectingRegion(true);
-        toast({
-          title: "Detecting Best Region...",
-          description: "Finding nearest server for optimal performance",
-        });
-        
-        const { detectBestRegion } = await import('@/lib/regionDetection');
-        gameRegion = await detectBestRegion();
-        setIsDetectingRegion(false);
-      }
+      // Set the bet amount in game context
+      setCurrentBetAmount(betAmount);
       
-      toast({
-        title: `Connecting to ${gameRegion.toUpperCase()} Server...`,
-        description: "Looking for available room.",
+      // Set the win/loss handlers that will be called by the game
+      // We'll use a different approach - pass these as URL parameters
+      const gameParams = new URLSearchParams({
+        region,
+        betAmount: betAmount.toString(),
+        userId: user.id
       });
-      
-      // Get best available room from server with region
-      const response = await fetch(`/api/room/join?region=${gameRegion}`);
-      const roomData = await response.json();
-      
+
       toast({
-        title: "Joining Game!",
-        description: `Entering ${gameRegion.toUpperCase()} room ${roomData.roomId} (${roomData.currentPlayers}/${roomData.maxPlayers} players)`,
+        title: "Bet placed!",
+        description: `$${betAmount} moved to hold wallet. Good luck!`,
       });
-      
-      // Navigate to regional room-specific game
-      setLocation(`/snake/${gameRegion}/${roomData.roomId}`);
+
+      // Navigate to game with parameters
+      setLocation(`/game?${gameParams.toString()}`);
     } catch (error) {
+      console.error('Failed to place bet:', error);
       toast({
-        title: "Error",
-        description: "Could not find available room. Trying backup...",
-        variant: "destructive",
+        title: "Bet failed",
+        description: "Could not place bet. Please try again.",
+        variant: "destructive"
       });
-      // Fallback to US room 1
-      setLocation('/snake/us/1');
     }
   };
 
@@ -402,12 +413,23 @@ export default function Home() {
     if (!user) return;
 
     try {
-      const response = await apiRequest("POST", `/api/users/${user.id}/claim-daily-crate`, {});
+      const response = await fetch(fullUrl(`/api/users/${user.id}/claim-daily-crate`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to claim daily crate');
+      }
+      
       const crate = await response.json();
       
       const reward = parseFloat(crate.reward);
-      const newBalance = parseFloat(user.balance) + reward;
-      updateUser({ balance: newBalance.toFixed(4) });
+      const newBalance = user.balance + reward;
+      updateUser({ balance: newBalance });
 
       toast({
         title: "Daily Crate Claimed!",
@@ -417,6 +439,181 @@ export default function Home() {
       toast({
         title: "Crate Already Claimed",
         description: "You've already claimed your daily crate today.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Check if daily reward is available
+  const canClaimDailyReward = () => {
+    if (!user || !user.lastDailyRewardClaim) return true;
+    
+    const lastClaim = new Date(user.lastDailyRewardClaim);
+    const now = new Date();
+    const hoursSinceLastClaim = (now.getTime() - lastClaim.getTime()) / (1000 * 60 * 60);
+    
+    return hoursSinceLastClaim >= 24;
+  };
+
+  // Get hours until next reward is available
+  const getHoursUntilNextReward = () => {
+    if (!user || !user.lastDailyRewardClaim || canClaimDailyReward()) return 0;
+    
+    const lastClaim = new Date(user.lastDailyRewardClaim);
+    const now = new Date();
+    const hoursSinceLastClaim = (now.getTime() - lastClaim.getTime()) / (1000 * 60 * 60);
+    
+    return Math.ceil(24 - hoursSinceLastClaim);
+  };
+
+  // Handle daily reward claim
+  const handleClaimDailyReward = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch(fullUrl('/api/auth/claim-daily-reward'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: user.username }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to claim daily reward');
+      }
+      
+      const data = await response.json();
+      
+      if (data.user) {
+        updateUser(data.user);
+      }
+
+      toast({
+        title: "Daily Reward Claimed!",
+        description: data.message || "You received $0.20 (100% bonus included)!",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to claim daily reward.";
+      toast({
+        title: "Reward Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle top-up completion
+  const handleTopUpComplete = (amount: number) => {
+    if (!user) return;
+    
+    const updatedUser = {
+      ...user,
+      balance: Number(user.balance) + amount
+    };
+    
+    updateUser(updatedUser);
+  };
+
+  // Handle withdrawal completion
+  const handleWithdrawComplete = (amount: number) => {
+    if (!user) return;
+    
+    const updatedUser = {
+      ...user,
+      balance: Number(user.balance) - amount
+    };
+    
+    updateUser(updatedUser);
+  };
+
+  // Handle username editing
+  const handleStartEditUsername = () => {
+    if (user) {
+      setNewUsername(user.username);
+      setIsEditingUsername(true);
+    }
+  };
+
+  const handleSaveUsername = async () => {
+    if (!user || !newUsername.trim()) return;
+    
+    try {
+      await updateUsername(newUsername.trim());
+      setIsEditingUsername(false);
+      toast({
+        title: "Username Updated!",
+        description: `Your username has been changed to "${newUsername.trim()}"`,
+      });
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update username",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEditUsername = () => {
+    setIsEditingUsername(false);
+    setNewUsername('');
+  };
+
+  // Get effective bet amount (only $1 for now)
+  const getEffectiveBetAmount = () => {
+    // For now, only allow $1 bets
+    return 1;
+  };
+
+  // Handle game win - move hold balance + winnings to main balance
+  const handleGameWin = async (score: number, timeAlive: number) => {
+    if (!user) return;
+    
+    const betAmount = getEffectiveBetAmount();
+    
+    // Calculate winnings based on score/time (simple formula for now)
+    // Minimum 0.5x, maximum 5x multiplier based on performance
+    const baseMultiplier = 0.5;
+    const scoreMultiplier = Math.min(score / 1000, 4.5); // Max 4.5x from score
+    const totalMultiplier = baseMultiplier + scoreMultiplier;
+    const winnings = betAmount * totalMultiplier;
+    
+    try {
+      await winBet(betAmount, winnings);
+      
+      toast({
+        title: "🎉 You Won!",
+        description: `${totalMultiplier.toFixed(2)}x multiplier! Won $${winnings.toFixed(2)} + bet back!`,
+      });
+    } catch (error) {
+      console.error('Failed to process win:', error);
+      toast({
+        title: "Win Processing Error",
+        description: "Your win couldn't be processed. Contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle game loss - remove money from hold balance
+  const handleGameLoss = async () => {
+    if (!user) return;
+    
+    const betAmount = getEffectiveBetAmount();
+    
+    try {
+      await loseBet(betAmount);
+      
+      toast({
+        title: "💀 Game Over",
+        description: `Lost $${betAmount.toFixed(2)} bet. Better luck next time!`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      console.error('Failed to process loss:', error);
+      toast({
+        title: "Loss Processing Error",
+        description: "Your loss couldn't be processed. Contact support.",
         variant: "destructive",
       });
     }
@@ -558,16 +755,100 @@ export default function Home() {
         {/* Top Bar - Welcome with gaming controller icon */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center">
-          <img src={logoImage} alt="Game Logo" className="h-8 mr-3" style={{imageRendering: 'pixelated'}} />
           <span className="text-white text-lg">Welcome, </span>
-          <span className="text-lg font-bold" style={{color: '#53d493'}}>Player one</span>
+          {isEditingUsername ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                className="text-lg font-bold bg-gray-800 border-green-500 text-white font-retro px-2 py-1 h-8 w-32"
+                placeholder="Enter username"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveUsername();
+                  } else if (e.key === 'Escape') {
+                    handleCancelEditUsername();
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                onClick={handleSaveUsername}
+                className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 text-xs border border-green-500 font-retro"
+              >
+                ✓
+              </button>
+              <button
+                onClick={handleCancelEditUsername}
+                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs border border-red-500 font-retro"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold" style={{color: '#53d493'}}>
+                {user ? user.username : 'Guest'}
+              </span>
+              {user && (
+                <button
+                  onClick={handleStartEditUsername}
+                  className="text-gray-400 hover:text-green-400 transition-colors p-1"
+                  title="Edit username"
+                >
+                  <Edit3 size={16} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
-          >
-            Logout
-          </button>
+          {user ? (
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={async () => {
+                  try {
+                    await logout();
+                    toast({
+                      title: "See You Later!",
+                      description: "Successfully logged out from PumpGames.Fun",
+                    });
+                  } catch (error) {
+                    toast({
+                      title: "Logout Error",
+                      description: "Failed to logout properly, but you've been logged out locally.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 border-2 border-red-500 font-retro"
+              >
+                Logout
+              </button>
+              <button 
+                onClick={() => setIsDailyRewardOpen(true)}
+                disabled={!canClaimDailyReward()}
+                className={`px-3 py-1 text-sm border-2 font-retro flex items-center gap-1 ${
+                  canClaimDailyReward() 
+                    ? 'bg-yellow-600 text-white hover:bg-yellow-700 border-yellow-500' 
+                    : 'bg-gray-600 text-gray-300 border-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <Gift className="w-4 h-4" />
+                {canClaimDailyReward() 
+                  ? 'Daily Reward' 
+                  : `${getHoursUntilNextReward()}h left`
+                }
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsLoginModalOpen(true)}
+              className="bg-green-600 text-white px-3 py-1 text-sm hover:bg-green-700 border-2 border-green-500 font-retro"
+            >
+              Login
+            </button>
+          )}
         </div>
       </div>
 
@@ -620,101 +901,172 @@ export default function Home() {
               </div>
               
               {/* Bet Amount Selection */}
+              <div className="mb-2">
+                <p className="text-green-400 text-xs font-retro text-center">
+                  🎯 Only $1 bets available for now
+                </p>
+              </div>
               <div className="grid grid-cols-3 gap-1 mb-3">
                 <button 
-                  onClick={() => setSelectedBetAmount(1)}
+                  onClick={() => {
+                    setSelectedBetAmount(1);
+                    setIsCustomBet(false);
+                  }}
                   className={`py-2 px-3 text-sm border-2 font-retro ${
-                    selectedBetAmount === 1 
+                    selectedBetAmount === 1 && !isCustomBet
                       ? 'text-white border-2' 
                       : 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600'
                   }`}
-                  style={selectedBetAmount === 1 ? {backgroundColor: '#53d493', borderColor: '#53d493'} : {}}
+                  style={selectedBetAmount === 1 && !isCustomBet ? {backgroundColor: '#53d493', borderColor: '#53d493'} : {}}
                 >
                   $1
                 </button>
-                <div className="relative group">
-                  <button 
-                    disabled
-                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
-                  >
-                    $5
-                  </button>
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" style={{imageRendering: 'pixelated'}}>
-                      <rect x="5" y="7" width="6" height="6" fill="currentColor"/>
-                      <rect x="4" y="6" width="1" height="1" fill="currentColor"/>
-                      <rect x="11" y="6" width="1" height="1" fill="currentColor"/>
-                      <rect x="4" y="5" width="1" height="1" fill="currentColor"/>
-                      <rect x="11" y="5" width="1" height="1" fill="currentColor"/>
-                      <rect x="6" y="4" width="4" height="1" fill="currentColor"/>
-                      <rect x="6" y="3" width="4" height="1" fill="currentColor"/>
-                      <rect x="7" y="2" width="2" height="1" fill="currentColor"/>
-                      <rect x="7" y="9" width="2" height="1" fill="currentColor"/>
+                <button 
+                  disabled
+                  className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed relative group"
+                  title="Coming Soon"
+                >
+                  <div className="flex items-center justify-center">
+                    <span className="text-gray-500">$5</span>
+                    <svg className="w-4 h-4 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                </div>
-                <div className="relative group">
-                  <button 
-                    disabled
-                    className="py-2 px-3 text-sm border-2 font-retro bg-gray-700 text-white border-gray-600 cursor-not-allowed w-full group-hover:bg-gray-800 group-hover:text-gray-500 group-hover:border-gray-700 transition-colors"
-                  >
-                    $20
-                  </button>
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" style={{imageRendering: 'pixelated'}}>
-                      <rect x="5" y="7" width="6" height="6" fill="currentColor"/>
-                      <rect x="4" y="6" width="1" height="1" fill="currentColor"/>
-                      <rect x="11" y="6" width="1" height="1" fill="currentColor"/>
-                      <rect x="4" y="5" width="1" height="1" fill="currentColor"/>
-                      <rect x="11" y="5" width="1" height="1" fill="currentColor"/>
-                      <rect x="6" y="4" width="4" height="1" fill="currentColor"/>
-                      <rect x="6" y="3" width="4" height="1" fill="currentColor"/>
-                      <rect x="7" y="2" width="2" height="1" fill="currentColor"/>
-                      <rect x="7" y="9" width="2" height="1" fill="currentColor"/>
+                  <div className="absolute inset-0 bg-gray-800 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                </button>
+                <button 
+                  disabled
+                  className="py-2 px-3 text-sm border-2 font-retro bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed relative group"
+                  title="Coming Soon"
+                >
+                  <div className="flex items-center justify-center">
+                    <span className="text-gray-500">$20</span>
+                    <svg className="w-4 h-4 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                </div>
+                  <div className="absolute inset-0 bg-gray-800 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                </button>
               </div>
               
-              {/* Region Selection */}
+              {/* Custom Bet Amount - Disabled for now */}
               <div className="mb-3">
-                <div className="text-white text-xs mb-2 font-retro text-center">Server Region</div>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="flex gap-1">
                   <button 
-                    onClick={() => handleStartGameWithRegion('us')}
-                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
-                    disabled={isDetectingRegion}
+                    disabled
+                    className="py-2 px-3 text-sm border-2 font-retro flex-shrink-0 bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed relative group"
+                    title="Coming Soon"
                   >
-                    🇺🇸 US
+                    <div className="flex items-center justify-center">
+                      <span className="text-gray-500">Custom</span>
+                      <svg className="w-4 h-4 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="absolute inset-0 bg-gray-800 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                  </button>
+                  <Input
+                    disabled
+                    type="number"
+                    value=""
+                    placeholder="Coming Soon"
+                    className="px-2 py-2 bg-gray-800 border-2 border-gray-700 text-gray-500 font-retro text-sm flex-1 cursor-not-allowed [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                  />
+                </div>
+                <p className="text-gray-500 text-xs mt-1 font-retro">
+                  Only $1 bets available for now
+                </p>
+              </div>
+              
+              {/* Auto Region and Friends */}
+              <div className="mb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => {
+                      if (user) {
+                        handleStartGameWithRegion('us');
+                      } else {
+                        setIsLoginModalOpen(true);
+                      }
+                    }}
+                    className={`py-2 px-2 text-xs border-2 font-retro transition-colors flex flex-col items-center justify-center ${
+                      user 
+                        ? 'border-gray-600 hover:bg-gray-600' 
+                        : 'border-gray-700 cursor-not-allowed opacity-60'
+                    }`}
+                    style={{
+                      backgroundColor: user ? '#53d493' : '#666', 
+                      borderColor: user ? '#53d493' : '#666', 
+                      color: 'white'
+                    }}
+                    disabled={isDetectingRegion || !user}
+                  >
+                    <span className="text-sm">🌍</span>
+                    <span>{user ? 'Auto' : 'Login Required'}</span>
                   </button>
                   <button 
-                    onClick={() => handleStartGameWithRegion('eu')}
-                    className="py-2 px-2 text-xs border-2 font-retro bg-gray-700 text-white border-gray-600 hover:bg-gray-600 transition-colors"
-                    disabled={isDetectingRegion}
+                    onClick={() => {
+                      if (user) {
+                        setIsFriendsModalOpen(true);
+                      } else {
+                        setIsLoginModalOpen(true);
+                      }
+                    }}
+                    className={`py-2 px-2 text-xs border-2 font-retro transition-colors flex flex-col items-center justify-center relative ${
+                      user 
+                        ? 'bg-gray-700 text-white border-gray-600 hover:bg-gray-600' 
+                        : 'bg-gray-800 text-gray-400 border-gray-700 cursor-not-allowed opacity-60'
+                    }`}
                   >
-                    🇪🇺 EU
-                  </button>
-                  <button 
-                    onClick={() => handleStartGameWithRegion()}
-                    className="py-2 px-2 text-xs border-2 font-retro border-gray-600 hover:bg-gray-600 transition-colors"
-                    style={{backgroundColor: '#53d493', borderColor: '#53d493', color: 'white'}}
-                    disabled={isDetectingRegion}
-                  >
-                    🌍 Auto
+                    <span className="text-sm">👥</span>
+                    <span>{user ? 'Friends' : 'Login Required'}</span>
+                    {/* Friend Request Notification Badge */}
+                    {user && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-white shadow-lg">
+                        2
+                      </div>
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* Play Button */}
               <button 
-                onClick={() => handleStartGameWithRegion()}
-                className="text-white font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2"
-                style={{backgroundColor: '#53d493', borderColor: '#53d493'}}
-                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785'}
-                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#53d493'}
+                onClick={() => {
+                  if (user) {
+                    // Check if user has sufficient balance for the bet amount
+                    const effectiveBetAmount = getEffectiveBetAmount();
+                    if (Number(user.balance) < effectiveBetAmount) {
+                      setIsBalanceWarningOpen(true);
+                    } else {
+                      handleStartGameWithRegion('us');
+                    }
+                  } else {
+                    setIsLoginModalOpen(true);
+                  }
+                }}
+                className={`font-bold text-lg py-3 w-full mb-3 font-retro transition-colors border-2 ${
+                  user 
+                    ? 'text-white' 
+                    : 'text-gray-300 cursor-pointer'
+                }`}
+                style={{
+                  backgroundColor: user ? '#53d493' : '#666', 
+                  borderColor: user ? '#53d493' : '#666'
+                }}
+                onMouseEnter={(e) => {
+                  if (user) {
+                    (e.target as HTMLButtonElement).style.backgroundColor = '#4ac785';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (user) {
+                    (e.target as HTMLButtonElement).style.backgroundColor = '#53d493';
+                  }
+                }}
                 disabled={isDetectingRegion}
               >
-                {isDetectingRegion ? 'DETECTING...' : 'PLAY'}
+                {isDetectingRegion ? 'DETECTING...' : (user ? 'PLAY' : 'LOGIN TO PLAY')}
               </button>
               
 
@@ -738,15 +1090,33 @@ export default function Home() {
               
               {/* Balance Display */}
               <div className="font-bold text-lg mb-3 text-center bg-gray-900 py-3 border-2 border-gray-600 font-retro" style={{color: '#53d493'}}>
-                $984.37
+                {user ? `$${Number(user.balance).toFixed(2)}` : '$0.00'}
               </div>
               
               {/* Wallet buttons */}
               <div className="grid grid-cols-2 gap-1">
-                <button className="bg-gray-700 text-white py-1 px-2 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro">
+                <button 
+                  onClick={() => {
+                    if (user) {
+                      setIsTopUpModalOpen(true);
+                    } else {
+                      setIsLoginModalOpen(true);
+                    }
+                  }}
+                  className="bg-gray-700 text-white py-1 px-1 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro"
+                >
                   Top Up
                 </button>
-                <button className="bg-gray-700 text-white py-1 px-2 text-sm border-2 border-gray-600 hover:bg-gray-600 font-retro">
+                <button 
+                  onClick={() => {
+                    if (user) {
+                      setIsWithdrawModalOpen(true);
+                    } else {
+                      setIsLoginModalOpen(true);
+                    }
+                  }}
+                  className="bg-gray-700 text-white py-1 px-1 text-xs border-2 border-gray-600 hover:bg-gray-600 font-retro"
+                >
                   Withdraw
                 </button>
               </div>
@@ -865,6 +1235,51 @@ export default function Home() {
           </div>
         </div>
       )}
+      
+      {/* Friends Modal */}
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
+      />
+      
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
+      
+      {/* Balance Warning Modal */}
+      <BalanceWarningModal
+        isOpen={isBalanceWarningOpen}
+        onClose={() => setIsBalanceWarningOpen(false)}
+        currentBalance={user ? Number(user.balance) : 0}
+        requiredBalance={getEffectiveBetAmount()}
+      />
+      
+      {/* Daily Reward Modal */}
+      <DailyRewardModal
+        isOpen={isDailyRewardOpen}
+        onClose={() => setIsDailyRewardOpen(false)}
+        onClaim={handleClaimDailyReward}
+        canClaim={canClaimDailyReward()}
+        hoursUntilNext={getHoursUntilNextReward()}
+      />
+      
+      {/* Top Up Modal */}
+      <TopUpModal
+        isOpen={isTopUpModalOpen}
+        onClose={() => setIsTopUpModalOpen(false)}
+        currentBalance={user ? Number(user.balance) : 0}
+        onTopUpComplete={handleTopUpComplete}
+      />
+      
+      {/* Withdraw Modal */}
+      <WithdrawModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        currentBalance={user ? Number(user.balance) : 0}
+        onWithdrawComplete={handleWithdrawComplete}
+      />
     </div>
   );
 }

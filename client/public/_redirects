@@ -1,0 +1,15 @@
+# Netlify SPA Routing - This MUST be at the root level
+/*    /index.html   200
+
+# Specific game routes
+/game    /index.html   200
+/snake/* /index.html   200
+
+# API proxy to your EC2 backend (update with your actual EC2 IP)
+/api/*  http://your-ec2-ip:3000/api/:splat  200
+
+# WebSocket proxy to your EC2 backend (update with your actual EC2 IP)
+/ws  http://your-ec2-ip:3000/ws  200
+
+# Force all routes to index.html for SPA
+/*    /index.html   200 

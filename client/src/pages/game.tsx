@@ -2,15 +2,25 @@ import { useRef, useEffect, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { X, Volume2 } from 'lucide-react';
-import dollarSignImageSrc from '@assets/$ (1)_1753992938537.png';
-import moneyCrateImageSrc from '@assets/$ (1)_1754305354543.png';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useAuth } from '../contexts/auth-context';
+import { useToast } from '../hooks/use-toast';
 
-// Game constants
-const MAP_CENTER_X = 2000;
-const MAP_CENTER_Y = 2000;
-const MAP_RADIUS = 1800; // Circular map radius
-const FOOD_COUNT = 160; // Doubled food count for more abundant gameplay
+// Dynamic game constants based on arena size
+// These will be calculated dynamically based on current arena size
+const getMapCenterX = (arenaSize: { width: number; height: number }) => arenaSize.width / 2;
+const getMapCenterY = (arenaSize: { width: number; height: number }) => arenaSize.height / 2;
+const getMapRadius = (arenaSize: { width: number; height: number }) => Math.min(arenaSize.width, arenaSize.height) * 0.45; // 90% of the smaller dimension
+
+// Scale food count based on arena size (160 for 2000x2000, scales proportionally)
+const getFoodCount = (arenaSize: { width: number; height: number }) => {
+  const baseArea = 2000 * 2000; // Base arena size
+  const currentArea = arenaSize.width * arenaSize.height;
+  const scaleFactor = currentArea / baseArea;
+  return Math.max(80, Math.min(320, Math.round(160 * scaleFactor))); // Between 80-320 food
+};
+
+const BASE_FOOD_COUNT = 160; // Base food count for compatibility
 const FOOD_GRAVITY = 0.147; // Reduced by another 30% (0.21 * 0.7) for gentler attraction
 const FOOD_MAX_SPEED = 0.52; // 35% slower speed (0.8 * 0.65) for smoother attraction
 const FOOD_ATTRACTION_RADIUS = 50; // Reduced to 50px attraction range
@@ -74,12 +84,15 @@ function getRandomFoodColor(): string {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-function createFood(id: string): Food {
+function createFood(id: string, arenaSize = { width: 2000, height: 2000 }): Food {
   // Spawn food evenly distributed across the entire map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.sqrt(Math.random()) * (MAP_RADIUS - 50); // Square root for even distribution
-  const x = MAP_CENTER_X + Math.cos(angle) * radius;
-  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+  const mapRadius = getMapRadius(arenaSize);
+  const mapCenterX = getMapCenterX(arenaSize);
+  const mapCenterY = getMapCenterY(arenaSize);
+  const radius = Math.sqrt(Math.random()) * (mapRadius - 50); // Square root for even distribution
+  const x = mapCenterX + Math.cos(angle) * radius;
+  const y = mapCenterY + Math.sin(angle) * radius;
   
   return {
     id,
@@ -152,14 +165,19 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
     console.log(`📍 Food moved: ${food.id.slice(-3)} from (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) to (${updated.x.toFixed(1)}, ${updated.y.toFixed(1)}) | velocity: (${updated.vx.toFixed(2)}, ${updated.vy.toFixed(2)})`);
   }
   
-  // Keep food within map bounds
+  // Keep food within map bounds - use default arena size for food physics
+  const currentArenaSize = { width: 2000, height: 2000 }; // Default for food physics
+  const mapCenterX = getMapCenterX(currentArenaSize);
+  const mapCenterY = getMapCenterY(currentArenaSize);
+  const mapRadius = getMapRadius(currentArenaSize);
+  
   const distanceFromCenter = Math.sqrt(
-    (updated.x - MAP_CENTER_X) ** 2 + (updated.y - MAP_CENTER_Y) ** 2
+    (updated.x - mapCenterX) ** 2 + (updated.y - mapCenterY) ** 2
   );
-  if (distanceFromCenter > MAP_RADIUS - 50) {
-    const angle = Math.atan2(updated.y - MAP_CENTER_Y, updated.x - MAP_CENTER_X);
-    updated.x = MAP_CENTER_X + Math.cos(angle) * (MAP_RADIUS - 50);
-    updated.y = MAP_CENTER_Y + Math.sin(angle) * (MAP_RADIUS - 50);
+  if (distanceFromCenter > mapRadius - 50) {
+    const angle = Math.atan2(updated.y - mapCenterY, updated.x - mapCenterX);
+    updated.x = mapCenterX + Math.cos(angle) * (mapRadius - 50);
+    updated.y = mapCenterY + Math.sin(angle) * (mapRadius - 50);
     updated.vx = 0;
     updated.vy = 0;
   }
@@ -171,9 +189,13 @@ function updateFoodGravity(food: Food, allSnakes: Array<{ head: Position; totalM
 function createBotSnake(id: string): BotSnake {
   // Spawn bot at random location within map
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * (MAP_RADIUS - 200);
-  const x = MAP_CENTER_X + Math.cos(angle) * radius;
-  const y = MAP_CENTER_Y + Math.sin(angle) * radius;
+  const currentArenaSize = { width: 2000, height: 2000 }; // Default for food physics
+  const mapCenterX = getMapCenterX(currentArenaSize);
+  const mapCenterY = getMapCenterY(currentArenaSize);
+  const mapRadius = getMapRadius(currentArenaSize);
+  const radius = Math.random() * (mapRadius - 200);
+  const x = mapCenterX + Math.cos(angle) * radius;
+  const y = mapCenterY + Math.sin(angle) * radius;
   
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
   const baseSpeed = 0.9 + Math.random() * 0.4; // Slightly slower than player
@@ -269,10 +291,14 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
   } else {
     // Random wandering behavior (food targeting removed)
     if (currentTime - bot.lastDirectionChange > 800 + Math.random() * 1200) {
-      const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-      if (distFromCenter > MAP_RADIUS * 0.6) {
+      const currentArenaSize = { width: 2000, height: 2000 }; // Default for bot physics
+      const mapCenterX = getMapCenterX(currentArenaSize);
+      const mapCenterY = getMapCenterY(currentArenaSize);
+      const mapRadius = getMapRadius(currentArenaSize);
+      const distFromCenter = Math.sqrt((bot.head.x - mapCenterX) ** 2 + (bot.head.y - mapCenterY) ** 2);
+      if (distFromCenter > mapRadius * 0.6) {
         // Move toward center when near edges
-        const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+        const angleToCenter = Math.atan2(mapCenterY - bot.head.y, mapCenterX - bot.head.x);
         bot.targetAngle = angleToCenter + (Math.random() - 0.5) * Math.PI * 0.3;
       } else {
         // Random but more purposeful movement
@@ -319,9 +345,13 @@ function updateBotSnake(bot: BotSnake, playerSnake: SmoothSnake, otherBots: BotS
   bot.head.y += dy;
   
   // Keep bot within circular map bounds
-  const distFromCenter = Math.sqrt((bot.head.x - MAP_CENTER_X) ** 2 + (bot.head.y - MAP_CENTER_Y) ** 2);
-  if (distFromCenter > MAP_RADIUS - 50) {
-    const angleToCenter = Math.atan2(MAP_CENTER_Y - bot.head.y, MAP_CENTER_X - bot.head.x);
+  const currentArenaSize = { width: 2000, height: 2000 }; // Default for bot physics
+  const mapCenterX = getMapCenterX(currentArenaSize);
+  const mapCenterY = getMapCenterY(currentArenaSize);
+  const mapRadius = getMapRadius(currentArenaSize);
+  const distFromCenter = Math.sqrt((bot.head.x - mapCenterX) ** 2 + (bot.head.y - mapCenterY) ** 2);
+  if (distFromCenter > mapRadius - 50) {
+    const angleToCenter = Math.atan2(mapCenterY - bot.head.y, mapCenterX - bot.head.x);
     bot.targetAngle = angleToCenter;
   }
   
@@ -727,15 +757,20 @@ class SmoothSnake {
 }
 
 export default function GamePage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { user, winBet, loseBet } = useAuth();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const params = useParams();
   const roomId = params?.roomId || '1'; // Default to room 1 if no room specified
   const region = params?.region || 'us'; // Default to US region if no region specified
   const [mouseDirection, setMouseDirection] = useState<Position>({ x: 1, y: 0 });
   const [myPlayerColor, setMyPlayerColor] = useState<string>('#d55400'); // Default orange
   const [snake] = useState(() => {
-    const newSnake = new SmoothSnake(MAP_CENTER_X, MAP_CENTER_Y, '#d55400');
+    const initialArenaSize = { width: 2000, height: 2000 };
+    const centerX = getMapCenterX(initialArenaSize);
+    const centerY = getMapCenterY(initialArenaSize);
+    const newSnake = new SmoothSnake(centerX, centerY, '#d55400');
     console.log(`NEW SNAKE CREATED: mass=${newSnake.totalMass}, visibleSegments=${newSnake.visibleSegments.length}, trail=${newSnake.segmentTrail.length}`);
     return newSnake;
   });
@@ -813,6 +848,12 @@ export default function GamePage() {
   const [qKeyPressed, setQKeyPressed] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [cashedOutAmount, setCashedOutAmount] = useState(0);
+  
+  // Refs for immediate access to state values in game loop
+  const qKeyPressedRef = useRef(false);
+  const cashingOutRef = useRef(false);
+  const cashOutStartTimeRef = useRef<number | null>(null);
+  
   const lastSentPositionRef = useRef<{ x: number; y: number; segmentCount: number } | null>(null);
   const [otherPlayers, setOtherPlayers] = useState<Array<{
     id: string;
@@ -824,8 +865,77 @@ export default function GamePage() {
   }>>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [arenaSize, setArenaSize] = useState({ width: 2000, height: 2000 }); // Dynamic arena size
+  const [isGhostMode, setIsGhostMode] = useState(false);
+  const [ghostModeEndTime, setGhostModeEndTime] = useState<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Betting system state
+  const [currentBetAmount, setCurrentBetAmount] = useState<number>(0);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  
+  // Parse URL parameters for betting
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const betAmount = parseFloat(urlParams.get('betAmount') || '0');
+    const userId = urlParams.get('userId') || '';
+    
+    if (betAmount > 0 && userId) {
+      setCurrentBetAmount(betAmount);
+      setCurrentUserId(userId);
+      console.log(`🎯 Game started with bet: $${betAmount}, User: ${userId}`);
+    }
+  }, []);
+
+  // Function to handle game results and betting system
+  const handleGameResult = async (finalMass: number, timeAlive: number) => {
+    if (currentBetAmount <= 0 || !currentUserId) {
+      console.log('No bet amount or user ID, skipping betting system');
+      return;
+    }
+
+    try {
+      // Calculate winnings based on final mass and time
+      // Simple multiplier: 0.5x to 5x based on performance
+      const baseMultiplier = Math.min(5, Math.max(0.5, (finalMass / 10) * (timeAlive / 60)));
+      const winnings = currentBetAmount * baseMultiplier;
+      
+      console.log(`🎯 Game Result - Mass: ${finalMass}, Time: ${timeAlive}s, Bet: $${currentBetAmount}, Winnings: $${winnings.toFixed(2)}`);
+      
+      // Call the betting system
+      if (winnings > currentBetAmount) {
+        // Player won - get winnings
+        await winBet(currentBetAmount, winnings - currentBetAmount);
+        console.log(`💰 Won $${(winnings - currentBetAmount).toFixed(2)}!`);
+        
+        // Show success toast
+        toast({
+          title: "🎉 You Won!",
+          description: `Bet: $${currentBetAmount} | Winnings: $${(winnings - currentBetAmount).toFixed(2)} | Total: $${winnings.toFixed(2)}`,
+        });
+      } else {
+        // Player lost - bet amount stays in hold wallet
+        await loseBet(currentBetAmount);
+        console.log(`💸 Lost bet of $${currentBetAmount}`);
+        
+        // Show loss toast
+        toast({
+          title: "💸 Game Over",
+          description: `Bet of $${currentBetAmount} lost. Better luck next time!`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Failed to process game result:', error);
+      
+      // Show error toast
+      toast({
+        title: "❌ Error",
+        description: "Failed to process betting result. Please contact support.",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Function to drop money crates when snake dies (1 crate per mass unit)
   const dropMoneyCrates = (playerMoney: number, snakeMass: number) => {
@@ -892,7 +1002,6 @@ export default function GamePage() {
   // Load money crate image
   useEffect(() => {
     const img = new Image();
-    img.src = moneyCrateImageSrc;
     img.onload = () => {
       console.log('Money crate image loaded successfully');
       setMoneyCrateImage(img);
@@ -1004,33 +1113,35 @@ export default function GamePage() {
     
     // Initialize food particles
     const initialFoods: Food[] = [];
-    for (let i = 0; i < FOOD_COUNT; i++) {
-      initialFoods.push(createFood(`food_${i}`));
+    const foodCount = getFoodCount(arenaSize);
+    for (let i = 0; i < foodCount; i++) {
+      initialFoods.push(createFood(`food_${i}`, arenaSize));
     }
     setFoods(initialFoods);
     
-    console.log("Game started - initialized", FOOD_COUNT, "food particles");
+    console.log("Game started - initialized", foodCount, "food particles");
   }, [gameStarted]);
 
   // WebSocket connection for real multiplayer
   useEffect(() => {
     if (!gameStarted) return;
 
-    console.log(`Connecting to multiplayer server room ${roomId}...`);
+    // Use environment-based WebSocket URL
+    const wsUrl = import.meta.env.PROD 
+      ? import.meta.env.VITE_WS_URL || 'ws://your-ec2-ip:3000/ws'
+      : 'ws://localhost:5174/ws';
     
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}&region=${region}`);
-    
-    wsRef.current = socket;
+    const ws = new WebSocket(`${wsUrl}?region=${region}&room=${roomId}`);
 
-    socket.onopen = () => {
+    wsRef.current = ws;
+
+    ws.onopen = () => {
       console.log("Connected to multiplayer server!");
-      console.log("WebSocket readyState:", socket.readyState);
+      console.log("WebSocket readyState:", ws.readyState);
       setConnectionStatus('Connected');
     };
 
-    socket.onmessage = (event) => {
+    ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'players') {
@@ -1040,10 +1151,59 @@ export default function GamePage() {
           );
           // Use server data directly to avoid position mismatch
           setOtherPlayers(filteredPlayers);
-          console.log(`Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+          console.log(`🤖 Received ${data.players.length} total players, showing ${filteredPlayers.length} others`);
+          console.log(`🤖 Player IDs:`, data.players.map((p: any) => `${p.id}${p.isBot ? ' (BOT)' : ''}`));
+          console.log(`🤖 MyPlayerId: ${myPlayerId}`);
         } else if (data.type === 'welcome') {
           setMyPlayerId(data.playerId);
           console.log(`My player ID: ${data.playerId} in room ${data.roomId || roomId}`);
+          
+          // Enable ghost mode for 1.5 seconds on spawn
+          setIsGhostMode(true);
+          setGhostModeEndTime(Date.now() + 1500);
+          console.log(`👻 Ghost mode activated for 1.5 seconds`);
+        } else if (data.type === 'players') {
+          // Handle server player updates
+          const currentTime = Date.now();
+          setServerPlayers(data.players || []);
+          
+          // Update player positions for smooth interpolation
+          setPlayerPositions(prevPositions => {
+            const newPositions = new Map(prevPositions);
+            
+            (data.players || []).forEach((player: any) => {
+              if (player.id !== myPlayerId && player.segments && player.segments.length > 0) {
+                const existing = newPositions.get(player.id);
+                
+                if (existing) {
+                  // Check if positions changed significantly to avoid interpolating identical positions
+                  const headDistance = existing.target.length > 0 && player.segments.length > 0 ? 
+                    Math.sqrt(
+                      Math.pow(existing.target[0].x - player.segments[0].x, 2) + 
+                      Math.pow(existing.target[0].y - player.segments[0].y, 2)
+                    ) : 0;
+                  
+                  // Only update if there's meaningful movement (>1px)
+                  if (headDistance > 1) {
+                    newPositions.set(player.id, {
+                      current: existing.current.length > 0 ? existing.current : player.segments,
+                      target: player.segments,
+                      lastUpdate: currentTime
+                    });
+                  }
+                } else {
+                  // New player - no interpolation needed
+                  newPositions.set(player.id, {
+                    current: player.segments,
+                    target: player.segments,
+                    lastUpdate: currentTime
+                  });
+                }
+              }
+            });
+            
+            return newPositions;
+          });
         } else if (data.type === 'gameWorld') {
           setServerBots(data.bots || []);
           
@@ -1162,6 +1322,9 @@ export default function GamePage() {
           // Calculate time alive in seconds
           const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
           
+          // Handle game result with betting system
+          handleGameResult(snake.totalMass, timeAlive);
+          
           // Store game over data for home page
           localStorage.setItem('gameOverData', JSON.stringify({
             finalMass: snake.totalMass,
@@ -1193,13 +1356,17 @@ export default function GamePage() {
             snake.totalMass = 0;
             snake.clearSnakeOnDeath();
           }, 0);
+        } else if (data.type === 'arenaSize') {
+          // Handle arena size updates from server
+          console.log(`🏟️ Arena size updated: ${data.arenaSize.width}x${data.arenaSize.height} (${data.playerCount} players)`);
+          setArenaSize(data.arenaSize);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
     };
 
-    socket.onclose = (event) => {
+    ws.onclose = (event) => {
       console.log("Disconnected from multiplayer server");
       console.log("Close event:", event.code, event.reason);
       setConnectionStatus('Disconnected');
@@ -1213,7 +1380,7 @@ export default function GamePage() {
           if (gameStarted && !wsRef.current) {
             console.log("Auto-reconnecting to multiplayer server...");
             // Create new WebSocket connection
-            const newSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws?room=${roomId}`);
+                         const newSocket = new WebSocket(`ws://localhost:5174/ws?room=${roomId}&region=${region}`);
             wsRef.current = newSocket;
             
             // Set up handlers for new connection
@@ -1221,23 +1388,23 @@ export default function GamePage() {
               console.log("Reconnected to multiplayer server!");
               setConnectionStatus('Connected');
             };
-            newSocket.onmessage = socket.onmessage;
-            newSocket.onclose = socket.onclose;
-            newSocket.onerror = socket.onerror;
+            newSocket.onmessage = ws.onmessage;
+            newSocket.onclose = ws.onclose;
+            newSocket.onerror = ws.onerror;
           }
         }, 2000);
       }
     };
 
-    socket.onerror = (error) => {
+    ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       setConnectionStatus('Connection Error');
     };
 
     return () => {
       console.log("Cleaning up WebSocket connection...");
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
       }
     };
   }, [gameStarted, roomId]); // Include roomId to reconnect when room changes
@@ -1339,13 +1506,44 @@ export default function GamePage() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(true);
         snake.setBoost(true);
-      } else if (e.key.toLowerCase() === 'q') {
+        
+        // End ghost mode if player boosts
+        if (isGhostMode) {
+          setIsGhostMode(false);
+          setGhostModeEndTime(null);
+          console.log(`👻 Ghost mode ended early (player boosted)`);
+          
+          // Notify server
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'ghostModeEnd',
+              reason: 'boost'
+            }));
+          }
+        }
+      }
+      
+      // Handle Q key separately - should work regardless of other keys
+      if (e.key.toLowerCase() === 'q' || e.code === 'KeyQ') {
+        console.log('Q key pressed - starting cash out. Key details:', {
+          key: e.key,
+          code: e.code,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          altKey: e.altKey
+        });
         setQKeyPressed(true);
-        if (!cashingOut) {
+        qKeyPressedRef.current = true;
+        if (!cashingOutRef.current) {
           // Start cash-out process only if Q is pressed
+          const startTime = Date.now();
           setCashingOut(true);
-          setCashOutStartTime(Date.now());
+          cashingOutRef.current = true;
+          setCashOutStartTime(startTime);
+          cashOutStartTimeRef.current = startTime;
           setCashOutProgress(0);
+          console.log('Cash out started at:', startTime);
+          console.log('Current refs - cashingOut:', cashingOutRef.current, 'qKeyPressed:', qKeyPressedRef.current);
         }
       }
     };
@@ -1354,10 +1552,15 @@ export default function GamePage() {
       if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsBoosting(false);
         snake.setBoost(false);
-      } else if (e.key.toLowerCase() === 'q') {
+      }
+      
+      // Handle Q key release separately
+      if (e.key.toLowerCase() === 'q' || e.code === 'KeyQ') {
+        console.log('Q key released - cancelling cash out');
         setQKeyPressed(false);
+        qKeyPressedRef.current = false;
         // Cancel cash-out process when Q is released
-        if (cashingOut) {
+        if (cashingOutRef.current) {
           console.log('Cash-out cancelled - Q key released');
           
           // Send cancellation message to other players
@@ -1369,14 +1572,31 @@ export default function GamePage() {
           }
         }
         setCashingOut(false);
+        cashingOutRef.current = false;
         setCashOutProgress(0);
         setCashOutStartTime(null);
+        cashOutStartTimeRef.current = null;
       }
     };
 
     const handleMouseDown = () => {
       setIsBoosting(true);
       snake.setBoost(true);
+      
+      // End ghost mode if player boosts
+      if (isGhostMode) {
+        setIsGhostMode(false);
+        setGhostModeEndTime(null);
+        console.log(`👻 Ghost mode ended early (player boosted via mouse)`);
+        
+        // Notify server
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'ghostModeEnd',
+            reason: 'boost'
+          }));
+        }
+      }
     };
 
     const handleMouseUp = () => {
@@ -1476,6 +1696,13 @@ export default function GamePage() {
       const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.05); // Cap at 50ms (20fps minimum)
       setLastFrameTime(currentTime);
       
+      // Handle ghost mode expiration
+      if (isGhostMode && ghostModeEndTime && currentTime >= ghostModeEndTime) {
+        setIsGhostMode(false);
+        setGhostModeEndTime(null);
+        console.log(`👻 Ghost mode expired`);
+      }
+      
       // Process growth at 10 mass per second rate
       snake.processGrowth(deltaTime);
       
@@ -1485,16 +1712,35 @@ export default function GamePage() {
         snake.move(Math.cos(snake.currentAngle), Math.sin(snake.currentAngle));
       } else {
         // Normal mouse control
+        const prevX = snake.head.x;
+        const prevY = snake.head.y;
         snake.move(mouseDirection.x, mouseDirection.y);
+        
+        // Check if player moved and end ghost mode early
+        if (isGhostMode && (Math.abs(snake.head.x - prevX) > 0.1 || Math.abs(snake.head.y - prevY) > 0.1)) {
+          setIsGhostMode(false);
+          setGhostModeEndTime(null);
+          console.log(`👻 Ghost mode ended early (player moved)`);
+          
+          // Notify server
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'ghostModeEnd',
+              reason: 'movement'
+            }));
+          }
+        }
       }
 
       // Bot AI disabled - bots controlled by server
 
       // Update cash-out progress - only if Q is still being held
-      if (cashingOut && cashOutStartTime && qKeyPressed) {
-        const elapsed = currentTime - cashOutStartTime;
+      if (cashingOutRef.current && cashOutStartTimeRef.current && qKeyPressedRef.current) {
+        const elapsed = currentTime - cashOutStartTimeRef.current;
         const progress = Math.min(elapsed / 3000, 1); // 3 seconds = 100%
         setCashOutProgress(progress);
+        
+        console.log(`Cash out progress: ${(progress * 100).toFixed(1)}% (${elapsed}ms elapsed)`);
         
         // Send cash-out progress to other players every frame for smooth updates
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1507,8 +1753,24 @@ export default function GamePage() {
         
         // Complete cash-out after 3 seconds
         if (progress >= 1) {
+          console.log('Cash out completed! Progress reached 100%');
           const amount = snake.money;
           console.log(`Cashed out $${amount.toFixed(2)}! Returning to home page.`);
+          
+          // Handle successful cash-out with betting system
+          if (currentBetAmount > 0 && currentUserId) {
+            const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+            const finalMass = snake.totalMass;
+            
+            // Calculate winnings based on final mass and time
+            const baseMultiplier = Math.min(5, Math.max(0.5, (finalMass / 10) * (timeAlive / 60)));
+            const winnings = currentBetAmount * baseMultiplier;
+            
+            console.log(`🎯 Cash-out Result - Mass: ${finalMass}, Time: ${timeAlive}s, Bet: $${currentBetAmount}, Winnings: $${winnings.toFixed(2)}`);
+            
+            // Player successfully cashed out - they win!
+            handleGameResult(finalMass, timeAlive);
+          }
           
           // Send completion message to other players
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1536,9 +1798,12 @@ export default function GamePage() {
           
           // Reset cash-out state
           setCashingOut(false);
+          cashingOutRef.current = false;
           setCashOutProgress(0);
           setCashOutStartTime(null);
+          cashOutStartTimeRef.current = null;
           setQKeyPressed(false);
+          qKeyPressedRef.current = false;
           
           // Store celebration data for home page
           localStorage.setItem('cashOutCelebration', JSON.stringify({ amount }));
@@ -1558,7 +1823,7 @@ export default function GamePage() {
           
           console.log('🏠 Returned to home page after cash out');
         }
-      } else if (cashingOut && !qKeyPressed) {
+      } else if (cashingOutRef.current && !qKeyPressedRef.current) {
         // Q was released, cancel cash-out  
         console.log('Cash-out cancelled - Q key released during game loop');
         
@@ -1571,8 +1836,17 @@ export default function GamePage() {
         }
         
         setCashingOut(false);
+        cashingOutRef.current = false;
         setCashOutProgress(0);
         setCashOutStartTime(null);
+        cashOutStartTimeRef.current = null;
+      } else if (cashingOutRef.current) {
+        console.log(`Cash out blocked - cashingOut:${cashingOutRef.current}, cashOutStartTime:${cashOutStartTimeRef.current}, qKeyPressed:${qKeyPressedRef.current}`);
+      }
+
+      // Debug: Log game loop status every 2 seconds
+      if (currentTime % 2000 < 16) {
+        console.log(`Game loop running - cashingOut:${cashingOutRef.current}, qKeyPressed:${qKeyPressedRef.current}, gameStarted:${gameStarted}`);
       }
 
       // Smooth interpolation for other players only
@@ -1706,9 +1980,10 @@ export default function GamePage() {
         let filteredFoods = updatedFoods.filter(food => !consumedFoodIds.includes(food.id));
         
         // Spawn new food to maintain constant count
-        const newFoodCount = FOOD_COUNT - filteredFoods.length;
+        const targetFoodCount = getFoodCount(arenaSize);
+        const newFoodCount = targetFoodCount - filteredFoods.length;
         for (let i = 0; i < newFoodCount; i++) {
-          filteredFoods.push(createFood(`food_${Date.now()}_${i}`));
+          filteredFoods.push(createFood(`food_${Date.now()}_${i}`, arenaSize));
         }
         
         return filteredFoods;
@@ -1718,11 +1993,15 @@ export default function GamePage() {
       const eyePositions = snake.getEyePositions();
       let hitBoundary = false;
       
+      const eyeMapCenterX = getMapCenterX(arenaSize);
+      const eyeMapCenterY = getMapCenterY(arenaSize);
+      const eyeMapRadius = getMapRadius(arenaSize);
+      
       for (const eye of eyePositions) {
         const distanceFromCenter = Math.sqrt(
-          (eye.x - MAP_CENTER_X) ** 2 + (eye.y - MAP_CENTER_Y) ** 2
+          (eye.x - eyeMapCenterX) ** 2 + (eye.y - eyeMapCenterY) ** 2
         );
-        if (distanceFromCenter > MAP_RADIUS) {
+        if (distanceFromCenter > eyeMapRadius) {
           hitBoundary = true;
           break;
         }
@@ -1733,6 +2012,9 @@ export default function GamePage() {
         
         // Calculate time alive in seconds
         const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+        
+        // Handle game result with betting system
+        handleGameResult(snake.totalMass, timeAlive);
         
         // Store game over data for home page
         localStorage.setItem('gameOverData', JSON.stringify({
@@ -1801,6 +2083,9 @@ export default function GamePage() {
         // Calculate time alive in seconds
         const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
         
+        // Handle game result with betting system
+        handleGameResult(snake.totalMass, timeAlive);
+        
         // Store game over data for home page
         localStorage.setItem('gameOverData', JSON.stringify({
           finalMass: snake.totalMass,
@@ -1860,6 +2145,13 @@ export default function GamePage() {
         
         if (headOnCollision) {
           console.log(`💀 HEAD-ON COLLISION WITH BOT - Instant return to home`);
+          
+          // Calculate time alive in seconds
+          const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+          
+          // Handle game result with betting system
+          handleGameResult(snake.totalMass, timeAlive);
+          
           // Drop money crates before clearing snake
           dropMoneyCrates(snake.money, snake.totalMass);
           
@@ -1942,13 +2234,14 @@ export default function GamePage() {
 
       // Server food system removed
 
-      // Check for collisions with other players' snakes
-      for (const otherPlayer of otherPlayers) {
-        if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
-        // Skip collision with dead players (check if they have any meaningful segments)
-        if (otherPlayer.isDead || otherPlayer.gameOver) continue;
-        // Skip players with very few segments (likely dead/disconnected)
-        if (otherPlayer.segments.length < 2) continue;
+      // Check for collisions with other players' snakes (skip if in ghost mode)
+      if (!isGhostMode) {
+        for (const otherPlayer of otherPlayers) {
+          if (!otherPlayer.segments || otherPlayer.segments.length === 0) continue;
+          // Skip collision with dead players (check if they have any meaningful segments)
+          // Note: otherPlayer status is handled by segments check below
+          // Skip players with very few segments (likely dead/disconnected)
+          if (otherPlayer.segments.length < 2) continue;
         
         for (const segment of otherPlayer.segments) {
           const dist = Math.sqrt((snake.head.x - segment.x) ** 2 + (snake.head.y - segment.y) ** 2);
@@ -1960,6 +2253,9 @@ export default function GamePage() {
             
             // Calculate time alive in seconds
             const timeAlive = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+            
+            // Handle game result with betting system
+            handleGameResult(snake.totalMass, timeAlive);
             
             // Store game over data for home page
             localStorage.setItem('gameOverData', JSON.stringify({
@@ -2000,9 +2296,11 @@ export default function GamePage() {
             return; // Stop the game loop
           }
         }
-      }
+        }
+      } // End ghost mode protection
 
-      // Check for collisions with server players' snakes
+      // Check for collisions with server players' snakes (skip if in ghost mode)
+      if (!isGhostMode) {
       for (const serverPlayer of serverPlayers) {
         if (!serverPlayer.segments || serverPlayer.segments.length === 0) continue;
         if (serverPlayer.id === myPlayerId) continue; // Skip self
@@ -2053,6 +2351,7 @@ export default function GamePage() {
           }
         }
       }
+      } // End ghost mode protection for server players
 
       // Calculate target zoom based on snake segments (capped at 130 segments)
       const segmentCount = snake.visibleSegments.length;
@@ -2088,7 +2387,8 @@ export default function GamePage() {
 
       // Draw background image across the full map area if loaded
       if (backgroundImage) {
-        const mapSize = MAP_RADIUS * 2.5;
+        const mapRadius = getMapRadius(arenaSize);
+        const mapSize = mapRadius * 2.5;
         // Draw background image tiled across the entire game area
         const pattern = ctx.createPattern(backgroundImage, 'repeat');
         if (pattern) {
@@ -2101,10 +2401,13 @@ export default function GamePage() {
       ctx.save();
       
       // Create a clipping path for the area outside the safe zone
-      const mapSize = MAP_RADIUS * 2.5;
+      const renderMapRadius = getMapRadius(arenaSize);
+      const renderMapCenterX = getMapCenterX(arenaSize);
+      const renderMapCenterY = getMapCenterY(arenaSize);
+      const mapSize = renderMapRadius * 2.5;
       ctx.beginPath();
       ctx.rect(-mapSize, -mapSize, mapSize * 2, mapSize * 2); // Full map area
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
+      ctx.arc(renderMapCenterX, renderMapCenterY, renderMapRadius, 0, Math.PI * 2, true); // Subtract safe zone (clockwise)
       ctx.clip();
       
       // Fill only the clipped area (outside the circle) with green overlay
@@ -2117,7 +2420,7 @@ export default function GamePage() {
       ctx.strokeStyle = '#53d392';
       ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.arc(MAP_CENTER_X, MAP_CENTER_Y, MAP_RADIUS, 0, Math.PI * 2);
+      ctx.arc(renderMapCenterX, renderMapCenterY, renderMapRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // Draw food particles as solid circles with attraction indicators
@@ -2234,11 +2537,82 @@ export default function GamePage() {
       });
       ctx.restore();
 
+      // Draw server bots first (they're behind players)
+      if (serverBots && serverBots.length > 0) {
+        console.log(`🤖 Drawing ${serverBots.length} server bots`);
+        serverBots.forEach((bot, botIndex) => {
+          if (bot.segments && bot.segments.length > 0) {
+            ctx.save();
+            
+            // Add subtle shadow for bots
+            ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            
+            // Draw bot segments from tail to head
+            for (let i = bot.segments.length - 1; i >= 0; i--) {
+              const segment = bot.segments[i];
+              const segmentRadius = bot.segmentRadius || 8; // Slightly smaller than players
+              
+              ctx.fillStyle = bot.color || '#6b7280'; // Gray color for bots
+              ctx.beginPath();
+              ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            
+            // Draw bot eyes if it has segments
+            if (bot.segments.length > 0) {
+              const head = bot.segments[0];
+              
+              // Calculate movement angle for eye direction
+              let movementAngle = 0;
+              if (bot.segments.length > 1) {
+                const dx = head.x - bot.segments[1].x;
+                const dy = head.y - bot.segments[1].y;
+                movementAngle = Math.atan2(dy, dx);
+              }
+              
+              const eyeDistance = 4;
+              const eyeSize = 2;
+              const pupilSize = 1;
+              
+              // Eye positions
+              const eye1X = head.x + Math.cos(movementAngle + Math.PI/2) * eyeDistance;
+              const eye1Y = head.y + Math.sin(movementAngle + Math.PI/2) * eyeDistance;
+              const eye2X = head.x + Math.cos(movementAngle - Math.PI/2) * eyeDistance;
+              const eye2Y = head.y + Math.sin(movementAngle - Math.PI/2) * eyeDistance;
+              
+              // Draw eyes
+              ctx.fillStyle = 'white';
+              ctx.beginPath();
+              ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
+              ctx.fill();
+              
+              // Draw pupils
+              ctx.fillStyle = 'black';
+              ctx.beginPath();
+              ctx.arc(eye1X + Math.cos(movementAngle) * 0.8, eye1Y + Math.sin(movementAngle) * 0.8, pupilSize, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(eye2X + Math.cos(movementAngle) * 0.8, eye2Y + Math.sin(movementAngle) * 0.8, pupilSize, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            
+            ctx.restore();
+          }
+        });
+      }
+
       // Draw only OTHER server players (exclude yourself) - limit rendering for performance
       const otherServerPlayers = serverPlayers.filter(player => player.id !== myPlayerId);
-      // Only log every 30th frame to reduce console spam
-      if (currentTime % 30 === 0) {
-        console.log(`Drawing ${otherServerPlayers.length} other players (excluding self)`);
+      // Debug logging - temporary
+      if (otherServerPlayers.length > 0 && currentTime % 60 === 0) {
+        console.log(`🎮 Drawing ${otherServerPlayers.length} other players (excluding self: ${myPlayerId})`);
+        console.log(`🎮 Other player IDs:`, otherServerPlayers.map(p => `${p.id}${p.isBot ? ' (BOT)' : ''}`));
       }
       otherServerPlayers.forEach((serverPlayer, playerIndex) => {
         if (serverPlayer.segments && serverPlayer.segments.length > 0) {
@@ -2593,10 +2967,19 @@ export default function GamePage() {
           const segment = snake.visibleSegments[i];
           const segmentRadius = snake.getSegmentRadius();
           
-          ctx.globalAlpha = segment.opacity;
+          // Apply ghost mode transparency and pulsing effect
+          if (isGhostMode) {
+            const pulsePhase = Math.sin(Date.now() * 0.008) * 0.2 + 0.8; // Pulse between 0.6 and 1.0
+            ctx.globalAlpha = segment.opacity * 0.4 * pulsePhase; // Make semi-transparent and pulsing
+            
+            // Add ghostly blue tint
+            ctx.fillStyle = "#4a90e2"; // Light blue ghost color
+          } else {
+            ctx.globalAlpha = segment.opacity;
+            ctx.fillStyle = "#d55400"; // Normal orange color
+          }
           
           // Draw solid segment
-          ctx.fillStyle = "#d55400";
           ctx.beginPath();
           ctx.arc(segment.x, segment.y, segmentRadius, 0, Math.PI * 2);
           ctx.fill();
@@ -2747,9 +3130,11 @@ export default function GamePage() {
     setScore(0);
     setShowCongrats(false);
     // Reset snake to initial state using new system
-    snake.head = { x: MAP_CENTER_X, y: MAP_CENTER_Y };
+    const mapCenterX = getMapCenterX(arenaSize);
+    const mapCenterY = getMapCenterY(arenaSize);
+    snake.head = { x: mapCenterX, y: mapCenterY };
     snake.currentAngle = 0;
-    snake.segmentTrail = [{ x: MAP_CENTER_X, y: MAP_CENTER_Y }];
+    snake.segmentTrail = [{ x: mapCenterX, y: mapCenterY }];
     snake.totalMass = snake.START_MASS;
     snake.growthRemaining = 0;
     snake.partialGrowth = 0; // Reset partialGrowth for faster mass conversion
@@ -2806,8 +3191,8 @@ export default function GamePage() {
             {/* Player snake dot (red) */}
             {snake.visibleSegments.length > 0 && (
               <circle
-                cx={48 + ((snake.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((snake.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((snake.head.x - getMapCenterX(arenaSize)) / getMapRadius(arenaSize)) * 44}
+                cy={48 + ((snake.head.y - getMapCenterY(arenaSize)) / getMapRadius(arenaSize)) * 44}
                 r="2"
                 fill="#ff4444"
               />
@@ -2817,8 +3202,8 @@ export default function GamePage() {
             {botSnakes.map(bot => (
               <circle
                 key={bot.id}
-                cx={48 + ((bot.head.x - MAP_CENTER_X) / MAP_RADIUS) * 44}
-                cy={48 + ((bot.head.y - MAP_CENTER_Y) / MAP_RADIUS) * 44}
+                cx={48 + ((bot.head.x - getMapCenterX(arenaSize)) / getMapRadius(arenaSize)) * 44}
+                cy={48 + ((bot.head.y - getMapCenterY(arenaSize)) / getMapRadius(arenaSize)) * 44}
                 r="1.5"
                 fill={bot.color}
               />
@@ -2838,6 +3223,11 @@ export default function GamePage() {
           <div className="text-white text-xs font-mono">
             Players: {serverPlayers.length}
           </div>
+          {isGhostMode && (
+            <div className="text-blue-400 text-xs font-mono animate-pulse">
+              👻 INVINCIBLE
+            </div>
+          )}
         </div>
       </div>
 
@@ -2853,11 +3243,36 @@ export default function GamePage() {
         </div>
       </div>
 
+      {/* Betting Information */}
+      {currentBetAmount > 0 && (
+        <div className="absolute top-32 right-4 z-10">
+          <div className="bg-black/60 border border-green-500 rounded px-3 py-2">
+            <div className="text-green-400 text-sm font-mono">
+              Bet: ${currentBetAmount}
+            </div>
+            <div className="text-gray-300 text-xs font-mono">
+              Hold Wallet Active
+            </div>
+            {gameStartTime && (
+              <div className="text-yellow-400 text-xs font-mono mt-1">
+                Multiplier: {Math.min(5, Math.max(0.5, (snake.totalMass / 10) * (Math.floor((Date.now() - gameStartTime) / 1000) / 60))).toFixed(2)}x
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-black/60 border border-gray-500 rounded px-3 py-2">
           <div className="text-white text-sm font-mono">Hold Q to cash out</div>
           <div className="text-white text-sm font-mono">Left click to boost</div>
+          {currentBetAmount > 0 && (
+            <>
+              <div className="text-green-400 text-sm font-mono mt-2">💰 Bet: ${currentBetAmount}</div>
+              <div className="text-yellow-400 text-xs font-mono">Survive longer for bigger winnings!</div>
+            </>
+          )}
         </div>
       </div>
       
@@ -2867,7 +3282,7 @@ export default function GamePage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
           <div className="bg-dark-card/90 backdrop-blur-sm border border-dark-border rounded-lg p-8 text-center">
             <div className="text-green-500 text-4xl font-bold mb-4">Congratulations!</div>
-            <div className="text-white text-2xl mb-2">You cashed out!</div>
+            <div className="text-white text-2xl mb-2">PumpGames.Fun Cash Out!</div>
             <div className="text-neon-yellow text-xl mb-6">${cashedOutAmount.toFixed(2)}</div>
             <div className="flex gap-4">
               <Button
@@ -2891,7 +3306,7 @@ export default function GamePage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
           <div className="bg-dark-card/90 backdrop-blur-sm border border-neon-green rounded-lg p-8 text-center">
             <div className="text-neon-green text-4xl font-bold mb-4">Congratulations!</div>
-            <div className="text-white text-2xl mb-2">You cashed out:</div>
+            <div className="text-white text-2xl mb-2">PumpGames.Fun Cash Out:</div>
             <div className="text-neon-yellow text-3xl font-bold mb-6">${cashedOutAmount.toFixed(2)}</div>
             <div className="flex gap-4 justify-center">
               <Button

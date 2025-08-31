@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { fullUrl } from "@/lib/queryClient";
 import { Copy, RefreshCw, Plus, DollarSign } from "lucide-react";
 
 export function Wallet() {
@@ -13,7 +13,7 @@ export function Wallet() {
   const { toast } = useToast();
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
   const [isCashOutOpen, setIsCashOutOpen] = useState(false);
-  const [addAmount, setAddAmount] = useState("");
+  const [addFundsAmount, setAddFundsAmount] = useState("");
   const [cashOutAmount, setCashOutAmount] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -43,7 +43,8 @@ export function Wallet() {
   };
 
   const handleAddFunds = async () => {
-    const amount = parseFloat(addAmount);
+    const amount = parseFloat(addFundsAmount);
+    
     if (isNaN(amount) || amount <= 0) {
       toast({
         title: "Invalid Amount",
@@ -54,17 +55,26 @@ export function Wallet() {
     }
 
     try {
-      const response = await apiRequest("POST", `/api/users/${user.id}/update-balance`, {
-        amount: amount
+      const response = await fetch(fullUrl(`/api/users/${user.id}/update-balance`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amount: amount }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const updatedUser = await response.json();
       updateUser(updatedUser);
       
       setIsAddFundsOpen(false);
-      setAddAmount("");
+      setAddFundsAmount("");
       
       toast({
-        title: "Funds Added",
+        title: "Funds Added Successfully",
         description: `Successfully added $${amount.toFixed(2)} to your wallet`,
       });
     } catch (error) {
@@ -78,7 +88,7 @@ export function Wallet() {
 
   const handleCashOut = async () => {
     const amount = parseFloat(cashOutAmount);
-    const userBalance = parseFloat(user.balance);
+    const userBalance = user.balance;
     
     if (isNaN(amount) || amount <= 0) {
       toast({
@@ -99,9 +109,18 @@ export function Wallet() {
     }
 
     try {
-      const response = await apiRequest("POST", `/api/users/${user.id}/update-balance`, {
-        amount: -amount
+      const response = await fetch(fullUrl(`/api/users/${user.id}/update-balance`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amount: -amount }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const updatedUser = await response.json();
       updateUser(updatedUser);
       
@@ -155,10 +174,10 @@ export function Wallet() {
           {/* Balance display */}
           <div className="text-center">
             <div className="neon-yellow text-4xl font-bold mb-1">
-              ${parseFloat(user.balance).toFixed(2)}
+              ${user.balance.toFixed(2)}
             </div>
             <div className="text-gray-400 text-sm">
-              {parseFloat(user.solBalance).toFixed(8)} SOL
+              {user.balance.toFixed(2)} USD
             </div>
           </div>
 
@@ -179,8 +198,8 @@ export function Wallet() {
                   <Input
                     type="number"
                     placeholder="Amount in USD"
-                    value={addAmount}
-                    onChange={(e) => setAddAmount(e.target.value)}
+                    value={addFundsAmount}
+                    onChange={(e) => setAddFundsAmount(e.target.value)}
                     className="bg-dark-bg border-dark-border"
                     min="0"
                     step="0.01"
@@ -212,16 +231,16 @@ export function Wallet() {
                 <div className="space-y-4">
                   <Input
                     type="number"
-                    placeholder="Amount in USD"
+                    placeholder="Enter amount"
                     value={cashOutAmount}
                     onChange={(e) => setCashOutAmount(e.target.value)}
-                    className="bg-dark-bg border-dark-border"
-                    min="0"
-                    max={parseFloat(user.balance)}
+                    min="1"
                     step="0.01"
+                    max={user.balance}
+                    className="bg-dark-input border-dark-border text-white"
                   />
-                  <div className="text-sm text-gray-400">
-                    Available: ${parseFloat(user.balance).toFixed(2)} • Minimum: $1.00
+                  <div className="text-gray-400 text-xs">
+                    Available: ${user.balance.toFixed(2)} • Minimum: $1.00
                   </div>
                   <Button 
                     onClick={handleCashOut}

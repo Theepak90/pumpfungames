@@ -1,64 +1,66 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage";
-import {
-  insertUserSchema,
-  insertGameSchema,
-} from "@shared/schema";
-import { z } from "zod";
+// Removed database dependencies for simple auth
+import { registerUser, loginUser } from "./simple-auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
 
 
-  // Auth routes
-  app.post("/api/auth/register", async (req, res) => {
+  // Simple Auth routes
+  app.post("/api/auth/register", (req, res) => {
     try {
-      const { username, password } = insertUserSchema.parse(req.body);
-      
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already taken" });
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
       }
 
-      const user = await storage.createUser({
-        username,
-        password, // In production, this should be hashed
-        balance: "10.0000", // Start with $10
-        solBalance: "0.05000000", // Start with some SOL
-        totalEarnings: "0.00",
-        gamesPlayed: 0,
-        kills: 0,
-        deaths: 0,
-        snakeColor: "#00FF88",
-        isOnline: false
-      });
-
-      res.json({ user: { ...user, password: undefined } });
+      const result = registerUser(username, password);
+      
+      if (result.success) {
+        res.json({ 
+          user: result.user,
+          message: result.message 
+        });
+      } else {
+        res.status(400).json({ message: result.message });
+      }
     } catch (error) {
-      res.status(400).json({ message: "Invalid registration data" });
+      console.error('Registration error:', error);
+      res.status(400).json({ message: "Registration failed" });
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", (req, res) => {
     try {
-      const { username, password } = z.object({
-        username: z.string(),
-        password: z.string()
-      }).parse(req.body);
+      const { username, password } = req.body;
 
-      const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
       }
 
-      await storage.updateUser(user.id, { isOnline: true });
-      res.json({ user: { ...user, password: undefined } });
+      const result = loginUser(username, password);
+      
+      if (result.success) {
+        res.json({ 
+          user: result.user,
+          message: result.message 
+        });
+      } else {
+        res.status(401).json({ message: result.message });
+      }
     } catch (error) {
-      res.status(400).json({ message: "Invalid login data" });
+      console.error('Login error:', error);
+      res.status(401).json({ message: "Login failed" });
     }
+  });
+
+  // Simple logout
+  app.post("/api/auth/logout", (req, res) => {
+    res.json({ message: "Logged out successfully" });
   });
 
   // User routes
